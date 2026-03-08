@@ -20,14 +20,55 @@ interface InputAreaProps {
   compact?: boolean;
   activeNote?: Note;
   mobileSidePanel?: boolean;
+  // Lifted State Props (Optional)
+  proMode?: ProMode;
+  setProMode?: (mode: ProMode) => void;
+  isAgentMode?: boolean;
+  setIsAgentMode?: (isAgent: boolean) => void;
+  isLongThinking?: boolean;
+  setIsLongThinking?: (isThinking: boolean) => void;
 }
 
-export const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onStop, isThinking, centered = false, settings, notes = [], spaces = [], activeSpaceId, onSelectSpace, onNewSpace, placeholder, compact = false, mobileSidePanel = false }) => {
+export const InputArea: React.FC<InputAreaProps> = ({ 
+    onSendMessage, 
+    onStop, 
+    isThinking, 
+    centered = false, 
+    settings, 
+    notes = [], 
+    spaces = [], 
+    activeSpaceId, 
+    onSelectSpace, 
+    onNewSpace, 
+    placeholder, 
+    compact = false, 
+    mobileSidePanel = false,
+    // Lifted State Props
+    proMode: propProMode,
+    setProMode: propSetProMode,
+    isAgentMode: propIsAgentMode,
+    setIsAgentMode: propSetIsAgentMode,
+    isLongThinking: propIsLongThinking,
+    setIsLongThinking: propSetIsLongThinking,
+}) => {
   const [input, setInput] = useState('');
   const [focusMode, setFocusMode] = useState<FocusMode>(FocusMode.WEB_SEARCH);
-  const [proMode, setProMode] = useState<ProMode>(ProMode.STANDARD);
-  const [isAgentMode, setIsAgentMode] = useState(false);
-  const [isLongThinking, setIsLongThinking] = useState(false);
+  
+  // Local State Fallbacks
+  const [localProMode, setLocalProMode] = useState<ProMode>(ProMode.STANDARD);
+  const [localIsAgentMode, setLocalIsAgentMode] = useState(false);
+  const [localIsLongThinking, setLocalIsLongThinking] = useState(false);
+
+  // Use props if available, otherwise local state
+  const proMode = propProMode !== undefined ? propProMode : localProMode;
+  const setProMode = propSetProMode || setLocalProMode;
+
+  const isAgentMode = propIsAgentMode !== undefined ? propIsAgentMode : localIsAgentMode;
+  const setIsAgentMode = propSetIsAgentMode || setLocalIsAgentMode;
+
+  const isLongThinking = propIsLongThinking !== undefined ? propIsLongThinking : localIsLongThinking;
+  const setIsLongThinking = propSetIsLongThinking || setLocalIsLongThinking;
+
   const [deepResearchMode, setDeepResearchMode] = useState<'Standard' | 'Advanced'>('Standard');
   const [deepResearchPages, setDeepResearchPages] = useState(5);
   const [thinkingDepth, setThinkingDepth] = useState(4000);

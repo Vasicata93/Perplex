@@ -65,6 +65,30 @@ function App() {
   const [isThinking, setIsThinking] = useState(false);
   const [isLearning, setIsLearning] = useState(false); 
   
+  // Input State (Lifted from InputArea for persistence)
+  const [inputProMode, setInputProMode] = useState<ProMode>(() => 
+      (sessionStorage.getItem('pplx_inputProMode') as ProMode) || ProMode.STANDARD
+  );
+  const [inputIsAgentMode, setInputIsAgentMode] = useState(() => 
+      sessionStorage.getItem('pplx_inputIsAgentMode') === 'true'
+  );
+  const [inputIsLongThinking, setInputIsLongThinking] = useState(() => 
+      sessionStorage.getItem('pplx_inputIsLongThinking') === 'true'
+  );
+
+  // Persist Input State
+  useEffect(() => {
+      sessionStorage.setItem('pplx_inputProMode', inputProMode);
+  }, [inputProMode]);
+
+  useEffect(() => {
+      sessionStorage.setItem('pplx_inputIsAgentMode', String(inputIsAgentMode));
+  }, [inputIsAgentMode]);
+
+  useEffect(() => {
+      sessionStorage.setItem('pplx_inputIsLongThinking', String(inputIsLongThinking));
+  }, [inputIsLongThinking]);
+  
   // Scroll State
   const [showScrollButton, setShowScrollButton] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -2057,6 +2081,12 @@ function App() {
                             activeSpaceId={activeSpaceId}
                             onSelectSpace={handleSelectSpace}
                             onNewSpace={() => setSpacesModalOpen(true)}
+                            proMode={inputProMode}
+                            setProMode={setInputProMode}
+                            isAgentMode={inputIsAgentMode}
+                            setIsAgentMode={setInputIsAgentMode}
+                            isLongThinking={inputIsLongThinking}
+                            setIsLongThinking={setInputIsLongThinking}
                           />
                     </div>
                 </div>
