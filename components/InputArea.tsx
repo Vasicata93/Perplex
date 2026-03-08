@@ -1,0 +1,1041 @@
+
+
+import React, { useState, useRef, useEffect } from 'react';
+import { ArrowUp, Plus, Mic, X, Camera, Image as ImageIcon, File, Cpu, Monitor, Square, Globe, Zap, Search, CheckCircle2, ChevronRight, Bot, Brain, FolderPlus, Plug } from 'lucide-react';
+import { FocusMode, Attachment, AppSettings, ModelProvider, ProMode, Note, Space } from '../types';
+import { FOCUS_MODES, PRO_MODES } from '../constants';
+
+interface InputAreaProps {
+  onSendMessage: (text: string, focusMode: FocusMode, proMode: ProMode, attachments: Attachment[], modelId?: string, isAgentMode?: boolean) => void;
+  onStop?: () => void;
+  isThinking: boolean;
+  centered?: boolean;
+  settings?: AppSettings;
+  notes?: Note[]; 
+  spaces?: Space[];
+  activeSpaceId?: string | null;
+  onSelectSpace?: (id: string | null) => void;
+  onNewSpace?: () => void;
+  placeholder?: string;
+  compact?: boolean;
+  activeNote?: Note;
+  mobileSidePanel?: boolean;
+}
+
+export const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onStop, isThinking, centered = false, settings, notes = [], spaces = [], activeSpaceId, onSelectSpace, onNewSpace, placeholder, compact = false, mobileSidePanel = false }) => {
+  const [input, setInput] = useState('');
+  const [focusMode, setFocusMode] = useState<FocusMode>(FocusMode.WEB_SEARCH);
+  const [proMode, setProMode] = useState<ProMode>(ProMode.STANDARD);
+  const [isAgentMode, setIsAgentMode] = useState(false);
+  const [isLongThinking, setIsLongThinking] = useState(false);
+  const [deepResearchMode, setDeepResearchMode] = useState<'Standard' | 'Advanced'>('Standard');
+  const [deepResearchPages, setDeepResearchPages] = useState(5);
+  const [thinkingDepth, setThinkingDepth] = useState(4000);
+  
+  // Library Selection State
+  const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
+  const [librarySearch, setLibrarySearch] = useState('');
+  
+  // Menus
+  const [showFocusMenu, setShowFocusMenu] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showModelMenu, setShowModelMenu] = useState(false);
+  
+  // Accordion States for Attach Menu
+  const [isSkillsExpanded, setIsSkillsExpanded] = useState(false);
+  const [isProjectsExpanded, setIsProjectsExpanded] = useState(false);
+  const [isConnectorsExpanded, setIsConnectorsExpanded] = useState(false);
+
+  // Tooltip State
+  const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null);
+
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  
+  // Voice Input State
+  const [isListening, setIsListening] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [detectedLangDisplay, setDetectedLangDisplay] = useState<string>(''); // For UI display (RO/EN)
+  
+  const recognitionRef = useRef<any>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const focusMenuRef = useRef<HTMLDivElement>(null);
+  const attachMenuRef = useRef<HTMLDivElement>(null);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
+  
+  // Specific refs for different input types
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Initialize selected model from settings
+  useEffect(() => {
+    if (settings) {
+        // Only update if we aren't currently overriding locally or if the setting changed drastically
+        if (settings.modelProvider === ModelProvider.GEMINI) {
+            setSelectedModelId('gemini-pro');
+        } else if (settings.modelProvider === ModelProvider.OPENROUTER) {
+            setSelectedModelId('openrouter');
+        } else if (settings.modelProvider === ModelProvider.OPENAI) {
+            setSelectedModelId('openai');
+        } else {
+            setSelectedModelId(settings.activeLocalModelId);
+        }
+        
+        if (settings.defaultProMode) {
+            setProMode(settings.defaultProMode);
+        }
+    }
+  }, [settings]);
+
+  // --- Voice Input Logic (Professional) ---
+  const stopListening = () => {
+      if (recognitionRef.current) {
+          recognitionRef.current.stop();
+          recognitionRef.current = null;
+      }
+      if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+      }
+      setIsListening(false);
+      setRecordingSeconds(0);
+      setDetectedLangDisplay('');
+  };
+
+  const handleVoiceInput = () => {
+    // 1. If active, stop it
+    if (isListening) {
+        stopListening();
+        return;
+    }
+
+    // 2. Check Support
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        alert("Speech recognition is not supported in this browser.");
+        return;
+    }
+
+    // 3. Initialize
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    
+    // Configuration for "Professional" feel
+    // FIX: Disable continuous mode on mobile to prevent text duplication bugs (Android Chrome issue)
+    const isMobile = window.innerWidth < 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    recognition.continuous = !isMobile; 
+    recognition.interimResults = true; // Show results in real-time
+    
+    // --- SMART AUTO-DETECT LOGIC ---
+    const appInterfaceRo = settings?.interfaceLanguage === 'ro';
+    const aiResponseRo = settings?.aiProfile?.language === 'Romanian';
+    const sysLangs = navigator.languages || [navigator.language];
+    const systemRo = sysLangs.some(l => l && l.toLowerCase().includes('ro'));
+
+    // Priority Logic: If ANY indicator points to Romanian, use 'ro-RO'.
+    const langCode = (appInterfaceRo || aiResponseRo || systemRo) ? 'ro-RO' : 'en-US';
+    
+    recognition.lang = langCode;
+    setDetectedLangDisplay(langCode === 'ro-RO' ? 'RO' : 'EN');
+
+    // 4. Handle Results - MOBILE FIX: Reconstruct transcript from scratch
+    // Capture the text that was already in the input box BEFORE we started speaking
+    const initialText = input;
+
+    recognition.onresult = (event: any) => {
+        let sessionTranscript = '';
+
+        // Iterate through ALL results in the current session.
+        // This is safer than appending because mobile browsers (esp. Android)
+        // can fire events with duplicate 'isFinal' chunks or messy indices.
+        for (let i = 0; i < event.results.length; ++i) {
+            sessionTranscript += event.results[i][0].transcript;
+        }
+
+        // Combine the text that was there before + the new session transcript
+        const separator = (initialText && sessionTranscript && !initialText.endsWith(' ')) ? ' ' : '';
+        setInput(initialText + separator + sessionTranscript);
+    };
+
+    recognition.onerror = (event: any) => {
+        // Ignore "no-speech" errors as they happen during silence in continuous mode
+        if (event.error !== 'no-speech') {
+            console.error("Speech Recognition Error", event.error);
+        }
+        if (event.error === 'not-allowed') {
+            alert("Microphone permission denied.");
+            stopListening();
+        }
+    };
+
+    recognition.onend = () => {
+        if (isListening) {
+             stopListening();
+        }
+    };
+
+    // 5. Start
+    recognitionRef.current = recognition;
+    try {
+        recognition.start();
+        setIsListening(true);
+        
+        // Start Timer
+        setRecordingSeconds(0);
+        timerRef.current = setInterval(() => {
+            setRecordingSeconds(prev => prev + 1);
+        }, 1000);
+    } catch (e) {
+        console.error("Failed to start recognition", e);
+        setIsListening(false);
+    }
+  };
+
+  const formatTimer = (seconds: number) => {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // --- Screen Share Logic ---
+  const handleScreenShare = async () => {
+    // Safety check for mobile browsers
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        alert("Screen sharing is not supported on this device.");
+        return;
+    }
+
+    try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+            video: { cursor: "always" } as any,
+            audio: false
+        });
+
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.autoplay = true;
+        video.muted = true; 
+
+        // Wait for video to load metadata and play to capture a frame
+        video.onloadedmetadata = () => {
+            video.play();
+            // Small delay to ensure the frame is rendered
+            setTimeout(() => {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                
+                if (ctx) {
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const base64Data = canvas.toDataURL('image/jpeg', 0.8);
+
+                    const newAttachment: Attachment = {
+                        type: 'image',
+                        content: base64Data,
+                        mimeType: 'image/jpeg',
+                        name: `Screen ${new Date().toLocaleTimeString()}.jpg`
+                    };
+                    setAttachments(prev => [...prev, newAttachment]);
+                }
+
+                // Stop the stream immediately after capturing the snapshot
+                stream.getTracks().forEach(track => track.stop());
+                video.remove();
+            }, 300);
+        };
+    } catch (err: any) {
+        // Ignore user cancellation errors to prevent console noise
+        if (err.name !== 'NotAllowedError' && err.name !== 'PermissionDeniedError') {
+             console.error("Screen share cancelled or failed:", err);
+        }
+    }
+  };
+
+  // --- File Attachment Logic ---
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = () => {
+            const content = reader.result as string;
+            const isImage = file.type.startsWith('image/');
+            const newAttachment: Attachment = {
+                type: isImage ? 'image' : 'text',
+                content: content,
+                mimeType: file.type,
+                name: file.name
+            };
+            setAttachments(prev => [...prev, newAttachment]);
+            setShowAttachMenu(false);
+        };
+        
+        if (file.type.startsWith('image/')) {
+            reader.readAsDataURL(file);
+        } else {
+            reader.readAsText(file);
+        }
+        e.target.value = '';
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Swipe Logic for Mobile Menu
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientY);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientY);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isSwipeDown = distance < -minSwipeDistance;
+    if (isSwipeDown) {
+      setShowFocusMenu(false);
+    }
+  };
+
+  const onAttachTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isSwipeDown = distance < -minSwipeDistance;
+    if (isSwipeDown) {
+      setShowAttachMenu(false);
+    }
+  };
+
+  // --- Submission Logic ---
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
+  const handleSubmit = () => {
+    if ((input.trim() || attachments.length > 0) && !isThinking) {
+      const finalAttachments = [...attachments];
+
+      // Handle Library Mode: If no specific pages selected, assume ALL
+      // If specific pages selected, only attach those.
+      if (focusMode === FocusMode.LIBRARY || focusMode === FocusMode.ALL) {
+          const notesToAttach = selectedLibraryIds.length === 0 
+            ? notes 
+            : notes.filter(n => selectedLibraryIds.includes(n.id));
+          
+          notesToAttach.forEach(note => {
+             finalAttachments.push({
+                 type: 'text',
+                 content: note.content,
+                 mimeType: 'text/markdown',
+                 name: note.title || 'Untitled Page'
+             });
+          });
+      }
+
+      onSendMessage(input, focusMode, proMode, finalAttachments, selectedModelId || undefined, isAgentMode);
+      setInput('');
+      setAttachments([]);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      // Unified minHeight (approx 42px) to keep the box consistent between Home/Chat
+      // and prevent the "Large" jump on refresh.
+      const minHeight = mobileSidePanel ? 32 : 42; 
+      textareaRef.current.style.height = Math.max(minHeight, Math.min(textareaRef.current.scrollHeight, 160)) + 'px';
+    }
+  }, [input, centered, mobileSidePanel]);
+
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // NOTE: On mobile, clicking "outside" the menu (which is fixed at bottom) usually means clicking the top part of screen.
+      // This logic still holds because the menu refs are distinct from the top of screen.
+      if (focusMenuRef.current && !focusMenuRef.current.contains(event.target as Node)) setShowFocusMenu(false);
+      if (attachMenuRef.current && !attachMenuRef.current.contains(event.target as Node)) setShowAttachMenu(false);
+      if (modelMenuRef.current && !modelMenuRef.current.contains(event.target as Node)) setShowModelMenu(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const activeFocus = FOCUS_MODES.find(m => m.id === focusMode) || FOCUS_MODES[0];
+  const FocusIcon = activeFocus.icon;
+
+  // Responsive Container Class
+  const containerClass = centered 
+    ? `w-full max-w-4xl mx-auto z-20 fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 px-4 md:static md:px-0 md:bottom-auto md:relative transition-all duration-300` 
+    : "w-full max-w-3xl mx-auto z-20 relative transition-all duration-300";
+
+  // Box Styles
+  const boxClass = centered
+    ? "bg-gradient-to-t from-[#0a0a0a] to-[#2a2a2a] border border-white/60 shadow-[0_0_30px_rgba(255,255,255,0.25)] rounded-[24px] flex flex-col transition-all duration-300 md:bg-none md:bg-pplx-card md:border-pplx-border md:shadow-md md:rounded-3xl"
+    : "bg-gradient-to-t from-[#0a0a0a] to-[#2a2a2a] border border-white/60 shadow-[0_0_30px_rgba(255,255,255,0.25)] rounded-[24px] flex flex-col transition-all duration-300 md:bg-none md:bg-pplx-card md:border-pplx-border md:shadow-xl md:rounded-3xl";
+
+  // -- Sizing Constants --
+  const buttonPadding = centered ? 'p-2 sm:px-2.5 sm:py-1.5' : 'p-2 sm:px-2.5 sm:py-1.5';
+  const roundButtonPadding = centered ? 'p-2 sm:p-1.5' : 'p-2 sm:p-1.5';
+  const iconSize = 20; // 20 matches header size
+  
+  // Mobile: Dark circle/pill matching the image (Dark Grey/Black background, Light icon)
+  // Desktop: transparent background, muted text, hover to text-primary
+  const mobileButtonFixedBg = "bg-[#1F1F1F] text-[#E0E0E0] border border-white/5 shadow-lg backdrop-blur-md hover:bg-[#2F2F2F] transition-all sm:bg-transparent dark:sm:bg-transparent sm:text-pplx-muted dark:sm:text-pplx-muted sm:hover:text-pplx-text sm:scale-100 sm:border-none sm:shadow-none sm:hover:bg-transparent";
+
+  // -- Components --
+  const Tooltip = ({ text }: { text: string }) => (
+    <div className="hidden md:block absolute -top-10 left-1/2 transform -translate-x-1/2 bg-black text-white text-[11px] font-medium py-1 px-2.5 rounded shadow-lg whitespace-nowrap z-50 animate-fadeIn pointer-events-none border border-pplx-border">
+        {text}
+        <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 border-t-pplx-border" />
+    </div>
+  );
+
+  return (
+    <div className={containerClass}>
+      <div className={`${boxClass} ${compact ? 'border-none shadow-none bg-transparent' : ''}`}>
+        
+        {/* Attachments Preview */}
+        {attachments.length > 0 && (
+            <div className={`flex gap-2 overflow-x-auto no-scrollbar mb-1 ${centered ? 'px-2 pt-2' : 'px-3 pt-2'}`}>
+                {attachments.map((att, idx) => (
+                    <div key={idx} className="relative group shrink-0 w-12 h-12 rounded-lg border border-pplx-border overflow-hidden bg-pplx-card">
+                        <button 
+                            onClick={() => removeAttachment(idx)}
+                            className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 text-white opacity-0 group-hover:opacity-100 transition-all z-10"
+                        >
+                            <X size={10} />
+                        </button>
+                        {att.type === 'image' ? (
+                            <img src={att.content} alt="preview" className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <File size={18} className="text-pplx-muted" />
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        )}
+
+        {/* Text Area */}
+        <div className={`flex items-start w-full ${compact ? 'px-2 pt-1' : (centered ? 'px-3 pt-2' : 'px-3 pt-2')} ${mobileSidePanel ? '!pt-0 !px-1.5' : ''}`}>
+            <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={isListening ? "Listening..." : (placeholder || (centered ? (isMobile ? "" : "Ask anything...") : "Ask follow-up..."))}
+                className={`w-full bg-transparent text-pplx-text placeholder-gray-500/90 leading-relaxed resize-none outline-none overflow-y-auto max-h-[160px] ${
+                    // Standardized font size logic to keep it compact but readable on mobile home
+                    centered ? 'text-[18px] md:text-lg py-2' : 'text-[16px] py-2'
+                } ${mobileSidePanel ? '!text-[13px] !py-0.5 !leading-tight min-h-[32px]' : ''}`}
+                rows={1}
+                // Lock the input while listening to ensure "Single Path" for voice input on mobile
+                disabled={isThinking}
+                readOnly={isListening} 
+                autoFocus={centered && window.innerWidth > 768}
+            />
+        </div>
+
+        {/* Hidden Inputs */}
+        <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} multiple />
+        <input type="file" ref={imageInputRef} className="hidden" onChange={handleFileSelect} accept="image/*" />
+        <input type="file" ref={cameraInputRef} className="hidden" onChange={handleFileSelect} accept="image/*" capture="environment" />
+
+        {/* Action Bar */}
+        <div className={`flex justify-between items-center ${compact ? 'px-1 pb-1 mt-0.5' : (centered ? 'px-2 pb-2 mt-2 gap-3 md:gap-0' : 'px-2 pb-2 mt-1')} ${mobileSidePanel ? '!mt-0 !pb-1 !px-1' : ''}`}>
+            
+          {/* LEFT GROUP: Attach */}
+          <div className={`flex items-center min-w-0 ${centered ? 'gap-2 md:gap-2' : 'gap-1 md:gap-2'} ${compact ? 'flex-1 mr-2' : ''}`}>
+             
+             {/* Attach Button */}
+             <div ref={attachMenuRef} className={compact ? '' : 'relative flex items-center gap-2'}>
+                 <button 
+                    onClick={() => setShowAttachMenu(!showAttachMenu)}
+                    onMouseEnter={() => setHoveredTooltip('attach')}
+                    onMouseLeave={() => setHoveredTooltip(null)}
+                    disabled={isListening}
+                    className={`relative flex items-center space-x-1 rounded-full hover:text-pplx-text font-medium ${buttonPadding} ${mobileButtonFixedBg} ${mobileSidePanel ? '!p-1.5' : ''}`}
+                 >
+                    <div>
+                        <Plus size={mobileSidePanel ? 16 : iconSize} />
+                    </div>
+                    {hoveredTooltip === 'attach' && !showAttachMenu && <Tooltip text="Attach File" />}
+                 </button>
+
+                 {/* Active Mode Badges (Minimalist) */}
+                 <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-[200px] md:max-w-none mask-linear-fade">
+                    {isAgentMode && (
+                        <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-pplx-accent/10 border border-pplx-accent/20 text-[10px] font-medium text-pplx-accent whitespace-nowrap animate-in fade-in zoom-in duration-200">
+                            <Bot size={10} />
+                            <span>Agent</span>
+                        </div>
+                    )}
+                    {isLongThinking && (
+                        <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-medium text-indigo-400 whitespace-nowrap animate-in fade-in zoom-in duration-200">
+                            <Brain size={10} />
+                            <span>Thinking</span>
+                        </div>
+                    )}
+                    {proMode !== ProMode.STANDARD && proMode !== ProMode.THINKING && (
+                         (() => {
+                            const mode = PRO_MODES.find(m => m.id === proMode);
+                            if (!mode) return null;
+                            const Icon = mode.icon;
+                            return (
+                                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-[10px] font-medium text-orange-400 whitespace-nowrap animate-in fade-in zoom-in duration-200">
+                                    <Icon size={10} />
+                                    <span>{mode.label}</span>
+                                </div>
+                            );
+                         })()
+                    )}
+                    {activeSpaceId && spaces.find(s => s.id === activeSpaceId) && (
+                        (() => {
+                            const space = spaces.find(s => s.id === activeSpaceId);
+                            return (
+                                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10px] font-medium text-blue-400 whitespace-nowrap animate-in fade-in zoom-in duration-200">
+                                    <span>{space?.emoji || '📁'}</span>
+                                    <span className="max-w-[80px] truncate">{space?.title}</span>
+                                </div>
+                            );
+                        })()
+                    )}
+                    {selectedLibraryIds.length > 0 && (
+                        <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-[10px] font-medium text-purple-400 whitespace-nowrap animate-in fade-in zoom-in duration-200">
+                            <Plug size={10} />
+                            <span>{selectedLibraryIds.length}</span>
+                        </div>
+                    )}
+                 </div>
+                 
+                 {showAttachMenu && (
+                    <div 
+                        onTouchStart={onTouchStart}
+                        onTouchMove={onTouchMove}
+                        onTouchEnd={onAttachTouchEnd}
+                        className={`fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 right-0 w-full max-h-[90vh] overflow-y-auto bg-pplx-card border-t border-pplx-border rounded-t-2xl shadow-xl p-4 z-50 animate-fadeIn pb-8 md:absolute md:bottom-12 md:left-0 ${compact ? 'md:w-full' : 'md:w-80'} md:border md:rounded-xl md:p-3 md:pb-3 md:border-b custom-scrollbar`}
+                    >
+                        {/* Mobile Drag Handle */}
+                        <div className="w-12 h-1 bg-gray-600 rounded-full mx-auto mb-4 md:hidden" />
+                        
+                        {/* Attach Section (Horizontal) */}
+                        <div className="mb-2">
+                            <div className="flex flex-row justify-between gap-2 px-1">
+                                <button onClick={() => imageInputRef.current?.click()} className="flex-1 flex flex-col items-center justify-center space-y-1 p-4 md:p-2 rounded-lg text-sm text-gray-300 hover:bg-pplx-hover hover:text-pplx-text transition-colors border border-pplx-border">
+                                    <ImageIcon size={24} className="md:w-5 md:h-5" />
+                                    <span className="text-xs">Photo</span>
+                                </button>
+                                <button onClick={() => fileInputRef.current?.click()} className="flex-1 flex flex-col items-center justify-center space-y-1 p-4 md:p-2 rounded-lg text-sm text-gray-300 hover:bg-pplx-hover hover:text-pplx-text transition-colors border border-pplx-border">
+                                    <File size={24} className="md:w-5 md:h-5" />
+                                    <span className="text-xs">File</span>
+                                </button>
+                                <button onClick={() => cameraInputRef.current?.click()} className="flex-1 flex flex-col items-center justify-center space-y-1 p-4 md:p-2 rounded-lg text-sm text-gray-300 hover:bg-pplx-hover hover:text-pplx-text transition-colors border border-pplx-border">
+                                    <Camera size={24} className="md:w-5 md:h-5" />
+                                    <span className="text-xs">Camera</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="h-px bg-pplx-border my-2 mx-1" />
+
+                        {/* Modes Section */}
+                        <div className="mb-2">
+                            <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1 px-2">Modes</div>
+                            <button onClick={() => setIsAgentMode(!isAgentMode)} className="w-full flex items-center justify-between p-2 mb-1 rounded-lg text-sm text-gray-300 hover:bg-pplx-hover hover:text-pplx-text transition-colors">
+                                <div className="flex items-center space-x-3">
+                                    <Bot size={16} className={isAgentMode ? 'text-pplx-accent' : ''} />
+                                    <span className={isAgentMode ? 'text-pplx-accent font-medium' : ''}>Agent Mode</span>
+                                </div>
+                                {isAgentMode && <CheckCircle2 size={14} className="text-pplx-accent" />}
+                            </button>
+                            
+                            {/* Thinking Mode */}
+                            <div className="flex flex-col mb-1 bg-pplx-card rounded-lg border border-transparent hover:border-pplx-border transition-colors">
+                                <div className="flex items-center justify-between p-2 cursor-pointer rounded-lg hover:bg-pplx-hover" onClick={() => setIsLongThinking(!isLongThinking)}>
+                                    <div className="flex items-center space-x-3">
+                                        <Brain size={16} className={isLongThinking ? 'text-pplx-accent' : 'text-gray-400'} />
+                                        <span className="font-medium text-gray-200 text-sm">Thinking Mode</span>
+                                    </div>
+                                    {/* Toggle Switch */}
+                                    <div className={`w-10 h-6 rounded-full transition-colors relative ${isLongThinking ? 'bg-pplx-accent' : 'bg-gray-600'}`}>
+                                        <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${isLongThinking ? 'left-5' : 'left-1'}`} />
+                                    </div>
+                                </div>
+                                {isLongThinking && (
+                                    <div className="px-2 pb-3 pt-1">
+                                        <div className="flex justify-between text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                                            <span>Depth</span>
+                                            <span>{thinkingDepth} Tokens</span>
+                                        </div>
+                                        <input 
+                                            type="range" 
+                                            min="1000" 
+                                            max="8000" 
+                                            step="1000"
+                                            value={thinkingDepth} 
+                                            onChange={(e) => setThinkingDepth(Number(e.target.value))}
+                                            className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-pplx-accent"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="h-px bg-pplx-border my-2 mx-1" />
+
+                        {/* Skills Section (Accordion) */}
+                        <div className="mb-2">
+                            <button 
+                                onClick={() => setIsSkillsExpanded(!isSkillsExpanded)}
+                                className="w-full flex items-center justify-between p-2 rounded-lg text-sm text-gray-300 hover:bg-pplx-hover hover:text-pplx-text transition-colors"
+                            >
+                                <div className="flex items-center space-x-3">
+                                    <Brain size={16} />
+                                    <span className="font-medium">Skills</span>
+                                </div>
+                                <ChevronRight size={14} className={`transition-transform ${isSkillsExpanded ? 'rotate-90' : ''}`} />
+                            </button>
+                            
+                            {isSkillsExpanded && (
+                                <div className="mt-1 ml-2 pl-2 border-l border-pplx-border space-y-1">
+                                    {PRO_MODES.filter(m => m.id !== ProMode.THINKING).map((mode) => {
+                                        if (mode.id === ProMode.RESEARCH) {
+                                            return (
+                                                <div key={mode.id} className="flex flex-col mb-2 bg-pplx-card rounded-lg border border-transparent hover:border-pplx-border transition-colors">
+                                                    <div className="flex items-center justify-between p-2 cursor-pointer rounded-lg hover:bg-pplx-hover" onClick={() => setProMode(mode.id)}>
+                                                        <div className="flex items-center space-x-3">
+                                                            <mode.icon size={16} className={proMode === mode.id ? 'text-pplx-accent' : 'text-gray-400'} />
+                                                            <div className="flex flex-col text-left">
+                                                                <span className={`text-sm ${proMode === mode.id ? 'text-pplx-accent font-medium' : 'text-gray-200 font-medium'}`}>Deep Research</span>
+                                                                <span className="text-[10px] text-gray-500">{deepResearchMode} • {deepResearchPages} Pages</span>
+                                                            </div>
+                                                        </div>
+                                                        {proMode === mode.id && <CheckCircle2 size={14} className="text-pplx-accent" />}
+                                                    </div>
+                                                    {proMode === mode.id && (
+                                                        <div className="mt-1 bg-pplx-sidebar rounded-lg p-3 border border-pplx-border mx-2 mb-2">
+                                                            <div className="flex items-center justify-between mb-4">
+                                                                <span className="text-xs font-medium text-gray-300">Mode</span>
+                                                                <div className="flex bg-pplx-card rounded-lg p-0.5 border border-pplx-border">
+                                                                    <button 
+                                                                        onClick={(e) => { e.stopPropagation(); setDeepResearchMode('Standard'); }}
+                                                                        className={`px-3 py-1 text-[10px] rounded-md transition-colors ${deepResearchMode === 'Standard' ? 'bg-pplx-hover text-white' : 'text-gray-400 hover:text-gray-200'}`}
+                                                                    >
+                                                                        Standard
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={(e) => { e.stopPropagation(); setDeepResearchMode('Advanced'); }}
+                                                                        className={`px-3 py-1 text-[10px] rounded-md transition-colors ${deepResearchMode === 'Advanced' ? 'bg-pplx-accent text-black font-medium' : 'text-gray-400 hover:text-gray-200'}`}
+                                                                    >
+                                                                        Advanced
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                            {deepResearchMode === 'Advanced' && (
+                                                                <div>
+                                                                    <div className="flex justify-between text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                                                                        <span>Report Length</span>
+                                                                        <span>{deepResearchPages} Pages (A4)</span>
+                                                                    </div>
+                                                                    <input 
+                                                                        type="range" 
+                                                                        min="1" 
+                                                                        max="10" 
+                                                                        step="1"
+                                                                        value={deepResearchPages} 
+                                                                        onChange={(e) => { e.stopPropagation(); setDeepResearchPages(Number(e.target.value)); }}
+                                                                        className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-pplx-accent"
+                                                                    />
+                                                                    <p className="text-[10px] text-gray-500 mt-2 italic">Uses multi-agent recursive breakdown.</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+                                        return (
+                                            <button 
+                                                key={mode.id}
+                                                onClick={() => setProMode(mode.id)}
+                                                className="w-full flex items-center justify-between p-2 rounded-lg text-sm text-gray-300 hover:bg-pplx-hover hover:text-pplx-text transition-colors"
+                                            >
+                                                <div className="flex items-center space-x-3">
+                                                    <mode.icon size={16} className={proMode === mode.id ? 'text-pplx-accent' : ''} />
+                                                    <span className={proMode === mode.id ? 'text-pplx-accent font-medium' : ''}>{mode.label}</span>
+                                                </div>
+                                                {proMode === mode.id && <CheckCircle2 size={14} className="text-pplx-accent" />}
+                                            </button>
+                                        );
+                                    })}
+                                    <button className="w-full flex items-center space-x-3 p-2 rounded-lg text-sm text-gray-400 hover:bg-pplx-hover hover:text-pplx-text transition-colors mt-2 border border-dashed border-pplx-border">
+                                        <Plus size={16} />
+                                        <span>Add new skill</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="h-px bg-pplx-border my-2 mx-1" />
+
+                        {/* Projects Section (Accordion) */}
+                        <div className="mb-2">
+                            <button 
+                                onClick={() => setIsProjectsExpanded(!isProjectsExpanded)}
+                                className="w-full flex items-center justify-between p-2 rounded-lg text-sm text-gray-300 hover:bg-pplx-hover hover:text-pplx-text transition-colors"
+                            >
+                                <div className="flex items-center space-x-3">
+                                    <FolderPlus size={16} className={activeSpaceId ? 'text-pplx-accent' : ''} />
+                                    <span className={`font-medium ${activeSpaceId ? 'text-pplx-accent' : ''}`}>Projects</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {activeSpaceId && <span className="text-[10px] bg-pplx-accent/20 text-pplx-accent px-1.5 py-0.5 rounded">Active</span>}
+                                    <ChevronRight size={14} className={`transition-transform ${isProjectsExpanded ? 'rotate-90' : ''}`} />
+                                </div>
+                            </button>
+                            
+                            {isProjectsExpanded && (
+                                <div className="mt-1 ml-2 pl-2 border-l border-pplx-border space-y-1">
+                                    {spaces.length > 0 ? (
+                                        <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1 pr-1">
+                                            {spaces.map(space => (
+                                                <button 
+                                                    key={space.id}
+                                                    onClick={() => { onSelectSpace?.(space.id); setShowAttachMenu(false); }}
+                                                    className={`w-full flex items-center justify-between p-2 rounded-lg text-sm transition-colors ${activeSpaceId === space.id ? 'bg-pplx-hover text-pplx-accent' : 'text-gray-300 hover:bg-pplx-hover hover:text-pplx-text'}`}
+                                                >
+                                                    <div className="flex items-center space-x-3 truncate">
+                                                        <span className="text-base shrink-0">{space.emoji || '📁'}</span>
+                                                        <span className="truncate">{space.title}</span>
+                                                    </div>
+                                                    {activeSpaceId === space.id && <CheckCircle2 size={14} className="text-pplx-accent shrink-0" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="p-2 text-xs text-gray-500 italic">No projects yet</div>
+                                    )}
+                                    
+                                    <button 
+                                        onClick={() => { onNewSpace?.(); setShowAttachMenu(false); }}
+                                        className="w-full flex items-center space-x-3 p-2 rounded-lg text-sm text-pplx-accent hover:bg-pplx-hover transition-colors mt-2 border border-dashed border-pplx-accent/30"
+                                    >
+                                        <Plus size={16} />
+                                        <span>Create New Project</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="h-px bg-pplx-border my-2 mx-1" />
+
+                        {/* Connectors Section (Accordion) */}
+                        <div className="mb-1">
+                            <button 
+                                onClick={() => setIsConnectorsExpanded(!isConnectorsExpanded)}
+                                className="w-full flex items-center justify-between p-2 rounded-lg text-sm text-gray-300 hover:bg-pplx-hover hover:text-pplx-text transition-colors"
+                            >
+                                <div className="flex items-center space-x-3">
+                                    <Plug size={16} />
+                                    <span className="font-medium">Connectors</span>
+                                </div>
+                                <ChevronRight size={14} className={`transition-transform ${isConnectorsExpanded ? 'rotate-90' : ''}`} />
+                            </button>
+                            
+                            {isConnectorsExpanded && (
+                                <div className="mt-1 ml-2 pl-2 border-l border-pplx-border space-y-1">
+                                    <button className="w-full flex items-center space-x-3 p-2 rounded-lg text-sm text-gray-300 hover:bg-pplx-hover hover:text-pplx-text transition-colors">
+                                        <Plug size={16} />
+                                        <span>Connectors List...</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                 )}
+             </div>
+
+             {/* Selected Items Badges - Removed for clean UI */}
+          </div>
+
+          {/* RIGHT GROUP: Focus, Model, Screen, Voice, Send */}
+          <div className={`flex items-center shrink-0 ml-auto ${centered ? 'gap-2 md:gap-2' : 'gap-1 md:gap-2'}`}>
+
+             {/* Focus Mode Button (Moved to Right) */}
+             <div ref={focusMenuRef} className={compact ? '' : 'relative'}>
+                <button 
+                    onClick={() => setShowFocusMenu(!showFocusMenu)}
+                    onMouseEnter={() => setHoveredTooltip('focus')}
+                    onMouseLeave={() => setHoveredTooltip(null)}
+                    disabled={isListening}
+                    className={`relative flex items-center space-x-1 rounded-full transition-colors hover:text-pplx-text ${buttonPadding} ${mobileButtonFixedBg} font-medium ${mobileSidePanel ? '!p-1.5' : ''}`}
+                >
+                    <div className={`${focusMode !== FocusMode.WEB_SEARCH ? 'text-pplx-accent' : ''}`}>
+                       <span className="flex items-center gap-1.5">
+                           <FocusIcon size={mobileSidePanel ? 16 : iconSize} /> 
+                       </span>
+                    </div>
+                </button>
+                
+                {/* Focus Menu */}
+                {showFocusMenu && (
+                    <div 
+                        onTouchStart={onTouchStart}
+                        onTouchMove={onTouchMove}
+                        onTouchEnd={onTouchEnd}
+                        className={`fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 right-0 w-full bg-pplx-card border-t border-pplx-border rounded-t-2xl shadow-xl p-2 z-50 animate-fadeIn pb-8 md:absolute md:bottom-12 md:right-0 ${compact ? 'md:w-full' : 'md:w-80'} md:border md:rounded-xl md:p-1 md:pb-1 md:border-b`}
+                    >
+                        {/* Mobile Drag Handle */}
+                        <div className="w-12 h-1 bg-gray-600 rounded-full mx-auto mb-2 md:hidden" />
+
+                        <div className="max-h-[85vh] md:max-h-[300px] overflow-y-auto custom-scrollbar">
+                            {FOCUS_MODES.map((mode) => (
+                                <div key={mode.id}>
+                                    <button
+                                        onClick={() => { 
+                                            setFocusMode(mode.id); 
+                                            // User requested to keep menu open
+                                        }}
+                                        className={`w-full flex items-center justify-between px-3 py-3 rounded-lg text-sm group transition-all ${
+                                            focusMode === mode.id ? 'bg-pplx-hover' : 'hover:bg-pplx-hover'
+                                        }`}
+                                    >
+                                        <div className="flex items-center space-x-3">
+                                            <mode.icon size={20} className={focusMode === mode.id ? 'text-pplx-accent' : 'text-gray-400 group-hover:text-pplx-text'} />
+                                            <div className="flex flex-col text-left">
+                                                <span className={focusMode === mode.id ? 'text-pplx-text font-medium' : 'text-gray-400 group-hover:text-pplx-text'}>
+                                                    {mode.label}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className={`w-9 h-5 rounded-full relative transition-colors ${
+                                            focusMode === mode.id ? 'bg-pplx-accent' : 'bg-gray-600'
+                                        }`}>
+                                            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${
+                                                focusMode === mode.id ? 'left-[18px]' : 'left-[2px]'
+                                            }`} />
+                                        </div>
+                                    </button>
+
+                                    {/* Discrete separator after Library */}
+                                    {mode.id === FocusMode.LIBRARY && (
+                                        <div className="my-1 h-px bg-pplx-border/50 w-full mx-auto opacity-50" />
+                                    )}
+
+                                    {/* Library Sub-Selection Logic */}
+                                    {mode.id === FocusMode.LIBRARY && focusMode === FocusMode.LIBRARY && (
+                                        <div className="pl-10 pr-2 pb-2 animate-fadeIn bg-pplx-secondary/10 rounded-b-lg mb-1">
+                                            <div className="text-xs text-pplx-muted mb-2 pt-2 border-t border-pplx-border/50">Select Knowledge Sources:</div>
+                                            
+                                            <div className="relative mb-2">
+                                                <Search size={12} className="absolute left-2 top-2 text-pplx-muted" />
+                                                <input 
+                                                    className="w-full bg-pplx-input rounded text-xs py-1.5 pl-7 pr-2 text-pplx-text outline-none"
+                                                    placeholder="Search pages..."
+                                                    value={librarySearch}
+                                                    onChange={(e) => setLibrarySearch(e.target.value)}
+                                                />
+                                            </div>
+
+                                            <div className="max-h-[50vh] md:max-h-32 overflow-y-auto custom-scrollbar space-y-1">
+                                                {/* Select All Toggle */}
+                                                <button 
+                                                    onClick={() => setSelectedLibraryIds(selectedLibraryIds.length === notes.length ? [] : notes.map(n => n.id))}
+                                                    className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-pplx-hover rounded text-xs text-pplx-text font-medium"
+                                                >
+                                                    <span>All Pages ({notes.length})</span>
+                                                    {selectedLibraryIds.length === notes.length && <CheckCircle2 size={12} className="text-pplx-accent" />}
+                                                </button>
+                                                
+                                                {notes
+                                                    .filter(n => n.title.toLowerCase().includes(librarySearch.toLowerCase()))
+                                                    .map(note => (
+                                                        <button 
+                                                            key={note.id}
+                                                            onClick={() => {
+                                                                if (selectedLibraryIds.includes(note.id)) {
+                                                                    setSelectedLibraryIds(prev => prev.filter(id => id !== note.id));
+                                                                } else {
+                                                                    setSelectedLibraryIds(prev => [...prev, note.id]);
+                                                                }
+                                                            }}
+                                                            className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-pplx-hover rounded text-xs text-pplx-muted hover:text-pplx-text text-left"
+                                                        >
+                                                            <div className="flex items-center gap-2 truncate">
+                                                                <span>{note.emoji || '📄'}</span>
+                                                                <span className="truncate max-w-[120px]">{note.title || 'Untitled'}</span>
+                                                            </div>
+                                                            <div className={`w-3 h-3 rounded-sm border ${selectedLibraryIds.includes(note.id) ? 'bg-pplx-accent border-pplx-accent' : 'border-pplx-muted'}`} />
+                                                        </button>
+                                                ))}
+                                                {notes.length === 0 && <div className="text-[10px] text-pplx-muted italic px-2">No pages in library.</div>}
+                                            </div>
+                                            <div className="text-[9px] text-pplx-muted mt-2 text-center opacity-70">
+                                                {selectedLibraryIds.length === 0 ? "Default: All pages used" : `${selectedLibraryIds.length} pages selected`}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+             </div>
+            
+             {/* Model Selector (Hidden on small mobile) */}
+             {settings && (
+                 <div ref={modelMenuRef} className="relative hidden sm:block">
+                    <button 
+                        onClick={() => setShowModelMenu(!showModelMenu)}
+                        onMouseEnter={() => setHoveredTooltip('model')}
+                        onMouseLeave={() => setHoveredTooltip(null)}
+                        disabled={isListening}
+                        className={`relative flex items-center justify-center gap-0.5 rounded-full hover:text-pplx-text transition-colors ${roundButtonPadding} ${mobileButtonFixedBg}`}
+                    >
+                        <Cpu size={iconSize} />
+                        {hoveredTooltip === 'model' && !showModelMenu && <Tooltip text="AI Model" />}
+                    </button>
+                    {showModelMenu && (
+                        <div className="absolute bottom-12 right-0 w-56 bg-pplx-card border border-pplx-border rounded-xl shadow-xl p-1 z-50 animate-fadeIn">
+                            <div className="px-2 py-1.5 text-[10px] uppercase font-bold text-pplx-muted">Cloud</div>
+                            <button onClick={() => { setSelectedModelId('gemini-pro'); setShowModelMenu(false); }} className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-pplx-hover hover:text-pplx-text rounded-lg flex justify-between items-center group">
+                                <span>Gemini Pro 1.5/2.0</span>
+                                {selectedModelId === 'gemini-pro' && <div className="w-2 h-2 rounded-full bg-pplx-accent"></div>}
+                            </button>
+
+                            {/* Added OpenRouter and OpenAI to Model Menu */}
+                            {settings.openRouterApiKey && (
+                                <button onClick={() => { setSelectedModelId('openrouter'); setShowModelMenu(false); }} className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-pplx-hover hover:text-pplx-text rounded-lg flex justify-between items-center group">
+                                    <span className="flex items-center gap-2"><Globe size={12}/> OpenRouter</span>
+                                    {selectedModelId === 'openrouter' && <div className="w-2 h-2 rounded-full bg-pplx-accent"></div>}
+                                </button>
+                            )}
+
+                             {settings.openAiApiKey && (
+                                <button onClick={() => { setSelectedModelId('openai'); setShowModelMenu(false); }} className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-pplx-hover hover:text-pplx-text rounded-lg flex justify-between items-center group">
+                                    <span className="flex items-center gap-2"><Zap size={12}/> OpenAI</span>
+                                    {selectedModelId === 'openai' && <div className="w-2 h-2 rounded-full bg-pplx-accent"></div>}
+                                </button>
+                            )}
+                            
+                            {settings.localModels.length > 0 && (
+                                <>
+                                    <div className="px-2 py-1.5 text-[10px] uppercase font-bold text-pplx-muted mt-1">Local / Custom</div>
+                                    {settings.localModels.map(m => (
+                                        <button key={m.id} onClick={() => { setSelectedModelId(m.id); setShowModelMenu(false); }} className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-pplx-hover hover:text-pplx-text rounded-lg flex justify-between items-center truncate">
+                                            <span>{m.name}</span>
+                                            {selectedModelId === m.id && <div className="w-2 h-2 rounded-full bg-pplx-accent"></div>}
+                                        </button>
+                                    ))}
+                                </>
+                            )}
+                        </div>
+                    )}
+                 </div>
+             )}
+
+             {/* Screen Share (Hidden on Mobile) */}
+             <button
+                onClick={handleScreenShare}
+                onMouseEnter={() => setHoveredTooltip('screen')}
+                onMouseLeave={() => setHoveredTooltip(null)}
+                disabled={isListening}
+                className={`hidden md:flex relative items-center justify-center rounded-full transition-colors hover:text-pplx-text ${roundButtonPadding} ${mobileButtonFixedBg}`}
+             >
+                <div>
+                    <Monitor size={iconSize} />
+                </div>
+                {hoveredTooltip === 'screen' && <Tooltip text="Share Screen" />}
+             </button>
+
+             {/* Voice Input (Enhanced) */}
+             <button 
+                onClick={handleVoiceInput} 
+                onMouseEnter={() => setHoveredTooltip('voice')}
+                onMouseLeave={() => setHoveredTooltip(null)}
+                className={`relative flex items-center justify-center transition-all duration-300 gap-2 shrink-0 ${
+                    isListening 
+                    ? 'bg-red-500/10 text-red-500 px-4 py-2 sm:py-1.5 rounded-full border border-red-500/30' 
+                    : `rounded-full hover:text-pplx-text ${roundButtonPadding} ${mobileButtonFixedBg} ${mobileSidePanel ? '!p-1.5' : ''}`
+                }`}
+             >
+                 {isListening ? (
+                     <>
+                        <div className="relative">
+                             <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-20"></span>
+                             <Square size={12} fill="currentColor" />
+                        </div>
+                        <span className="text-xs font-mono font-medium animate-pulse flex items-center gap-1.5">
+                            {formatTimer(recordingSeconds)}
+                            <span className="opacity-50">•</span>
+                            <span className="font-bold tracking-wider">{detectedLangDisplay}</span>
+                        </span>
+                     </>
+                 ) : (
+                    <div>
+                         <Mic size={mobileSidePanel ? 16 : iconSize} />
+                    </div>
+                 )}
+                 {hoveredTooltip === 'voice' && !isListening && <Tooltip text="Voice Input (Auto-Detect)" />}
+             </button>
+            
+             {/* Send / Stop Button - Hidden when listening to allow voice bar to expand right */}
+             {!isListening && (isThinking || input.trim().length > 0 || attachments.length > 0) && (
+                 <button 
+                    onClick={isThinking ? onStop : handleSubmit}
+                    disabled={(!isThinking && !input.trim() && attachments.length === 0)}
+                    className={`ml-1 rounded-full transition-all duration-200 flex items-center justify-center ${
+                        (isThinking || input.trim() || attachments.length > 0)
+                        ? 'bg-pplx-accent text-black hover:bg-cyan-400 shadow-[0_0_15px_rgba(32,184,205,0.4)]' 
+                        : 'bg-pplx-hover text-gray-500 cursor-not-allowed'
+                    } ${centered ? 'p-4 sm:p-2 scale-110' : 'p-3 sm:p-2 scale-110 sm:scale-100'} ${centered ? 'shadow-md origin-center' : ''}`}
+                 >
+                     {isThinking ? (
+                        <div className="animate-fadeIn">
+                            <Square size={centered ? 14 : 12} fill="currentColor" />
+                        </div>
+                     ) : (
+                        <div>
+                            {/* Slightly larger icon for send button (20% larger than 20px is ~24px) */}
+                            <ArrowUp size={centered ? 24 : 22} strokeWidth={2.5} />
+                        </div>
+                     )}
+                 </button>
+             )}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
