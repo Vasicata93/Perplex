@@ -593,14 +593,14 @@ export const InputArea: React.FC<InputAreaProps> = ({
                         dragConstraints={{ top: 0 }}
                         dragElastic={{ top: 0, bottom: 0.6 }}
                         onDragEnd={(_: any, info: any) => {
-                            if (info.offset.y > 100 || info.velocity.y > 500) {
+                            if (info.offset.y > 50 || info.velocity.y > 200) {
                                 setShowAttachMenu(false);
                             }
                         }}
                         initial={{ y: '100%' }}
                         animate={{ y: 0 }}
                         exit={{ y: '100%' }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                        transition={{ type: 'spring', damping: 20, stiffness: 250 }}
                         onPointerDown={(e: React.PointerEvent) => handleDragStart(e, attachDragControls, attachScrollRef)}
                         className={`fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 right-0 w-full max-h-[90vh] overflow-y-auto overscroll-contain bg-pplx-card border-t border-pplx-border rounded-t-2xl shadow-xl p-4 z-50 pb-8 md:absolute md:bottom-12 md:left-0 ${compact ? 'md:w-full' : 'md:w-80'} md:border md:rounded-xl md:p-3 md:pb-3 md:border-b custom-scrollbar touch-pan-y`}
                     >
@@ -889,14 +889,14 @@ export const InputArea: React.FC<InputAreaProps> = ({
                         dragConstraints={{ top: 0 }}
                         dragElastic={{ top: 0, bottom: 0.6 }}
                         onDragEnd={(_: any, info: any) => {
-                            if (info.offset.y > 100 || info.velocity.y > 500) {
+                            if (info.offset.y > 50 || info.velocity.y > 200) {
                                 setShowFocusMenu(false);
                             }
                         }}
                         initial={{ y: '100%' }}
                         animate={{ y: 0 }}
                         exit={{ y: '100%' }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                        transition={{ type: 'spring', damping: 20, stiffness: 250 }}
                         onPointerDown={(e: React.PointerEvent) => handleDragStart(e, focusDragControls, focusScrollRef)}
                         className={`fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 right-0 w-full bg-pplx-card border-t border-pplx-border rounded-t-2xl shadow-xl p-2 z-50 pb-8 md:absolute md:bottom-12 md:right-0 ${compact ? 'md:w-full' : 'md:w-80'} md:border md:rounded-xl md:p-1 md:pb-1 md:border-b overscroll-contain touch-pan-y`}
                     >

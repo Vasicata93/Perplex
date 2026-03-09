@@ -595,6 +595,26 @@ export class LLMService {
   // Virtual Knowledge Base for Tool-based Retrieval
   private workspaceFiles: Attachment[] = [];
 
+  // Models that support internal reasoning via OpenRouter
+  private static readonly OPENROUTER_REASONING_MODELS = [
+    'deepseek-r1',
+    'deepseek-v3.2',
+    'deepseek-v3.1',
+    'qwen/qwq-32b',
+    'qwen/qwen3',
+    'qwen/qwen3-max-thinking',
+    'gemini-3-pro-preview',
+    'gemini-3-flash-preview',
+    'gemini-2.5-pro-preview',
+    'gemini-2.5-flash',
+    'grok-4-1',
+    'minimax-m2.5',
+    'minimax-m1',
+    'glm-4-7',
+    'magistral-medium',
+    'magistral-small'
+  ];
+
   constructor() {
     this.apiKey = process.env.API_KEY;
     if (this.apiKey) {
@@ -1749,6 +1769,25 @@ export class LLMService {
                 stream: true,
                 temperature: 0.7 
             };
+
+            // Handle OpenRouter specific reasoning features
+            if (endpoint.includes("openrouter.ai")) {
+                const isReasoningModel = LLMService.OPENROUTER_REASONING_MODELS.some(m => modelName.toLowerCase().includes(m.toLowerCase()));
+                const isClaudeThinking = modelName.toLowerCase().includes("claude-3.7-sonnet");
+
+                if (isReasoningModel) {
+                    body.include_reasoning = true;
+                }
+
+                if (isClaudeThinking && (proMode === ProMode.REASONING || proMode === ProMode.THINKING)) {
+                    body.thinking = {
+                        type: "enabled",
+                        budget_tokens: proMode === ProMode.REASONING ? 16000 : 4000
+                    };
+                    // Ensure max_tokens is sufficient for thinking + response
+                    body.max_tokens = body.thinking.budget_tokens + 8000;
+                }
+            }
             
             if (tools.length > 0) {
                 body.tools = tools;

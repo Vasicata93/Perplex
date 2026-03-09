@@ -122,7 +122,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const sidebarClasses = `
-    fixed inset-y-0 left-0 z-[70] bg-pplx-sidebar border-r border-pplx-border transition-all duration-150 ease-out shadow-2xl h-full
+    fixed inset-y-0 left-0 z-[150] bg-pplx-sidebar border-r border-pplx-border transition-all duration-150 ease-out shadow-2xl h-full
     md:static md:shadow-none md:translate-x-0
     ${isOpen ? 'translate-x-0' : '-translate-x-full'}
     ${isOpen ? 'md:w-[280px]' : 'md:w-0 md:border-r-0 md:overflow-hidden'}
