@@ -185,7 +185,7 @@ export const MobileDock: React.FC<MobileDockProps> = ({
       )}
 
       {/* Dock Container */}
-      <div className="fixed bottom-2 left-0 right-0 z-50 flex flex-col items-center sm:hidden">
+      <div className="fixed bottom-2 left-0 right-0 z-[110] flex flex-col items-center sm:hidden">
         
         {/* Black Backdrop Overlay for Menu */}
         <div 

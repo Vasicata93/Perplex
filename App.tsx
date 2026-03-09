@@ -1436,15 +1436,11 @@ function App() {
                     <div className="absolute top-[-20%] left-[-30%] w-[120%] h-[70%] bg-[radial-gradient(ellipse_at_center,_rgba(255,220,160,0.3)_0%,_rgba(0,0,0,0)_70%)] blur-[40px]" />
                 </div>
 
-                {/* DESKTOP BACKGROUND: Existing Glows */}
-                <div className="hidden md:block absolute inset-0">
-                    <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] dark:bg-indigo-900/10 bg-indigo-500/5 rounded-full blur-[140px] opacity-50" />
-                    <div className="absolute bottom-[-20%] right-[-10%] w-[70%] h-[70%] dark:bg-emerald-900/5 bg-emerald-500/5 rounded-full blur-[140px] opacity-50" />
-                    <div className="absolute top-[20%] left-[40%] w-[50%] h-[50%] dark:bg-blue-900/5 bg-blue-500/5 rounded-full blur-[120px] opacity-40" />
-                </div>
+                {/* DESKTOP BACKGROUND: Uniform color (glows removed as requested) */}
+                <div className="hidden md:block absolute inset-0" />
 
-                {/* Noise overlay for texture */}
-                <div className="absolute inset-0 dark:opacity-[0.02] opacity-[0.01] mix-blend-overlay" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }} />
+                {/* Noise overlay for texture - Hidden on desktop for uniform color */}
+                <div className="absolute inset-0 dark:opacity-[0.02] opacity-[0.01] mix-blend-overlay md:hidden" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }} />
             </div>
         )}
 
@@ -1507,7 +1503,7 @@ function App() {
 
         {/* Home Header (Mobile Only) */}
         {!activeThreadId && activeView === 'chat' && !activeSpaceId && (
-            <div className="md:hidden absolute top-0 left-0 right-0 z-40 p-6 pt-10 flex flex-col items-start gap-4 pointer-events-none">
+            <div className="md:hidden absolute top-0 left-0 right-0 z-20 p-6 pt-10 flex flex-col items-start gap-4 pointer-events-none">
                 {/* Profile Section (Click to Open Settings) */}
                 <div 
                     onClick={() => setSettingsOpen(true)}
@@ -1550,8 +1546,12 @@ function App() {
         )}
 
         {activeThreadId && activeView === 'chat' && (
-            <div className="absolute top-0 left-0 right-0 z-40 pointer-events-none [&>div]:!bg-transparent [&>div]:!backdrop-blur-none [&>div]:pointer-events-auto">
-                {(() => {
+            <>
+                {/* TOP GRADIENT MASK */}
+                <div className="fixed top-0 left-0 right-0 h-32 bg-gradient-to-b from-[#121212] md:from-pplx-primary via-[#121212]/80 md:via-pplx-primary/80 to-transparent pointer-events-none z-30" />
+                
+                <div className="absolute top-0 left-0 right-0 z-40 pointer-events-none [&>div]:!bg-transparent [&>div]:!backdrop-blur-none [&>div]:pointer-events-auto">
+                    {(() => {
                     // Use focused message if available, otherwise fallback to last model message
                     const focusedMsg = activeThread?.messages.find(m => m.id === focusedMessageId);
                     const lastModelMessage = activeThread?.messages.filter(m => m.role === Role.MODEL).slice(-1)[0];
@@ -1575,6 +1575,7 @@ function App() {
                     );
                 })()}
             </div>
+            </>
         )}
 
 {activeView === 'library' ? (
@@ -1606,7 +1607,7 @@ function App() {
             <div 
                 ref={chatContainerRef}
                 onScroll={handleScroll}
-                className="flex-1 overflow-y-auto overflow-x-hidden w-full p-2 md:p-0 scroll-smooth pt-24 pb-28 md:pb-64" // Reduced padding-bottom on mobile
+                className={`flex-1 overflow-y-auto overflow-x-hidden w-full p-2 md:p-0 scroll-smooth pt-24 pb-28 ${activeView === 'chat' && !activeThreadId ? 'md:pb-0' : 'md:pb-64'}`} // Reduced padding-bottom on mobile
             >
             {!activeThreadId || !activeThread ? (
                 <div className="flex flex-col min-h-full relative z-10">
@@ -1775,7 +1776,7 @@ function App() {
                             </div>
                         </div>
                     ) : (
-                        <div className="flex flex-col h-full items-center justify-center -mt-10 relative z-10">
+                        <div className={`flex flex-col h-full items-center justify-center relative z-10 ${activeView === 'chat' && !activeThreadId ? 'md:mt-24 -mt-10' : '-mt-10'}`}>
                             {/* ... existing default home view ... */}
                             <div className="hidden md:flex flex-col items-center">
                                 <PerplexityLogo className="w-16 h-16 text-gray-800 dark:text-white/90 mb-8 drop-shadow-xl dark:drop-shadow-2xl" />
@@ -2060,7 +2061,7 @@ function App() {
                 <div className="fixed bottom-[130px] left-0 right-0 h-14 bg-gradient-to-t from-pplx-primary via-pplx-primary/80 to-transparent pointer-events-none z-10 hidden md:block" />
                 {/* Mobile version usually has input fixed differently, but this helps fade content on scroll */}
                 <div 
-                    className="fixed left-0 right-0 h-14 bg-gradient-to-t from-[#121212] to-transparent pointer-events-none z-10 md:hidden hidden" 
+                    className="fixed left-0 right-0 h-14 bg-gradient-to-t from-[#121212] to-transparent pointer-events-none z-10 md:hidden" 
                     style={{ 
                         bottom: settings.enableMobileDock 
                             ? 'calc(120px + env(safe-area-inset-bottom))' 
@@ -2068,7 +2069,7 @@ function App() {
                     }}
                 />
 
-                <div className={`w-full bg-[#121212] md:bg-pplx-primary pt-2 px-4 z-30 shrink-0 border-t border-transparent ${settings.enableMobileDock ? 'sm:pb-6' : 'pb-0'}`}>
+                <div className={`w-full bg-[#121212] md:bg-pplx-primary pt-2 px-4 z-30 shrink-0 border-t border-transparent transition-all duration-500 ${settings.enableMobileDock ? 'sm:pb-6' : 'pb-0'} ${activeView === 'chat' && !activeThreadId && !activeSpace ? 'md:pb-[35vh]' : 'md:pb-0'}`}>
                     <div className="pointer-events-auto">
                           <InputArea 
                             key={activeThreadId || 'home'} 

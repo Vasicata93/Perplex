@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { ArrowUp, Plus, Mic, X, Camera, Image as ImageIcon, File, Cpu, Monitor, Square, Globe, Zap, Search, CheckCircle2, ChevronRight, Bot, Brain, FolderPlus, Plug } from 'lucide-react';
+import { motion, AnimatePresence, useDragControls } from 'motion/react';
 import { FocusMode, Attachment, AppSettings, ModelProvider, ProMode, Note, Space } from '../types';
 import { FOCUS_MODES, PRO_MODES } from '../constants';
 
@@ -98,6 +99,12 @@ export const InputArea: React.FC<InputAreaProps> = ({
   const [detectedLangDisplay, setDetectedLangDisplay] = useState<string>(''); // For UI display (RO/EN)
   
   const recognitionRef = useRef<any>(null);
+  
+  // Drag Controls for Bottom Sheets
+  const attachDragControls = useDragControls();
+  const focusDragControls = useDragControls();
+  const attachScrollRef = useRef<HTMLDivElement>(null);
+  const focusScrollRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
@@ -336,36 +343,11 @@ export const InputArea: React.FC<InputAreaProps> = ({
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Swipe Logic for Mobile Menu
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
-
-  const minSwipeDistance = 50;
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientY);
-  };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientY);
-  };
-
-  const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    const distance = touchStart - touchEnd;
-    const isSwipeDown = distance < -minSwipeDistance;
-    if (isSwipeDown) {
-      setShowFocusMenu(false);
-    }
-  };
-
-  const onAttachTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    const distance = touchStart - touchEnd;
-    const isSwipeDown = distance < -minSwipeDistance;
-    if (isSwipeDown) {
-      setShowAttachMenu(false);
+  // Helper to handle drag start only when at top
+  const handleDragStart = (e: React.PointerEvent, controls: any, scrollRef: React.RefObject<HTMLDivElement>) => {
+    if (window.innerWidth >= 768) return; // Only mobile
+    if (!scrollRef.current || scrollRef.current.scrollTop <= 0) {
+      controls.start(e);
     }
   };
 
@@ -536,16 +518,24 @@ export const InputArea: React.FC<InputAreaProps> = ({
                  {/* Active Mode Badges (Minimalist) */}
                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-[200px] md:max-w-none mask-linear-fade">
                     {isAgentMode && (
-                        <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-pplx-accent/10 border border-pplx-accent/20 text-[10px] font-medium text-pplx-accent whitespace-nowrap animate-in fade-in zoom-in duration-200">
+                        <button 
+                            onClick={() => setIsAgentMode(false)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-full bg-pplx-accent/10 border border-pplx-accent/20 text-[10px] font-medium text-pplx-accent whitespace-nowrap animate-in fade-in zoom-in duration-200 hover:bg-pplx-accent/20 transition-colors group"
+                        >
                             <Bot size={10} />
                             <span>Agent</span>
-                        </div>
+                            <X size={8} className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
                     )}
                     {isLongThinking && (
-                        <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-medium text-indigo-400 whitespace-nowrap animate-in fade-in zoom-in duration-200">
+                        <button 
+                            onClick={() => setIsLongThinking(false)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-medium text-indigo-400 whitespace-nowrap animate-in fade-in zoom-in duration-200 hover:bg-indigo-500/20 transition-colors group"
+                        >
                             <Brain size={10} />
                             <span>Thinking</span>
-                        </div>
+                            <X size={8} className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
                     )}
                     {proMode !== ProMode.STANDARD && proMode !== ProMode.THINKING && (
                          (() => {
@@ -553,10 +543,14 @@ export const InputArea: React.FC<InputAreaProps> = ({
                             if (!mode) return null;
                             const Icon = mode.icon;
                             return (
-                                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-[10px] font-medium text-orange-400 whitespace-nowrap animate-in fade-in zoom-in duration-200">
+                                <button 
+                                    onClick={() => setProMode(ProMode.STANDARD)}
+                                    className="flex items-center gap-1 px-2 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-[10px] font-medium text-orange-400 whitespace-nowrap animate-in fade-in zoom-in duration-200 hover:bg-orange-500/20 transition-colors group"
+                                >
                                     <Icon size={10} />
                                     <span>{mode.label}</span>
-                                </div>
+                                    <X size={8} className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </button>
                             );
                          })()
                     )}
@@ -564,30 +558,57 @@ export const InputArea: React.FC<InputAreaProps> = ({
                         (() => {
                             const space = spaces.find(s => s.id === activeSpaceId);
                             return (
-                                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10px] font-medium text-blue-400 whitespace-nowrap animate-in fade-in zoom-in duration-200">
+                                <button 
+                                    onClick={() => onSelectSpace?.(null)}
+                                    className="flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10px] font-medium text-blue-400 whitespace-nowrap animate-in fade-in zoom-in duration-200 hover:bg-blue-500/20 transition-colors group"
+                                >
                                     <span>{space?.emoji || '📁'}</span>
                                     <span className="max-w-[80px] truncate">{space?.title}</span>
-                                </div>
+                                    <X size={8} className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </button>
                             );
                         })()
                     )}
-                    {selectedLibraryIds.length > 0 && (
-                        <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-[10px] font-medium text-purple-400 whitespace-nowrap animate-in fade-in zoom-in duration-200">
-                            <Plug size={10} />
-                            <span>{selectedLibraryIds.length}</span>
-                        </div>
-                    )}
+                    {/* Attachments Badges */}
+                    {attachments.map((att, idx) => (
+                        <button 
+                            key={idx}
+                            onClick={() => removeAttachment(idx)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-full bg-gray-500/10 border border-gray-500/20 text-[10px] font-medium text-gray-400 whitespace-nowrap animate-in fade-in zoom-in duration-200 hover:bg-gray-500/20 transition-colors group"
+                        >
+                            {att.type === 'image' ? <ImageIcon size={10} /> : <File size={10} />}
+                            <span className="max-w-[60px] truncate">{att.name || 'File'}</span>
+                            <X size={8} className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
+                    ))}
                  </div>
                  
+                 <AnimatePresence>
                  {showAttachMenu && (
-                    <div 
-                        onTouchStart={onTouchStart}
-                        onTouchMove={onTouchMove}
-                        onTouchEnd={onAttachTouchEnd}
-                        className={`fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 right-0 w-full max-h-[90vh] overflow-y-auto bg-pplx-card border-t border-pplx-border rounded-t-2xl shadow-xl p-4 z-50 animate-fadeIn pb-8 md:absolute md:bottom-12 md:left-0 ${compact ? 'md:w-full' : 'md:w-80'} md:border md:rounded-xl md:p-3 md:pb-3 md:border-b custom-scrollbar`}
+                    <motion.div 
+                        ref={attachScrollRef}
+                        drag="y"
+                        dragControls={attachDragControls}
+                        dragListener={false}
+                        dragConstraints={{ top: 0 }}
+                        dragElastic={{ top: 0, bottom: 0.6 }}
+                        onDragEnd={(_: any, info: any) => {
+                            if (info.offset.y > 100 || info.velocity.y > 500) {
+                                setShowAttachMenu(false);
+                            }
+                        }}
+                        initial={{ y: '100%' }}
+                        animate={{ y: 0 }}
+                        exit={{ y: '100%' }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                        onPointerDown={(e: React.PointerEvent) => handleDragStart(e, attachDragControls, attachScrollRef)}
+                        className={`fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 right-0 w-full max-h-[90vh] overflow-y-auto overscroll-contain bg-pplx-card border-t border-pplx-border rounded-t-2xl shadow-xl p-4 z-50 pb-8 md:absolute md:bottom-12 md:left-0 ${compact ? 'md:w-full' : 'md:w-80'} md:border md:rounded-xl md:p-3 md:pb-3 md:border-b custom-scrollbar touch-pan-y`}
                     >
                         {/* Mobile Drag Handle */}
-                        <div className="w-12 h-1 bg-gray-600 rounded-full mx-auto mb-4 md:hidden" />
+                        <div 
+                            onPointerDown={(e: React.PointerEvent) => attachDragControls.start(e)}
+                            className="w-12 h-1 bg-gray-600 rounded-full mx-auto mb-4 md:hidden cursor-grab active:cursor-grabbing" 
+                        />
                         
                         {/* Attach Section (Horizontal) */}
                         <div className="mb-2">
@@ -612,13 +633,18 @@ export const InputArea: React.FC<InputAreaProps> = ({
                         {/* Modes Section */}
                         <div className="mb-2">
                             <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1 px-2">Modes</div>
-                            <button onClick={() => setIsAgentMode(!isAgentMode)} className="w-full flex items-center justify-between p-2 mb-1 rounded-lg text-sm text-gray-300 hover:bg-pplx-hover hover:text-pplx-text transition-colors">
-                                <div className="flex items-center space-x-3">
-                                    <Bot size={16} className={isAgentMode ? 'text-pplx-accent' : ''} />
-                                    <span className={isAgentMode ? 'text-pplx-accent font-medium' : ''}>Agent Mode</span>
+                            <div className="flex flex-col mb-1 bg-pplx-card rounded-lg border border-transparent hover:border-pplx-border transition-colors">
+                                <div className="flex items-center justify-between p-2 cursor-pointer rounded-lg hover:bg-pplx-hover" onClick={() => setIsAgentMode(!isAgentMode)}>
+                                    <div className="flex items-center space-x-3">
+                                        <Bot size={16} className={isAgentMode ? 'text-pplx-accent' : 'text-gray-400'} />
+                                        <span className={`text-sm ${isAgentMode ? 'text-pplx-accent font-medium' : 'text-gray-200 font-medium'}`}>Agent Mode</span>
+                                    </div>
+                                    {/* Toggle Switch */}
+                                    <div className={`w-10 h-6 rounded-full transition-colors relative ${isAgentMode ? 'bg-pplx-accent' : 'bg-gray-600'}`}>
+                                        <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${isAgentMode ? 'left-5' : 'left-1'}`} />
+                                    </div>
                                 </div>
-                                {isAgentMode && <CheckCircle2 size={14} className="text-pplx-accent" />}
-                            </button>
+                            </div>
                             
                             {/* Thinking Mode */}
                             <div className="flex flex-col mb-1 bg-pplx-card rounded-lg border border-transparent hover:border-pplx-border transition-colors">
@@ -822,8 +848,9 @@ export const InputArea: React.FC<InputAreaProps> = ({
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </motion.div>
                  )}
+                 </AnimatePresence>
              </div>
 
              {/* Selected Items Badges - Removed for clean UI */}
@@ -839,27 +866,47 @@ export const InputArea: React.FC<InputAreaProps> = ({
                     onMouseEnter={() => setHoveredTooltip('focus')}
                     onMouseLeave={() => setHoveredTooltip(null)}
                     disabled={isListening}
-                    className={`relative flex items-center space-x-1 rounded-full transition-colors hover:text-pplx-text ${buttonPadding} ${mobileButtonFixedBg} font-medium ${mobileSidePanel ? '!p-1.5' : ''}`}
+                    className={`relative flex items-center space-x-1 rounded-full transition-all hover:text-pplx-text ${buttonPadding} ${mobileButtonFixedBg} font-medium ${mobileSidePanel ? '!p-1.5' : ''} ${focusMode === FocusMode.LIBRARY && selectedLibraryIds.length > 0 ? 'px-3' : ''}`}
                 >
-                    <div className={`${focusMode !== FocusMode.WEB_SEARCH ? 'text-pplx-accent' : ''}`}>
-                       <span className="flex items-center gap-1.5">
-                           <FocusIcon size={mobileSidePanel ? 16 : iconSize} /> 
-                       </span>
+                    <div className={`flex items-center gap-1.5 ${focusMode !== FocusMode.WEB_SEARCH ? 'text-pplx-accent' : ''}`}>
+                        {focusMode === FocusMode.LIBRARY && selectedLibraryIds.length > 0 && (
+                            <span className="text-xs font-bold animate-in fade-in zoom-in duration-200">
+                                {selectedLibraryIds.length}
+                            </span>
+                        )}
+                        <FocusIcon size={mobileSidePanel ? 16 : iconSize} /> 
                     </div>
                 </button>
                 
                 {/* Focus Menu */}
+                <AnimatePresence>
                 {showFocusMenu && (
-                    <div 
-                        onTouchStart={onTouchStart}
-                        onTouchMove={onTouchMove}
-                        onTouchEnd={onTouchEnd}
-                        className={`fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 right-0 w-full bg-pplx-card border-t border-pplx-border rounded-t-2xl shadow-xl p-2 z-50 animate-fadeIn pb-8 md:absolute md:bottom-12 md:right-0 ${compact ? 'md:w-full' : 'md:w-80'} md:border md:rounded-xl md:p-1 md:pb-1 md:border-b`}
+                    <motion.div 
+                        ref={focusScrollRef}
+                        drag="y"
+                        dragControls={focusDragControls}
+                        dragListener={false}
+                        dragConstraints={{ top: 0 }}
+                        dragElastic={{ top: 0, bottom: 0.6 }}
+                        onDragEnd={(_: any, info: any) => {
+                            if (info.offset.y > 100 || info.velocity.y > 500) {
+                                setShowFocusMenu(false);
+                            }
+                        }}
+                        initial={{ y: '100%' }}
+                        animate={{ y: 0 }}
+                        exit={{ y: '100%' }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                        onPointerDown={(e: React.PointerEvent) => handleDragStart(e, focusDragControls, focusScrollRef)}
+                        className={`fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 right-0 w-full bg-pplx-card border-t border-pplx-border rounded-t-2xl shadow-xl p-2 z-50 pb-8 md:absolute md:bottom-12 md:right-0 ${compact ? 'md:w-full' : 'md:w-80'} md:border md:rounded-xl md:p-1 md:pb-1 md:border-b overscroll-contain touch-pan-y`}
                     >
                         {/* Mobile Drag Handle */}
-                        <div className="w-12 h-1 bg-gray-600 rounded-full mx-auto mb-2 md:hidden" />
+                        <div 
+                            onPointerDown={(e: React.PointerEvent) => focusDragControls.start(e)}
+                            className="w-12 h-1 bg-gray-600 rounded-full mx-auto mb-2 md:hidden cursor-grab active:cursor-grabbing" 
+                        />
 
-                        <div className="max-h-[85vh] md:max-h-[300px] overflow-y-auto custom-scrollbar">
+                        <div className="max-h-[85vh] md:max-h-[300px] overflow-y-auto overscroll-contain custom-scrollbar">
                             {FOCUS_MODES.map((mode) => (
                                 <div key={mode.id}>
                                     <button
@@ -949,8 +996,9 @@ export const InputArea: React.FC<InputAreaProps> = ({
                                 </div>
                             ))}
                         </div>
-                    </div>
+                    </motion.div>
                 )}
+                </AnimatePresence>
              </div>
             
              {/* Model Selector (Hidden on small mobile) */}

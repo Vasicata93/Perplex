@@ -76,12 +76,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   
   // State for Mobile Library Full Screen
   const [isMobileLibraryOpen, setIsMobileLibraryOpen] = useState(false);
+  const [mobileLibraryFilter, setMobileLibraryFilter] = useState<'all' | 'favorites'>('all');
 
   // Effect to handle showFavorites prop
   useEffect(() => {
       if (showFavorites && setShowFavorites) {
           if (window.innerWidth < 768) {
               setIsMobileLibraryOpen(true);
+              setMobileLibraryFilter('favorites');
           } else {
               setExpandedSection('library');
           }
@@ -303,6 +305,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           onClick={() => {
                               if (window.innerWidth < 768) {
                                   setIsMobileLibraryOpen(true);
+                                  setMobileLibraryFilter('all');
                               } else {
                                   toggleSection('library');
                               }
@@ -421,7 +424,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <ChevronLeft size={24}/>
                 </button>
                 <h2 className="text-xl font-medium tracking-tight text-pplx-text font-serif">
-                    Pages
+                    {mobileLibraryFilter === 'favorites' ? 'Favorites' : 'Pages'}
                 </h2>
                 <button 
                     onClick={() => { onNewNote(); setIsMobileLibraryOpen(false); toggleSidebar(); }} 
@@ -433,31 +436,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
             
             <div className="flex-1 overflow-y-auto custom-scrollbar pb-20">
                 {/* Recents Section */}
-                <div className="px-4 py-4">
-                    <h3 className="text-sm font-medium text-pplx-muted mb-3">Recents</h3>
-                    <div className="flex space-x-3 overflow-x-auto pb-2 -mx-4 pl-8 pr-4 no-scrollbar snap-x">
-                        {[...notes].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 5).map(note => (
-                            <div 
-                                key={note.id}
-                                onClick={() => { onSelectNote(note.id); setIsMobileLibraryOpen(false); toggleSidebar(); }}
-                                className="flex-shrink-0 w-24 h-24 bg-pplx-card border border-pplx-border rounded-xl overflow-hidden relative snap-start cursor-pointer active:scale-95 transition-transform"
-                            >
-                                <div className="h-1/2 w-full bg-gradient-to-br from-pplx-secondary to-pplx-border relative">
-                                    {note.cover && <img src={note.cover} alt="" className="w-full h-full object-cover opacity-80" />}
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <span className="text-xl drop-shadow-md">{note.emoji || '📄'}</span>
+                {mobileLibraryFilter === 'all' && (
+                    <div className="px-4 py-4">
+                        <h3 className="text-sm font-medium text-pplx-muted mb-3">Recents</h3>
+                        <div className="flex space-x-3 overflow-x-auto pb-2 -mx-4 pl-8 pr-4 no-scrollbar snap-x">
+                            {[...notes].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 5).map(note => (
+                                <div 
+                                    key={note.id}
+                                    onClick={() => { onSelectNote(note.id); setIsMobileLibraryOpen(false); toggleSidebar(); }}
+                                    className="flex-shrink-0 w-24 h-24 bg-pplx-card border border-pplx-border rounded-xl overflow-hidden relative snap-start cursor-pointer active:scale-95 transition-transform"
+                                >
+                                    <div className="h-1/2 w-full bg-gradient-to-br from-pplx-secondary to-pplx-border relative">
+                                        {note.cover && <img src={note.cover} alt="" className="w-full h-full object-cover opacity-80" />}
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <span className="text-xl drop-shadow-md">{note.emoji || '📄'}</span>
+                                        </div>
+                                    </div>
+                                    <div className="p-2 h-1/2 flex flex-col justify-between">
+                                        <span className="text-xs font-medium text-pplx-text line-clamp-2 leading-tight">{note.title || 'Untitled'}</span>
                                     </div>
                                 </div>
-                                <div className="p-2 h-1/2 flex flex-col justify-between">
-                                    <span className="text-xs font-medium text-pplx-text line-clamp-2 leading-tight">{note.title || 'Untitled'}</span>
-                                </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Favorites Section Mobile */}
-                {notes.some(n => n.isFavorite) && (
+                {notes.some(n => n.isFavorite) ? (
                     <div className="px-2 mb-4">
                          <div className="px-3 py-2 text-xs font-bold text-pplx-muted uppercase tracking-wider flex items-center gap-1.5 opacity-70">
                               <Star size={12} className="text-yellow-400 fill-yellow-400" /> Favorites
@@ -479,33 +484,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 isMobile={true}
                             />
                         ))}
-                        <div className="h-px bg-pplx-border/50 my-2 mx-3" />
+                        {mobileLibraryFilter === 'all' && <div className="h-px bg-pplx-border/50 my-2 mx-3" />}
+                    </div>
+                ) : mobileLibraryFilter === 'favorites' && (
+                    <div className="px-4 py-12 text-center animate-fadeIn">
+                        <Star size={48} className="mx-auto text-pplx-muted/20 mb-4" />
+                        <p className="text-pplx-muted text-sm">No favorite pages yet.</p>
                     </div>
                 )}
 
                 {/* All Pages Section */}
-                <div className="px-2">
-                    {notes.filter(n => !n.parentId).length === 0 && (
-                        <div className="px-3 py-4 text-sm text-pplx-muted italic text-center">No pages yet. Create one to get started!</div>
-                    )}
-                    {notes.filter(n => !n.parentId).map(note => (
-                        <NoteItem 
-                            key={note.id} 
-                            note={note} 
-                            allNotes={notes} 
-                            activeNoteId={activeNoteId}
-                            onSelectNote={(id: string) => { onSelectNote(id); setIsMobileLibraryOpen(false); toggleSidebar(); }}
-                            onDuplicateNote={onDuplicateNote}
-                            onMoveNote={onMoveNote}
-                            onDeleteNote={onDeleteNote}
-                            onNewNote={(parentId?: string) => { onNewNote(parentId); setIsMobileLibraryOpen(false); toggleSidebar(); }}
-                            activeMenuNoteId={activeMenuNoteId}
-                            setActiveMenuNoteId={setActiveMenuNoteId}
-                            menuRef={menuRef}
-                            isMobile={true}
-                        />
-                    ))}
-                </div>
+                {mobileLibraryFilter === 'all' && (
+                    <div className="px-2">
+                        {notes.filter(n => !n.parentId).length === 0 && (
+                            <div className="px-3 py-4 text-sm text-pplx-muted italic text-center">No pages yet. Create one to get started!</div>
+                        )}
+                        {notes.filter(n => !n.parentId).map(note => (
+                            <NoteItem 
+                                key={note.id} 
+                                note={note} 
+                                allNotes={notes} 
+                                activeNoteId={activeNoteId}
+                                onSelectNote={(id: string) => { onSelectNote(id); setIsMobileLibraryOpen(false); toggleSidebar(); }}
+                                onDuplicateNote={onDuplicateNote}
+                                onMoveNote={onMoveNote}
+                                onDeleteNote={onDeleteNote}
+                                onNewNote={(parentId?: string) => { onNewNote(parentId); setIsMobileLibraryOpen(false); toggleSidebar(); }}
+                                activeMenuNoteId={activeMenuNoteId}
+                                setActiveMenuNoteId={setActiveMenuNoteId}
+                                menuRef={menuRef}
+                                isMobile={true}
+                            />
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
       )}
