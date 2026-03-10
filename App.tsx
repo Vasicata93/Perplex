@@ -1561,7 +1561,7 @@ function App() {
         {activeThreadId && activeView === 'chat' && (
             <>
                 {/* TOP GRADIENT MASK */}
-                <div className="fixed top-0 left-0 right-0 h-32 bg-gradient-to-b from-[#121212] md:from-pplx-primary via-[#121212]/80 md:via-pplx-primary/80 to-transparent pointer-events-none z-30" />
+                <div className="fixed top-0 left-0 right-0 h-14 md:h-32 bg-gradient-to-b from-[#121212] md:from-pplx-primary via-[#121212]/80 md:via-pplx-primary/80 to-transparent pointer-events-none z-30" />
                 
                 <div className="absolute top-0 left-0 right-0 z-40 pointer-events-none [&>div]:!bg-transparent [&>div]:!backdrop-blur-none [&>div]:pointer-events-auto">
                     {(() => {

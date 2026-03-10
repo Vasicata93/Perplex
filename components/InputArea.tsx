@@ -344,17 +344,19 @@ export const InputArea: React.FC<InputAreaProps> = ({
   };
 
   // Helper to handle drag start only when at top
-  const handleDragStart = (e: React.PointerEvent, controls: any, scrollRef: React.RefObject<HTMLDivElement>) => {
-    if (window.innerWidth >= 768) return; // Only mobile
-    
-    // Don't start drag if clicking a button or input to allow their own interactions
-    const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('input') || target.closest('textarea') || target.closest('select')) {
-      return;
-    }
-
-    if (!scrollRef.current || scrollRef.current.scrollTop <= 0) {
-      controls.start(e);
+  const handleDragStart = (
+    e: React.PointerEvent,
+    controls: any,
+    scrollRef: React.RefObject<HTMLDivElement>
+  ) => {
+    if (window.innerWidth >= 768) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const atTop = el.scrollTop <= 0;
+    const draggingDown = (e as any).movementY > 0;
+    if (atTop || draggingDown) {
+        e.stopPropagation();
+        controls.start(e);
     }
   };
 
@@ -610,7 +612,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
                         exit={{ y: '100%' }}
                         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                         onPointerDown={(e: React.PointerEvent) => handleDragStart(e, attachDragControls, attachScrollRef)}
-                        className={`fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 right-0 w-full max-h-[90vh] overflow-y-auto overscroll-contain bg-pplx-card border-t border-pplx-border rounded-t-2xl shadow-xl p-4 z-50 pb-8 md:absolute md:bottom-12 md:left-0 ${compact ? 'md:w-full' : 'md:w-80'} md:border md:rounded-xl md:p-3 md:pb-3 md:border-b custom-scrollbar touch-pan-y`}
+                        className={`fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 right-0 w-full max-h-[90vh] overflow-y-auto overscroll-none bg-pplx-card border-t border-pplx-border rounded-t-2xl shadow-xl p-4 z-50 pb-8 md:absolute md:bottom-12 md:left-0 ${compact ? 'md:w-full' : 'md:w-80'} md:border md:rounded-xl md:p-3 md:pb-3 md:border-b custom-scrollbar touch-none`}
                     >
                         {/* Mobile Drag Handle */}
                         <div 
@@ -908,7 +910,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
                         exit={{ y: '100%' }}
                         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                         onPointerDown={(e: React.PointerEvent) => handleDragStart(e, focusDragControls, focusScrollRef)}
-                        className={`fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 right-0 w-full bg-pplx-card border-t border-pplx-border rounded-t-2xl shadow-xl p-2 z-50 pb-8 md:absolute md:bottom-12 md:right-0 ${compact ? 'md:w-full' : 'md:w-80'} md:border md:rounded-xl md:p-1 md:pb-1 md:border-b overscroll-contain touch-pan-y`}
+                        className={`fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 right-0 w-full bg-pplx-card border-t border-pplx-border rounded-t-2xl shadow-xl p-2 z-50 pb-8 md:absolute md:bottom-12 md:right-0 ${compact ? 'md:w-full' : 'md:w-80'} md:border md:rounded-xl md:p-1 md:pb-1 md:border-b overscroll-none touch-none`}
                     >
                         {/* Mobile Drag Handle */}
                         <div 
