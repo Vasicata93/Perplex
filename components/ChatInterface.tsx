@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Message, Role, Attachment, Note } from '../types';
+import { Message, Role, Attachment, Note, FocusMode } from '../types';
 import { InputArea } from './InputArea';
 import { MessageRenderer } from './MessageRenderer';
 import { TornadoIndicator } from './TornadoIndicator';
@@ -9,7 +9,7 @@ import { User, BookOpen, Globe, Copy, Check, RefreshCw, Share2, Volume2, ImageIc
 interface ChatInterfaceProps {
   messages: Message[];
   isThinking: boolean;
-  onSendMessage: (text: string, attachments: Attachment[]) => void;
+  onSendMessage: (text: string, focusModes: FocusMode[], attachments: Attachment[]) => void;
   onStopGeneration: () => void;
   onRegenerate: (messageId: string) => void;
   onEditMessage: (messageId: string, newContent: string) => void;
@@ -234,7 +234,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       {/* Input Area */}
       <div className={`p-4 bg-pplx-card relative z-20 ${isSidePanel ? 'md:p-4 p-2' : ''}`}>
         <InputArea 
-          onSendMessage={(text, _focusMode, _proMode, atts) => onSendMessage(text, atts)}
+          onSendMessage={(text, focusModes, _proMode, atts) => onSendMessage(text, focusModes, atts)}
           isThinking={isThinking}
           onStop={onStopGeneration}
           placeholder="Ask about this page..."

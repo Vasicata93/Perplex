@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChatInterface } from './ChatInterface';
-import { Message, Attachment, Note } from '../types';
+import { Message, Attachment, Note, FocusMode } from '../types';
 import { 
   SquarePen, 
   PanelRight, 
@@ -14,7 +14,7 @@ interface SideChatPanelProps {
   onClose: () => void;
   messages: Message[];
   isThinking: boolean;
-  onSendMessage: (text: string, attachments: Attachment[]) => void;
+  onSendMessage: (text: string, focusModes: FocusMode[], attachments: Attachment[]) => void;
   onStopGeneration: () => void;
   onRegenerate: (messageId: string) => void;
   onEditMessage: (messageId: string, newContent: string) => void;

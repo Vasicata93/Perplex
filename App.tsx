@@ -1158,7 +1158,7 @@ function App() {
       }
   };
 
-  const handleSendMessage = async (text: string, focusMode: FocusMode, proMode: ProMode, attachments: Attachment[], modelId?: string, isAgentMode: boolean = false, threadIdOverride?: string) => {
+  const handleSendMessage = async (text: string, focusModes: FocusMode[], proMode: ProMode, attachments: Attachment[], modelId?: string, isAgentMode: boolean = false, threadIdOverride?: string) => {
     isStoppedRef.current = false;
     setIsThinking(true);
     
@@ -1218,16 +1218,29 @@ function App() {
     let customSystemInstructions = undefined;
     
     // --- FOCUS MODE LOGIC UPDATE (Handle Library Mode) ---
-    if (focusMode === FocusMode.LIBRARY) {
-        effectiveUseSearch = false; // Disable web search when focusing on Library
-        // STRICT INSTRUCTION: Enforce focus ONLY on the attached pages content.
-        modifiedPrompt = `[STRICT LIBRARY FOCUS] User Query: ${text}
+    if (focusModes.includes(FocusMode.LIBRARY)) {
+        const hasWebSearch = focusModes.includes(FocusMode.WEB_SEARCH) || focusModes.includes(FocusMode.ALL);
         
-        INSTRUCTIONS:
-        1. Answer ONLY using the content of the attached 'Library Pages' (markdown files attached to this request).
-        2. Do not use outside knowledge, internet search, or your general training data unless explicitly asked to define general terms found in the text.
-        3. Do not confuse these pages with your internal "Memory". These are specific documents the user has selected.
-        4. If the answer is not found in the attached pages, state clearly that the information is missing from the selected library pages.`;
+        if (!hasWebSearch) {
+            effectiveUseSearch = false; // Disable web search when focusing ONLY on Library
+            // STRICT INSTRUCTION: Enforce focus ONLY on the attached pages content.
+            modifiedPrompt = `[STRICT LIBRARY FOCUS] User Query: ${text}
+            
+            INSTRUCTIONS:
+            1. Answer ONLY using the content of the attached 'Library Pages' (markdown files attached to this request).
+            2. Do not use outside knowledge, internet search, or your general training data unless explicitly asked to define general terms found in the text.
+            3. Do not confuse these pages with your internal "Memory". These are specific documents the user has selected.
+            4. If the answer is not found in the attached pages, state clearly that the information is missing from the selected library pages.`;
+        } else {
+            // COMBINED FOCUS: Use both Library and Web Search
+            modifiedPrompt = `[LIBRARY + WEB SEARCH FOCUS] User Query: ${text}
+            
+            INSTRUCTIONS:
+            1. Use the content of the attached 'Library Pages' (markdown files attached to this request) as your primary context.
+            2. Supplement with information from the internet (web search) to provide a comprehensive answer.
+            3. If there is a conflict between the library pages and the web, prioritize the library pages but mention the discrepancy.
+            4. Clearly distinguish between information from the library pages and information from the web.`;
+        }
     }
 
     if (activeSpace) {
@@ -2019,7 +2032,7 @@ function App() {
                                                      {msg.relatedQuestions.map((q, i) => (
                                                          <button 
                                                             key={i}
-                                                            onClick={() => handleSendMessage(q, FocusMode.ALL, ProMode.STANDARD, [])}
+                                                            onClick={() => handleSendMessage(q, [FocusMode.ALL], ProMode.STANDARD, [])}
                                                             className="flex items-center justify-between w-full py-1.5 px-1 text-left text-sm text-pplx-muted hover:text-pplx-text transition-colors group relative pl-3 border-l-2 border-transparent hover:border-pplx-accent/50"
                                                          >
                                                              <div className="flex items-center gap-2 truncate">
@@ -2102,7 +2115,7 @@ function App() {
         onClose={() => setIsSideChatOpen(false)}
         messages={threads.find(t => t.id === sideChatThreadId)?.messages || []}
         isThinking={isThinking}
-        onSendMessage={(text, atts) => handleSendMessage(text, FocusMode.ALL, ProMode.STANDARD, atts, undefined, false, sideChatThreadId!)}
+        onSendMessage={(text, focusModes, atts) => handleSendMessage(text, focusModes, ProMode.STANDARD, atts, undefined, false, sideChatThreadId!)}
         onStopGeneration={handleStopGeneration}
         onRegenerate={(msgId) => handleRegenerate(msgId, sideChatThreadId!)}
         onEditMessage={(msgId, newContent) => handleEditUserMessage(msgId, newContent, sideChatThreadId!)}
@@ -2153,7 +2166,12 @@ function App() {
         notes={notes}
         settings={settings}
         onUpdateSettings={handleUpdateSettings}
-        activeView={activeView === 'chat' && !activeThreadId ? 'home' : activeView === 'library' && !activeNoteId ? 'favorites' : ''}
+        activeView={
+          activeView === 'chat' && !activeThreadId ? 'home' : 
+          activeView === 'library' && !activeNoteId ? 'favorites' : 
+          activeView === 'calendar' ? 'calendar' : 
+          activeNoteId || ''
+        }
         backDestination={backDestination}
         isHomeBackActive={isHomeBackActive}
       />

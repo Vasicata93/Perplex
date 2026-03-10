@@ -81,7 +81,7 @@ export const MobileDock: React.FC<MobileDockProps> = ({
   const getShortcutIcon = (slotIndex: number) => {
     const noteId = shortcuts[slotIndex];
     
-    if (noteId === 'favorites') return <Star size={18} className={activeView === 'library' ? 'text-black' : 'text-white/60'} fill={activeView === 'library' ? 'black' : 'none'} />;
+    if (noteId === 'favorites') return <Star size={18} className={activeView === 'favorites' ? 'text-black' : 'text-white/60'} fill={activeView === 'favorites' ? 'black' : 'none'} />;
     if (noteId === 'calendar') return <Calendar size={18} className={activeView === 'calendar' ? 'text-black' : 'text-white/60'} />;
     
     const note = notes.find(n => n.id === noteId);

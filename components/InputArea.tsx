@@ -7,7 +7,7 @@ import { FocusMode, Attachment, AppSettings, ModelProvider, ProMode, Note, Space
 import { FOCUS_MODES, PRO_MODES } from '../constants';
 
 interface InputAreaProps {
-  onSendMessage: (text: string, focusMode: FocusMode, proMode: ProMode, attachments: Attachment[], modelId?: string, isAgentMode?: boolean) => void;
+  onSendMessage: (text: string, focusModes: FocusMode[], proMode: ProMode, attachments: Attachment[], modelId?: string, isAgentMode?: boolean) => void;
   onStop?: () => void;
   isThinking: boolean;
   centered?: boolean;
@@ -53,7 +53,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
     setIsLongThinking: propSetIsLongThinking,
 }) => {
   const [input, setInput] = useState('');
-  const [focusMode, setFocusMode] = useState<FocusMode>(FocusMode.WEB_SEARCH);
+  const [focusModes, setFocusModes] = useState<FocusMode[]>([FocusMode.WEB_SEARCH]);
   
   // Local State Fallbacks
   const [localProMode, setLocalProMode] = useState<ProMode>(ProMode.STANDARD);
@@ -346,6 +346,13 @@ export const InputArea: React.FC<InputAreaProps> = ({
   // Helper to handle drag start only when at top
   const handleDragStart = (e: React.PointerEvent, controls: any, scrollRef: React.RefObject<HTMLDivElement>) => {
     if (window.innerWidth >= 768) return; // Only mobile
+    
+    // Don't start drag if clicking a button or input to allow their own interactions
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('input') || target.closest('textarea') || target.closest('select')) {
+      return;
+    }
+
     if (!scrollRef.current || scrollRef.current.scrollTop <= 0) {
       controls.start(e);
     }
@@ -365,7 +372,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
 
       // Handle Library Mode: If no specific pages selected, assume ALL
       // If specific pages selected, only attach those.
-      if (focusMode === FocusMode.LIBRARY || focusMode === FocusMode.ALL) {
+      if (focusModes.includes(FocusMode.LIBRARY) || focusModes.includes(FocusMode.ALL)) {
           const notesToAttach = selectedLibraryIds.length === 0 
             ? notes 
             : notes.filter(n => selectedLibraryIds.includes(n.id));
@@ -380,7 +387,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
           });
       }
 
-      onSendMessage(input, focusMode, proMode, finalAttachments, selectedModelId || undefined, isAgentMode);
+      onSendMessage(input, focusModes, proMode, finalAttachments, selectedModelId || undefined, isAgentMode);
       setInput('');
       setAttachments([]);
       if (textareaRef.current) {
@@ -412,7 +419,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const activeFocus = FOCUS_MODES.find(m => m.id === focusMode) || FOCUS_MODES[0];
+  const activeFocus = FOCUS_MODES.find(m => focusModes.includes(m.id)) || FOCUS_MODES[0];
   const FocusIcon = activeFocus.icon;
 
   // Responsive Container Class
@@ -590,25 +597,28 @@ export const InputArea: React.FC<InputAreaProps> = ({
                         drag="y"
                         dragControls={attachDragControls}
                         dragListener={false}
-                        dragConstraints={{ top: 0 }}
-                        dragElastic={{ top: 0, bottom: 0.6 }}
+                        dragConstraints={{ top: 0, bottom: 0 }}
+                        dragElastic={{ top: 0, bottom: 1 }}
+                        dragMomentum={false}
                         onDragEnd={(_: any, info: any) => {
-                            if (info.offset.y > 50 || info.velocity.y > 200) {
+                            if (info.offset.y > 100 || info.velocity.y > 500) {
                                 setShowAttachMenu(false);
                             }
                         }}
                         initial={{ y: '100%' }}
                         animate={{ y: 0 }}
                         exit={{ y: '100%' }}
-                        transition={{ type: 'spring', damping: 20, stiffness: 250 }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                         onPointerDown={(e: React.PointerEvent) => handleDragStart(e, attachDragControls, attachScrollRef)}
                         className={`fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 right-0 w-full max-h-[90vh] overflow-y-auto overscroll-contain bg-pplx-card border-t border-pplx-border rounded-t-2xl shadow-xl p-4 z-50 pb-8 md:absolute md:bottom-12 md:left-0 ${compact ? 'md:w-full' : 'md:w-80'} md:border md:rounded-xl md:p-3 md:pb-3 md:border-b custom-scrollbar touch-pan-y`}
                     >
                         {/* Mobile Drag Handle */}
                         <div 
                             onPointerDown={(e: React.PointerEvent) => attachDragControls.start(e)}
-                            className="w-12 h-1 bg-gray-600 rounded-full mx-auto mb-4 md:hidden cursor-grab active:cursor-grabbing" 
-                        />
+                            className="w-full py-2 -mt-2 mb-2 md:hidden cursor-grab active:cursor-grabbing flex justify-center" 
+                        >
+                            <div className="w-12 h-1 bg-gray-600/50 rounded-full" />
+                        </div>
                         
                         {/* Attach Section (Horizontal) */}
                         <div className="mb-2">
@@ -866,10 +876,10 @@ export const InputArea: React.FC<InputAreaProps> = ({
                     onMouseEnter={() => setHoveredTooltip('focus')}
                     onMouseLeave={() => setHoveredTooltip(null)}
                     disabled={isListening}
-                    className={`relative flex items-center space-x-1 rounded-full transition-all hover:text-pplx-text ${buttonPadding} ${mobileButtonFixedBg} font-medium ${mobileSidePanel ? '!p-1.5' : ''} ${focusMode === FocusMode.LIBRARY && selectedLibraryIds.length > 0 ? 'px-3' : ''}`}
+                    className={`relative flex items-center space-x-1 rounded-full transition-all hover:text-pplx-text ${buttonPadding} ${mobileButtonFixedBg} font-medium ${mobileSidePanel ? '!p-1.5' : ''} ${focusModes.includes(FocusMode.LIBRARY) && selectedLibraryIds.length > 0 ? 'px-3' : ''}`}
                 >
-                    <div className={`flex items-center gap-1.5 ${focusMode !== FocusMode.WEB_SEARCH ? 'text-pplx-accent' : ''}`}>
-                        {focusMode === FocusMode.LIBRARY && selectedLibraryIds.length > 0 && (
+                    <div className={`flex items-center gap-1.5 ${!focusModes.includes(FocusMode.WEB_SEARCH) || focusModes.length > 1 ? 'text-pplx-accent' : ''}`}>
+                        {focusModes.includes(FocusMode.LIBRARY) && selectedLibraryIds.length > 0 && (
                             <span className="text-xs font-bold animate-in fade-in zoom-in duration-200">
                                 {selectedLibraryIds.length}
                             </span>
@@ -882,55 +892,69 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 <AnimatePresence>
                 {showFocusMenu && (
                     <motion.div 
-                        ref={focusScrollRef}
                         drag="y"
                         dragControls={focusDragControls}
                         dragListener={false}
-                        dragConstraints={{ top: 0 }}
-                        dragElastic={{ top: 0, bottom: 0.6 }}
+                        dragConstraints={{ top: 0, bottom: 0 }}
+                        dragElastic={{ top: 0, bottom: 1 }}
+                        dragMomentum={false}
                         onDragEnd={(_: any, info: any) => {
-                            if (info.offset.y > 50 || info.velocity.y > 200) {
+                            if (info.offset.y > 100 || info.velocity.y > 500) {
                                 setShowFocusMenu(false);
                             }
                         }}
                         initial={{ y: '100%' }}
                         animate={{ y: 0 }}
                         exit={{ y: '100%' }}
-                        transition={{ type: 'spring', damping: 20, stiffness: 250 }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                         onPointerDown={(e: React.PointerEvent) => handleDragStart(e, focusDragControls, focusScrollRef)}
                         className={`fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 right-0 w-full bg-pplx-card border-t border-pplx-border rounded-t-2xl shadow-xl p-2 z-50 pb-8 md:absolute md:bottom-12 md:right-0 ${compact ? 'md:w-full' : 'md:w-80'} md:border md:rounded-xl md:p-1 md:pb-1 md:border-b overscroll-contain touch-pan-y`}
                     >
                         {/* Mobile Drag Handle */}
                         <div 
                             onPointerDown={(e: React.PointerEvent) => focusDragControls.start(e)}
-                            className="w-12 h-1 bg-gray-600 rounded-full mx-auto mb-2 md:hidden cursor-grab active:cursor-grabbing" 
-                        />
+                            className="w-full py-2 -mt-1 mb-1 md:hidden cursor-grab active:cursor-grabbing flex justify-center" 
+                        >
+                            <div className="w-12 h-1 bg-gray-600/50 rounded-full" />
+                        </div>
 
-                        <div className="max-h-[85vh] md:max-h-[300px] overflow-y-auto overscroll-contain custom-scrollbar">
+                        <div ref={focusScrollRef} className="max-h-[85vh] md:max-h-[300px] overflow-y-auto overscroll-contain custom-scrollbar">
                             {FOCUS_MODES.map((mode) => (
                                 <div key={mode.id}>
                                     <button
                                         onClick={() => { 
-                                            setFocusMode(mode.id); 
-                                            // User requested to keep menu open
+                                            if (mode.id === FocusMode.ALL) {
+                                                setFocusModes([FocusMode.WEB_SEARCH, FocusMode.LIBRARY]);
+                                            } else {
+                                                setFocusModes(prev => {
+                                                    if (prev.includes(mode.id)) {
+                                                        // Don't allow empty focus modes if possible, or just toggle
+                                                        const next = prev.filter(id => id !== mode.id);
+                                                        return next.length === 0 ? [mode.id] : next;
+                                                    } else {
+                                                        // If selecting one, remove 'ALL' if it was there (though we handle ALL specially)
+                                                        return [...prev.filter(id => id !== FocusMode.ALL), mode.id];
+                                                    }
+                                                });
+                                            }
                                         }}
                                         className={`w-full flex items-center justify-between px-3 py-3 rounded-lg text-sm group transition-all ${
-                                            focusMode === mode.id ? 'bg-pplx-hover' : 'hover:bg-pplx-hover'
+                                            focusModes.includes(mode.id) ? 'bg-pplx-hover' : 'hover:bg-pplx-hover'
                                         }`}
                                     >
                                         <div className="flex items-center space-x-3">
-                                            <mode.icon size={20} className={focusMode === mode.id ? 'text-pplx-accent' : 'text-gray-400 group-hover:text-pplx-text'} />
+                                            <mode.icon size={20} className={focusModes.includes(mode.id) ? 'text-pplx-accent' : 'text-gray-400 group-hover:text-pplx-text'} />
                                             <div className="flex flex-col text-left">
-                                                <span className={focusMode === mode.id ? 'text-pplx-text font-medium' : 'text-gray-400 group-hover:text-pplx-text'}>
+                                                <span className={focusModes.includes(mode.id) ? 'text-pplx-text font-medium' : 'text-gray-400 group-hover:text-pplx-text'}>
                                                     {mode.label}
                                                 </span>
                                             </div>
                                         </div>
                                         <div className={`w-9 h-5 rounded-full relative transition-colors ${
-                                            focusMode === mode.id ? 'bg-pplx-accent' : 'bg-gray-600'
+                                            focusModes.includes(mode.id) ? 'bg-pplx-accent' : 'bg-gray-600'
                                         }`}>
                                             <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${
-                                                focusMode === mode.id ? 'left-[18px]' : 'left-[2px]'
+                                                focusModes.includes(mode.id) ? 'left-[18px]' : 'left-[2px]'
                                             }`} />
                                         </div>
                                     </button>
@@ -941,7 +965,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
                                     )}
 
                                     {/* Library Sub-Selection Logic */}
-                                    {mode.id === FocusMode.LIBRARY && focusMode === FocusMode.LIBRARY && (
+                                    {mode.id === FocusMode.LIBRARY && focusModes.includes(FocusMode.LIBRARY) && (
                                         <div className="pl-10 pr-2 pb-2 animate-fadeIn bg-pplx-secondary/10 rounded-b-lg mb-1">
                                             <div className="text-xs text-pplx-muted mb-2 pt-2 border-t border-pplx-border/50">Select Knowledge Sources:</div>
                                             

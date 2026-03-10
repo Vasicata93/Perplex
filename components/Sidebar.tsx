@@ -92,6 +92,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }
   }, [showFavorites, setShowFavorites, setExpandedSection]);
 
+  // Close mobile library when navigating away from library view or to a specific note
+  useEffect(() => {
+    if (activeView !== 'library' || activeNoteId !== null) {
+      setIsMobileLibraryOpen(false);
+    }
+  }, [activeView, activeNoteId]);
+
   // Swipe logic - Track X and Y to differentiate scroll from swipe
   const touchStartRef = useRef<{ x: number, y: number } | null>(null);
 
