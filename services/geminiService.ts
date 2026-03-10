@@ -598,16 +598,25 @@ export class LLMService {
   // Models that support internal reasoning via OpenRouter
   private static readonly OPENROUTER_REASONING_MODELS = [
     'deepseek-r1',
+    'deepseek-r1-0528',
     'deepseek-v3.2',
+    'deepseek-v3.2-exp',
+    'deepseek-v3.2-speciale',
+    'deepseek-v3.1-terminus',
     'deepseek-v3.1',
     'qwen/qwq-32b',
-    'qwen/qwen3',
+    'qwen/qwen3-235b-a22b',
+    'qwen/qwen3-30b-a3b',
+    'qwen/qwen3-14b',
+    'qwen/qwen3-8b',
     'qwen/qwen3-max-thinking',
+    'claude-3.7-sonnet:thinking',
     'gemini-3-pro-preview',
     'gemini-3-flash-preview',
     'gemini-2.5-pro-preview',
     'gemini-2.5-flash',
     'grok-4-1',
+    'grok-4-1-fast',
     'minimax-m2.5',
     'minimax-m1',
     'glm-4-7',
@@ -1130,7 +1139,8 @@ export class LLMService {
             searchProvider,
             activeSearchKey,
             onChunk,
-            virtualFiles.length > 0 // Enable readFiles tool
+            virtualFiles.length > 0, // Enable readFiles tool
+            proMode
         );
     }
 
@@ -1692,7 +1702,8 @@ export class LLMService {
     searchProvider: 'tavily' | 'brave',
     searchApiKey?: string,
     onChunk?: (text: string, reasoning?: string) => void,
-    useReadFiles: boolean = false
+    useReadFiles: boolean = false,
+    proMode: ProMode = ProMode.STANDARD
   ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; searchImages: string[]; pendingAction?: PendingAction; reasoning?: string }> {
     
     // 1. Prepare Messages
@@ -1773,13 +1784,13 @@ export class LLMService {
             // Handle OpenRouter specific reasoning features
             if (endpoint.includes("openrouter.ai")) {
                 const isReasoningModel = LLMService.OPENROUTER_REASONING_MODELS.some(m => modelName.toLowerCase().includes(m.toLowerCase()));
-                const isClaudeThinking = modelName.toLowerCase().includes("claude-3.7-sonnet");
 
                 if (isReasoningModel) {
                     body.include_reasoning = true;
                 }
 
-                if (isClaudeThinking && (proMode === ProMode.REASONING || proMode === ProMode.THINKING)) {
+                // If model is explicitly a reasoning model or proMode is set, enable thinking
+                if (isReasoningModel || proMode === ProMode.REASONING || proMode === ProMode.THINKING) {
                     body.thinking = {
                         type: "enabled",
                         budget_tokens: proMode === ProMode.REASONING ? 16000 : 4000
