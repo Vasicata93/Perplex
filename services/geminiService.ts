@@ -1390,6 +1390,12 @@ export class LLMService {
                         if (part.text) {
                             text += part.text;
                         }
+                        // Handle Gemini 2.0/3.0 Thinking models
+                        if ((part as any).thought) {
+                            const thought = (part as any).thought;
+                            reasoning += thought;
+                            if (onChunk) onChunk("", thought);
+                        }
                     }
                 }
 
@@ -1675,7 +1681,7 @@ export class LLMService {
 
         const { cleanText, questions } = this.extractRelatedQuestions(finalResponseText);
         return { 
-            text: cleanText, 
+            text: cleanText || (reasoning ? "I have completed my thinking process." : "I've processed your request."), 
             citations: Array.from(new Map(citations.map(c => [c.uri, c])).values()), 
             relatedQuestions: questions, 
             searchImages: searchImages,
@@ -1850,7 +1856,14 @@ export class LLMService {
                         if (!choice) continue;
                         const delta = choice.delta;
 
-                        // 1. Handle Content (Reasoning + Text)
+                        // 1. Handle Reasoning (OpenRouter/OpenAI/DeepSeek)
+                        const reasoningChunk = delta.reasoning || delta.thought || (delta as any).reasoning_content;
+                        if (reasoningChunk) {
+                            finalReasoning += reasoningChunk;
+                            if (onChunk) onChunk("", reasoningChunk);
+                        }
+
+                        // 2. Handle Content (Text)
                         if (delta.content) {
                             const chunk = delta.content;
                             currentTurnContent += chunk;
@@ -1922,8 +1935,20 @@ export class LLMService {
             // If no tool calls, we are done
             if (toolCalls.length === 0) {
                 // Strip thinking tags from final content for clean text
-                finalContent = currentTurnContent.replace(/<thinking>[\s\S]*?<\/thinking>/g, "").trim();
+                const cleanContent = currentTurnContent.replace(/<thinking>[\s\S]*?<\/thinking>/g, "").trim();
+                if (cleanContent) {
+                    finalContent = cleanContent;
+                } else if (!finalContent) {
+                    // If this turn is empty but we have no previous content, use what we have
+                    finalContent = currentTurnContent.trim();
+                }
                 break; // Exit loop
+            }
+
+            // If we have content in this turn but also tool calls, preserve it
+            const turnCleanContent = currentTurnContent.replace(/<thinking>[\s\S]*?<\/thinking>/g, "").trim();
+            if (turnCleanContent) {
+                finalContent += (finalContent ? "\n\n" : "") + turnCleanContent;
             }
 
             // Process Tool Calls
@@ -2174,7 +2199,7 @@ export class LLMService {
     const uniqueImages = Array.from(new Set(collectedImages));
 
     return { 
-        text: finalContent || "Done.", 
+        text: finalContent || (finalReasoning ? "I have completed my thinking process." : "I've processed your request."), 
         citations: uniqueCitations,
         relatedQuestions: extracted.questions,
         searchImages: uniqueImages,
