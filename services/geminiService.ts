@@ -1415,6 +1415,7 @@ Important:
         let turns = 0;
         const maxTurns = 3;
         let currentMessage: any = currentParts;
+        let isThinking = false;
 
         while (turns < maxTurns) {
             const result = await chat.sendMessageStream({ message: currentMessage });
@@ -1425,7 +1426,7 @@ Important:
                 if (this.abortController?.signal.aborted) break;
 
                 // Extract Function Calls
-                const fc = chunk.candidates?.[0]?.content?.parts?.filter((p: any) => !!p.functionCall).map((p: any) => p.functionCall);
+                const fc = chunk.functionCalls;
                 if (fc && fc.length > 0) functionCalls = [...functionCalls, ...fc];
 
                 // Extract Text and Reasoning
@@ -1447,57 +1448,39 @@ Important:
                 if (text) {
                     turnText += text;
                     
-                    // Check if we are inside a thinking block or if this chunk contains thinking tags
-                    const hasThinkingStart = text.includes('<thinking>');
-                    const hasThinkingEnd = text.includes('</thinking>');
-                    
-                    if (hasThinkingStart || hasThinkingEnd || reasoning.length > 0 && !finalResponseText.endsWith('</thinking>')) {
-                        // Complex logic to separate thinking from response
-                        // Simplified for stream:
-                        if (hasThinkingStart) {
-                             const parts = text.split('<thinking>');
-                             if (parts[0]) {
-                                 finalResponseText += parts[0];
-                                 if (onChunk) onChunk(parts[0], undefined);
-                             }
-                             if (parts[1]) {
-                                 reasoning += parts[1];
-                                 if (onChunk) onChunk("", parts[1]);
-                             }
-                        } else if (hasThinkingEnd) {
-                             const parts = text.split('</thinking>');
-                             if (parts[0]) {
-                                 reasoning += parts[0];
-                                 if (onChunk) onChunk("", parts[0]);
-                             }
-                             if (parts[1]) {
-                                 finalResponseText += parts[1];
-                                 if (onChunk) onChunk(parts[1], undefined);
-                             }
-                             // Reset reasoning flag implicitly by structure, but we track it via 'reasoning' var
+                    let remainingText = text;
+                    while (remainingText.length > 0) {
+                        if (!isThinking) {
+                            const startIndex = remainingText.indexOf('<thinking>');
+                            if (startIndex !== -1) {
+                                const before = remainingText.substring(0, startIndex);
+                                if (before) {
+                                    finalResponseText += before;
+                                    if (onChunk) onChunk(before, undefined);
+                                }
+                                isThinking = true;
+                                remainingText = remainingText.substring(startIndex + 10); // '<thinking>'.length
+                            } else {
+                                finalResponseText += remainingText;
+                                if (onChunk) onChunk(remainingText, undefined);
+                                remainingText = "";
+                            }
                         } else {
-                             // If we are in reasoning mode (started but not ended)
-                             // This is tricky because we don't have a strict state flag here other than 'reasoning' length
-                             // But 'reasoning' length > 0 doesn't mean we are currently *in* a thinking block if it was closed previously.
-                             // However, the prompt usually generates thinking at the start.
-                             
-                             // Let's rely on a simpler heuristic: if we haven't seen </thinking> yet, it's reasoning.
-                             // But wait, what if we have multiple thinking blocks? (Rare for this model)
-                             
-                             // Better approach: maintain a state 'isThinking' across chunks
-                             // But for this hotfix, let's assume standard behavior: <thinking>... </thinking> Response.
-                             
-                             if (reasoning.length > 0 && !reasoning.includes('</thinking>')) {
-                                 reasoning += text;
-                                 if (onChunk) onChunk("", text);
-                             } else {
-                                 finalResponseText += text;
-                                 if (onChunk) onChunk(text, undefined);
-                             }
+                            const endIndex = remainingText.indexOf('</thinking>');
+                            if (endIndex !== -1) {
+                                const thought = remainingText.substring(0, endIndex);
+                                if (thought) {
+                                    reasoning += thought;
+                                    if (onChunk) onChunk("", thought);
+                                }
+                                isThinking = false;
+                                remainingText = remainingText.substring(endIndex + 11); // '</thinking>'.length
+                            } else {
+                                reasoning += remainingText;
+                                if (onChunk) onChunk("", remainingText);
+                                remainingText = "";
+                            }
                         }
-                    } else {
-                        finalResponseText += text;
-                        if (onChunk) onChunk(text, undefined);
                     }
                 }
 
@@ -1709,6 +1692,8 @@ Important:
                         }
                         toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
                         if (onChunk) onChunk("", `\n🧠 Căutare semantică: "${query}"...\n`);
+                    } else {
+                        toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Error: Unknown tool." } } });
                     }
                 }
 
