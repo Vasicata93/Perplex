@@ -176,6 +176,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         ? 'bg-pplx-card border border-pplx-border/60 px-4 py-3 rounded-3xl rounded-tr-sm text-pplx-text text-right whitespace-pre-wrap shadow-md backdrop-blur-md' 
                         : 'w-full text-pplx-text'
                     }`}>
+                      {msg.role === Role.MODEL && msg.reasoning && (
+                        <div className="mb-4 p-4 bg-pplx-secondary rounded-lg border border-pplx-border text-sm text-pplx-text/80 font-mono whitespace-pre-wrap">
+                          <div className="font-bold text-pplx-accent mb-2">Reasoning Process:</div>
+                          {msg.reasoning}
+                        </div>
+                      )}
                       {msg.role === Role.USER ? msg.content : <MessageRenderer content={msg.content} />}
                     </div>
                   )}
