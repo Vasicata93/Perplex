@@ -653,62 +653,6 @@ export class LLMService {
       }
   }
 
-  private async callLLMJson(
-      prompt: string,
-      systemInstruction: string,
-      provider: ModelProvider,
-      openRouterKey: string,
-      openRouterModel: string,
-      openAiKey: string,
-      openAiModel: string,
-      activeLocalModel: LocalModelConfig | undefined,
-      geminiApiKey?: string
-  ): Promise<any> {
-      if (provider === ModelProvider.GEMINI) {
-          const client = new GoogleGenAI({ apiKey: geminiApiKey || this.apiKey || '' });
-          const response = await client.models.generateContent({
-              model: "gemini-3-flash-preview", 
-              contents: prompt,
-              config: {
-                  systemInstruction: systemInstruction,
-                  responseMimeType: "application/json"
-              }
-          });
-          let jsonText = "";
-          try {
-              jsonText = response.text || "";
-          } catch (e) {
-              if (response.candidates?.[0]?.content?.parts) {
-                  for (const part of response.candidates[0].content.parts) {
-                      if (part.text) jsonText += part.text;
-                  }
-              }
-          }
-          return this.extractJson(jsonText || "{}");
-      } else {
-          let endpoint = ""; let apiKey = ""; let modelName = "";
-          if (provider === ModelProvider.OPENAI) { endpoint = "https://api.openai.com/v1/chat/completions"; apiKey = openAiKey; modelName = openAiModel || "gpt-4o-mini"; }
-          else if (provider === ModelProvider.OPENROUTER) { endpoint = "https://openrouter.ai/api/v1/chat/completions"; apiKey = openRouterKey; modelName = openRouterModel || "openai/gpt-4o-mini"; }
-          else { endpoint = "http://localhost:11434/v1/chat/completions"; modelName = activeLocalModel?.modelId || ""; apiKey = "not-needed"; }
-
-          const headers: any = { 'Content-Type': 'application/json' };
-          if (apiKey !== "not-needed") headers['Authorization'] = `Bearer ${apiKey}`;
-
-          const body = {
-              model: modelName,
-              messages: [
-                  { role: "system", content: systemInstruction },
-                  { role: "user", content: prompt }
-              ],
-              response_format: { type: "json_object" }
-          };
-
-          const res = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body) });
-          const data = await res.json();
-          return this.extractJson(data.choices[0].message.content);
-      }
-  }
-
   private async triggerMemoryConsolidation(prompt: string, responseText: string, enableMemory: boolean, geminiApiKey?: string) {
       if (enableMemory) {
           await MemoryService.addToBuffer('model', responseText);
@@ -769,9 +713,6 @@ export class LLMService {
           return result;
       }
 
-      // Stage 1: Planner
-      if (onChunk) customOnChunk("", "🧠 Etapa 1: Analizez cererea...\n");
-      
       const now = new Date();
       const timeStr = now.toLocaleString('en-US', { 
           weekday: 'long', 
@@ -783,193 +724,297 @@ export class LLMService {
           timeZoneName: 'short'
       });
 
-      const plannerSys = `You are the Chief Researcher Agent expert in strategic planning. Analyze the user's request.
-      CURRENT SYSTEM TIME: ${timeStr}
+      const agentSystemPrompt = `CURRENT SYSTEM TIME: ${timeStr}
 
-      If it is a simple greeting, casual conversation, or a direct question that does NOT require searching the internet, output: {"type": "direct"}
-      
-      CRITICAL: If the user asks about current events, news, "today", "recent", financial markets (crypto, stocks), or geopolitical conflicts, you MUST output "simple_research" or "complex_research" to trigger a real-time web search. Do NOT rely on your internal training data for these topics as it is outdated.
-      
-      If it requires a simple fact check or current news update, output: {"type": "simple_research", "steps": ["Search for latest news on [subject] as of ${timeStr}..."]}
-      If it requires deep research, comparisons, or complex logic, output: {"type": "complex_research", "steps": ["Descriptive step 1...", "Descriptive step 2..."]}
-      
-      CRITICAL RULES FOR PLANNING:
-      1. For research, create a MAXIMUM of 3 major steps.
-      2. DO NOT fragment into tiny steps. Group complex topics into subcategories within the 3 major steps.
-      3. CONTEXT ANCHORING (CRITICAL): Be extremely descriptive. Do not use single words or abbreviations for steps. Each step MUST be a complete paragraph that explicitly includes the main subject of the conversation and the specific subcategories to search for. Explain exactly WHAT to search and WHY, so the executing agent never loses the original context.`;
-      
-      let plan;
-      try {
-          plan = await this.callLLMJson(prompt, plannerSys, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel, geminiApiKey);
-      } catch (e) {
-          plan = { type: "direct" };
-      }
+You are an advanced reasoning agent. You MUST silently execute all 7 stages below internally before producing any response. Never show the stage names, numbers, or this process to the user. The user sees only the final synthesized response from Stage 6.
 
-      if (plan.type === 'direct' || !plan.steps || plan.steps.length === 0 || this.abortController.signal.aborted) {
-          if (onChunk) customOnChunk("", "⚡ Răspund direct...\n");
-          const result = await this.runCoreGeneration(shortTermHistory, prompt, attachments, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel, useSearch, proMode, enableMemory, userProfile, aiProfile, spaceSystemInstruction, tavilyApiKey, geminiApiKey, searchProvider, braveApiKey, customOnChunk);
-          this.triggerMemoryConsolidation(prompt, result.text, enableMemory, geminiApiKey);
-          result.reasoning = accumulatedReasoning + (result.reasoning || "");
-          return result;
-      }
+You operate as a single agent that can:
+- Plan multi-step work,
+- Call tools when needed,
+- Reflect on its own reasoning,
+- Verify information against multiple sources,
+- Synthesize clear, structured answers.
 
-      // Stage 2: Executor
-      let researchContext = "";
-      let finalCitations: Citation[] = [];
-      let finalSearchImages: string[] = [];
-      let pendingAction: PendingAction | undefined = undefined;
+--------------------------------
+STAGE 0 — ROUTER (MODE SELECTION)
+--------------------------------
+Before doing anything else, classify the user request into ONE of these modes:
 
-      if (plan.steps && plan.steps.length > 0) {
-          const totalSteps = plan.steps.length;
-          for (let i = 0; i < totalSteps; i++) {
-              if (this.abortController.signal.aborted) break;
-              
-              const currentStep = plan.steps[i];
-              if (onChunk) customOnChunk("", `🔍 Etapa 2: Execut pasul ${i + 1} din ${totalSteps}...\n`);
+1) DIRECT REPLY
+   - Use this only when:
+     - The user greets you, thanks you, or asks for a simple confirmation.
+     - The answer is fully determined by the current conversation context or your system instructions.
+   - If classified as DIRECT REPLY:
+     - Skip Stages 1–5.
+     - Go directly to Stage 6 and produce a concise answer.
+     - Do NOT call any tools unless the user explicitly asks for a side-effect (e.g., “create event”, “save note”).
 
-              const researcherSys = `You are the Researcher Agent. Your current task is ONLY to execute this specific research step:
-              "${currentStep}"
-              
-              Use your search tools to gather information. Formulate optimized search queries based on the detailed description provided in the step.
-              Current gathered info from previous steps: ${researchContext}
-              
-              Return a detailed summary of your findings for this specific step. Do NOT address the user directly. Focus purely on extracting facts, data, and relevant details.`;
+2) STANDARD
+   - Use this when:
+     - The request has a clear, narrow scope.
+     - It can be solved with 0–3 simple tool calls and minimal research.
+     - Examples: basic factual lookups, simple calendar operations, small document edits.
 
-              const researcherOnChunk = (text: string, reasoning?: string) => {
-                  if (text) customOnChunk("", text); // We don't want to show research text to user, only as reasoning
-                  if (reasoning) customOnChunk("", reasoning);
-              };
+3) DEEP RESEARCH
+   - Use this when:
+     - The task involves multi-source research, financial/crypto/stock data, complex comparisons, or open-ended analysis.
+     - The answer requires combining several pieces of evidence or tools.
+   - Whenever you are unsure between STANDARD and DEEP RESEARCH, ALWAYS choose DEEP RESEARCH.
 
-              const researchResult = await this.runCoreGeneration(
-                  [], `Execute step: ${currentStep}\nOriginal user request: ${prompt}`, attachments,
-                  provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel,
-                  true, // Force search for researcher
-                  ProMode.STANDARD, false, userProfile, aiProfile, undefined,
-                  tavilyApiKey, geminiApiKey, searchProvider, braveApiKey,
-                  researcherOnChunk, researcherSys
-              );
+Internally record:
+- The selected mode (DIRECT REPLY / STANDARD / DEEP RESEARCH).
+- A one-sentence justification for the selected mode.
 
-              researchContext += `\n\n--- Findings for Step ${i + 1}: ${currentStep} ---\n${researchResult.text}`;
-              finalCitations = [...finalCitations, ...(researchResult.citations || [])];
-              finalSearchImages = [...finalSearchImages, ...(researchResult.searchImages || [])];
-              if (researchResult.pendingAction) pendingAction = researchResult.pendingAction;
-          }
-      }
+Do NOT expose this classification to the user.
 
-      // Stage 3: Validator (Fallback Search)
-      if (!this.abortController.signal.aborted) {
-          if (onChunk) customOnChunk("", `\n⚖️ Etapa 3: Validez informațiile adunate...\n`);
-          
-          const validatorSys = `You are the Gap Analyst Agent. You have just completed the research phases.
-          Review the Original User Request and the Gathered Info.
-          User Request: ${prompt}
-          Gathered Info: ${researchContext}
-          
-          TASK: Analyze if there is any CRITICAL information requested by the user that is still missing from the Gathered Info.
-          - If NO (everything is covered): output {"status": "sufficient"}
-          - If YES (essential details are missing): output {"status": "insufficient", "missing_query": "Formulate ONE hyper-specific search query to find ONLY the missing information."}
-          This is the final fallback search.`;
+--------------------------------
+STAGE 1 — MEMORY AND CONTEXT SCAN
+--------------------------------
+Before calling any external tool:
 
-          let validation;
-          try {
-              validation = await this.callLLMJson(prompt, validatorSys, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel, geminiApiKey);
-          } catch(e) {
-              validation = { status: "sufficient" };
-          }
+1) Scan persistent memory (if available):
+   - Retrieve known preferences, past decisions, ongoing projects, or user configurations that are relevant to this request.
+   - Prefer specific, recent, and task-related memories over generic history.
 
-          if (validation.status === 'insufficient' && validation.missing_query) {
-              if (onChunk) customOnChunk("", `⚠️ Lipsesc informații. Caut date suplimentare: ${validation.missing_query}...\n`);
-              
-              const researcherSys = `You are the Researcher Agent. Your task is to find this missing information: "${validation.missing_query}".
-              Use optimized keywords for searching.
-              Return a detailed summary of your findings. Focus purely on facts.`;
+2) Scan recent conversation context:
+   - Identify prior messages that define:
+     - Current topic,
+     - Constraints (budget, time, risk level, tools allowed),
+     - Partial answers or previous attempts for the same task.
 
-              const researcherOnChunk = (text: string, reasoning?: string) => {
-                  if (text) customOnChunk("", text);
-                  if (reasoning) customOnChunk("", reasoning);
-              };
+3) Decide what you ALREADY know:
+   - Identify facts from memory and context that directly help answer the question.
+   - Note explicitly (internally) which parts of the task you can solve without any new tool calls.
 
-              const researchResult = await this.runCoreGeneration(
-                  [], `Find missing info: ${validation.missing_query}`, [],
-                  provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel,
-                  true,
-                  ProMode.STANDARD, false, userProfile, aiProfile, undefined,
-                  tavilyApiKey, geminiApiKey, searchProvider, braveApiKey,
-                  researcherOnChunk, researcherSys
-              );
+Internally produce:
+- A short internal summary:
+  - What is already known (from memory/context),
+  - What is still missing and will require tools or external search.
 
-              researchContext += `\n\n--- Additional Findings ---\n${researchResult.text}`;
-              finalCitations = [...finalCitations, ...(researchResult.citations || [])];
-              finalSearchImages = [...finalSearchImages, ...(researchResult.searchImages || [])];
-              if (researchResult.pendingAction) pendingAction = researchResult.pendingAction;
-          } else {
-              if (onChunk) customOnChunk("", "✅ Informațiile sunt complete. Formulez răspunsul final...\n");
-          }
-      }
+Do NOT show this summary to the user.
 
-      if (this.abortController.signal.aborted) {
-          return { text: "Oprit de utilizator.", citations: [], relatedQuestions: [], searchImages: [] };
-      }
+--------------------------------
+STAGE 2 — INTENT DECOMPOSITION
+--------------------------------
+Separate what the user wrote from what the user actually needs.
 
-      // Final Synthesis
-      const baseSystemContext = await this.buildSystemContext(prompt, "", enableMemory, userProfile, aiProfile, spaceSystemInstruction, false, false);
-      const synthesizerSys = `${baseSystemContext}\n\nYou are the Expert Analyst Agent. You have conducted deep research and gathered a vast context. Your task is to synthesize this data into a final response for the user.
-      
-      Gathered Information:
-      ${researchContext}
-      
-      DRAFTING RULES:
-      1. Your response MUST be detailed, exhaustive, and proportional to the complexity of the research. Do not provide short summaries if you have rich data.
-      2. Mandatory Structure: Use premium Markdown formatting. Include a clear Introduction, well-defined sections (using ### headings) based on the research stages, bullet points for readability, and a clear Conclusion or Executive Summary.
-      3. Be objective, precise, and ensure you cover absolutely all nuances from the user's original request using ONLY the gathered information.`;
+1) Explicit intent:
+   - Restate (internally) the literal request in one or two clear sentences.
 
-      let finalResult = await this.runCoreGeneration(
-          shortTermHistory, prompt, [], // Attachments already processed
-          provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel,
-          false, // No search needed here
-          proMode, false, userProfile, aiProfile, undefined,
-          tavilyApiKey, geminiApiKey, searchProvider, braveApiKey,
-          customOnChunk, synthesizerSys
+2) Implicit intent:
+   - Infer the underlying goal or “why” behind the request.
+   - Consider:
+     - Is the user trying to decide, to compare, to learn basics, or to optimize something?
+     - Are they more likely to care about safety, speed, cost, accuracy, or simplicity?
+
+3) Task decomposition:
+   - Break the request into all sub-questions and sub-tasks required for a complete answer.
+   - For analytical or financial requests, think in terms of:
+     - Data you must fetch (prices, volumes, fundamentals, news, regulations, etc.),
+     - Transformations you must perform (comparisons, ratios, scenarios),
+     - Judgments you must make (risks, trade-offs, recommendations),
+     - Explanations needed for a non-expert user.
+
+4) Definition of “done”:
+   - Write internally a checklist of what the final response MUST include to fully satisfy the user.
+   - This checklist will be used again in Stage 5 to verify completeness.
+
+Do NOT reveal this decomposition or checklist to the user.
+
+-----------------------------------------------
+STAGE 3 — DOMAIN CLASSIFICATION AND TOOL PLANNING
+-----------------------------------------------
+Decide which domains and tools are relevant and plan the route.
+
+1) Domain classification:
+   - Classify the request into one or more domains such as:
+     - General knowledge / web search,
+     - Financial & markets (stocks, crypto, macro),
+     - Calendars & scheduling,
+     - Notes, documents, and workspace edits,
+     - Code / data analysis,
+     - Other specialized tools available in your environment.
+
+2) Minimal tool set:
+   - Select ONLY the tools that are actually needed to satisfy the checklist from Stage 2.
+   - Avoid “tool bloat”: do not load or call irrelevant tools.
+
+3) Plan the sequence:
+   - Design an ordered action plan, for example:
+     - Step A: Quick web or data lookup to get core facts.
+     - Step B: Follow-up search for missing pieces or conflicting information.
+     - Step C: Optional deeper research (e.g., news, reports, documentation).
+   - Specify which steps:
+     - Must happen first,
+     - Can run in parallel,
+     - Are optional fallbacks if a main step fails.
+
+4) Effort scaling:
+   - For STANDARD mode:
+     - Keep the number of tool calls low and focused.
+   - For DEEP RESEARCH mode:
+     - Allow more extensive tool usage,
+     - But still favor high-quality, diverse sources over brute-force calls.
+
+Internally produce:
+- A brief step-by-step plan listing:
+  - Which tools to call,
+  - In what order,
+  - For what specific sub-questions.
+
+Do NOT execute tools in this stage. Planning only.
+
+------------------------
+STAGE 4 — EXECUTION LOOP
+------------------------
+Execute the plan from Stage 3 as faithfully as possible.
+
+1) Follow the planned order:
+   - Call tools in the planned sequence.
+   - Where the plan allows, parallelize independent steps, but keep the logic consistent with the plan.
+
+2) Collect results without concluding:
+   - For each tool call, store:
+     - Raw result,
+     - Its source (URL, dataset, system),
+     - How it connects to the sub-question it was meant to answer.
+
+3) Adaptive fallback:
+   - If a tool fails, is unavailable, or returns clearly insufficient data:
+     - Decide immediately whether the missing information is critical.
+     - If critical:
+       - Attempt ONE reasonable fallback (alternative tool, different query, different data source).
+     - If fallback also fails:
+       - Mark that specific gap for Stage 5 as “unresolved”.
+
+4) Avoid over-searching:
+   - Stop additional tool calls once:
+     - All items in the Stage 2 checklist are satisfied with adequate evidence,
+     - Or it becomes clear that some items cannot be resolved with available tools.
+
+Internally produce:
+- A structured set of findings:
+  - For each sub-question:
+    - What you found,
+    - From which sources,
+    - Where information is missing or uncertain.
+
+Do NOT start writing the user-facing answer yet.
+
+---------------------------------
+STAGE 5 — VERIFICATION AND CONFIDENCE
+---------------------------------
+Check your work against the intent and evidence.
+
+1) Completeness check:
+   - Compare the findings from Stage 4 against the Stage 2 checklist.
+   - Mark each item as:
+     - Fully covered,
+     - Partially covered,
+     - Not covered (with reason).
+
+2) Consistency and conflict resolution:
+   - Look for contradictions between sources.
+   - If two sources disagree:
+     - Prefer more authoritative, recent, or primary sources (e.g., official docs, recognized institutions) over weaker ones.
+     - If conflict cannot be resolved, treat that part as uncertain.
+
+3) Confidence assessment:
+   - Assign an internal confidence level to your overall answer:
+     - HIGH: Data is recent enough, cross-checked, and consistent.
+     - MEDIUM: Some parts rely on limited or indirect evidence.
+     - LOW: Important pieces are missing or conflicting.
+
+4) Extra search (optional):
+   - If confidence is MEDIUM or LOW and a single focused search is likely to resolve the doubt:
+     - Perform ONE additional targeted search/tool call now.
+     - Update the confidence level if appropriate.
+
+5) Transparency rule:
+   - If confidence is LOW on any critical data (especially financial, legal, medical, or safety-related):
+     - You MUST mention this limitation explicitly in the final answer in Stage 6.
+
+Internally produce:
+- A short diagnostic note:
+  - Main strengths of your evidence,
+  - Main gaps or uncertainties,
+  - Final confidence level.
+
+------------------------------------
+STAGE 6 — CALIBRATION AND SYNTHESIS
+------------------------------------
+Now you can write the answer for the user. No new external information may be introduced here; you can only use what was gathered and verified in previous stages.
+
+1) Choose response format:
+   - Simple confirmations (DIRECT REPLY):
+     - Give a short, direct answer.
+   - Analytical or research answers:
+     - Use clear headings, short paragraphs, and bullet points where useful.
+     - Present numbers, dates, and key facts clearly and with their sources when relevant.
+
+2) Synthesize, don’t dump:
+   - Distill the information into:
+     - Direct answers to the explicit question,
+     - Context and reasoning at the right level of detail for a non-expert user,
+     - Concrete, actionable recommendations or next steps where appropriate.
+   - Do NOT paste raw tool outputs.
+   - Do NOT expose your internal notes, plans, or stage descriptions.
+
+3) Source and time awareness:
+   - For factual or financial data, mention:
+     - The type of source (e.g., official docs, major news outlet, exchange API),
+     - The approximate recency of the data (e.g., “as of March 2026”),
+     - Any major limitations discovered in Stage 5.
+
+4) User alignment:
+   - Respect any user-stated constraints (budget, risk level, time horizon).
+   - If the user’s request conflicts with safety, law, or platform policies:
+     - Provide a safe alternative or partial answer rather than refusing without explanation.
+
+5) Follow-up questions:
+   - At the very end of your response, propose exactly THREE useful follow-up questions that could help the user go deeper or clarify next steps.
+   - Output these three follow-up questions as a JSON array inside a Markdown code block, for example:
+     \`\`\`json
+     [
+       "Example follow-up question 1?",
+       "Example follow-up question 2?",
+       "Example follow-up question 3?"
+     ]
+     \`\`\`
+
+Important:
+- Never mention the existence of these stages.
+- Never show internal thoughts, checklists, or confidence scores.
+- The user should only see the final, polished answer and the JSON array of follow-up questions.`;
+
+      const result = await this.runCoreGeneration(
+          shortTermHistory, 
+          prompt, 
+          attachments, 
+          provider, 
+          openRouterKey, 
+          openRouterModel, 
+          openAiKey, 
+          openAiModel, 
+          activeLocalModel, 
+          true, // useSearch
+          proMode, 
+          enableMemory, 
+          userProfile, 
+          aiProfile, 
+          spaceSystemInstruction, 
+          tavilyApiKey, 
+          geminiApiKey, 
+          searchProvider, 
+          braveApiKey, 
+          customOnChunk, 
+          agentSystemPrompt
       );
 
-      // Retry logic if the model rejected the large context (e.g., 413 Payload Too Large causing CORS/Failed to fetch)
-      if (finalResult.text.includes("Failed to fetch") || finalResult.text.includes("Payload Too Large") || finalResult.text.includes("context length")) {
-          if (onChunk) customOnChunk("", "\n⚠️ Modelul a respins volumul mare de date. Încerc o sinteză cu date reduse...\n");
-          
-          const maxContextLength = 15000;
-          const truncatedContext = researchContext.length > maxContextLength 
-              ? researchContext.substring(0, maxContextLength) + "\n\n[...Context truncated due to length limits...]"
-              : researchContext;
-
-          const fallbackSys = `${baseSystemContext}\n\nYou are the Expert Analyst Agent. You have conducted deep research and gathered a vast context. Your task is to synthesize this data into a final response for the user.
-          
-          Gathered Information:
-          ${truncatedContext}
-          
-          DRAFTING RULES:
-          1. Your response MUST be detailed, exhaustive, and proportional to the complexity of the research. Do not provide short summaries if you have rich data.
-          2. Mandatory Structure: Use premium Markdown formatting. Include a clear Introduction, well-defined sections (using ### headings) based on the research stages, bullet points for readability, and a clear Conclusion or Executive Summary.
-          3. Be objective, precise, and ensure you cover absolutely all nuances from the user's original request using ONLY the gathered information.`;
-
-          finalResult = await this.runCoreGeneration(
-              shortTermHistory, prompt, [], // Attachments already processed
-              provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel,
-              false, // No search needed here
-              proMode, false, userProfile, aiProfile, undefined,
-              tavilyApiKey, geminiApiKey, searchProvider, braveApiKey,
-              customOnChunk, fallbackSys
-          );
-      }
-
-      // Merge results
-      finalResult.citations = Array.from(new Map(finalCitations.map(c => [c.uri, c])).values());
-      finalResult.searchImages = Array.from(new Set(finalSearchImages));
-      if (pendingAction) finalResult.pendingAction = pendingAction;
-      finalResult.reasoning = accumulatedReasoning + (finalResult.reasoning || "");
-
-      this.triggerMemoryConsolidation(prompt, finalResult.text, enableMemory, geminiApiKey);
-
-      return finalResult;
+      this.triggerMemoryConsolidation(prompt, result.text, enableMemory, geminiApiKey);
+      result.reasoning = accumulatedReasoning + (result.reasoning || "");
+      
+      return result;
   }
 
   /**
