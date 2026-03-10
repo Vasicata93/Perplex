@@ -1681,7 +1681,7 @@ export class LLMService {
 
         const { cleanText, questions } = this.extractRelatedQuestions(finalResponseText);
         return { 
-            text: cleanText || (reasoning ? "I have completed my thinking process." : "I've processed your request."), 
+            text: cleanText || "", 
             citations: Array.from(new Map(citations.map(c => [c.uri, c])).values()), 
             relatedQuestions: questions, 
             searchImages: searchImages,
@@ -1709,7 +1709,7 @@ export class LLMService {
     searchApiKey?: string,
     onChunk?: (text: string, reasoning?: string) => void,
     useReadFiles: boolean = false,
-    proMode: ProMode = ProMode.STANDARD
+    _proMode: ProMode = ProMode.STANDARD
   ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; searchImages: string[]; pendingAction?: PendingAction; reasoning?: string }> {
     
     // 1. Prepare Messages
@@ -1789,20 +1789,11 @@ export class LLMService {
 
             // Handle OpenRouter specific reasoning features
             if (endpoint.includes("openrouter.ai")) {
-                const isReasoningModel = LLMService.OPENROUTER_REASONING_MODELS.some(m => modelName.toLowerCase().includes(m.toLowerCase()));
-
+                const isReasoningModel = LLMService.OPENROUTER_REASONING_MODELS.some(
+                    m => modelName.toLowerCase().includes(m.toLowerCase())
+                );
                 if (isReasoningModel) {
-                    body.include_reasoning = true;
-                }
-
-                // If model is explicitly a reasoning model or proMode is set, enable thinking
-                if (isReasoningModel || proMode === ProMode.REASONING || proMode === ProMode.THINKING) {
-                    body.thinking = {
-                        type: "enabled",
-                        budget_tokens: proMode === ProMode.REASONING ? 16000 : 4000
-                    };
-                    // Ensure max_tokens is sufficient for thinking + response
-                    body.max_tokens = body.thinking.budget_tokens + 8000;
+                    body.reasoning = { enabled: true };
                 }
             }
             
@@ -2199,7 +2190,7 @@ export class LLMService {
     const uniqueImages = Array.from(new Set(collectedImages));
 
     return { 
-        text: finalContent || (finalReasoning ? "I have completed my thinking process." : "I've processed your request."), 
+        text: finalContent || "", 
         citations: uniqueCitations,
         relatedQuestions: extracted.questions,
         searchImages: uniqueImages,
