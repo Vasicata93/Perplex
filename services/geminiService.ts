@@ -6,6 +6,7 @@ import { MemoryService } from "./memoryService";
 import { TavilyService } from "./tavilyService";
 import { db, STORES } from "./db";
 import { getHolidays } from "../src/services/holidayService";
+import { RAGService } from "./ragService";
 
 // --- Tool Definitions ---
 
@@ -1629,26 +1630,53 @@ Important:
                         }
                         toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
                     } else if (fc.name === 'search_workspace_files') {
-                        const queries = (fc.args.queries as string[]).map(q => q.toLowerCase());
+                        const queries = fc.args.queries as string[];
                         let responseContent = `Search results for [${queries.join(', ')}] in workspace files:\n`;
                         let foundCount = 0;
-
-                        this.workspaceFiles.forEach(f => {
-                            if (!f.content) return;
-                            const lines = f.content.split('\n');
-                            lines.forEach((line, idx) => {
-                                const lowerLine = line.toLowerCase();
-                                if (queries.some(q => lowerLine.includes(q))) {
-                                    foundCount++;
-                                    const start = Math.max(0, idx - 1);
-                                    const end = Math.min(lines.length - 1, idx + 1);
-                                    responseContent += `\n[File: ${f.name}, Line ${idx + 1}]\n`;
-                                    for (let i = start; i <= end; i++) {
-                                        responseContent += `${i === idx ? '>> ' : '   '}${lines[i]}\n`;
+                        const apiKeyToUse = customApiKey || this.apiKey;
+                        
+                        if (apiKeyToUse) {
+                            const filenames = this.workspaceFiles.map(f => f.name);
+                            for (const query of queries) {
+                                try {
+                                    const results = await RAGService.search(query, undefined, apiKeyToUse, 3, filenames);
+                                    if (results.length > 0) {
+                                        foundCount += results.length;
+                                        responseContent += `\n--- Results for "${query}" ---\n`;
+                                        results.forEach((res, idx) => {
+                                            responseContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${res.chunk.content}\n`;
+                                        });
                                     }
+                                } catch (e) {
+                                    console.error("[RAG] Search error in tool:", e);
                                 }
+                            }
+                        }
+
+                        // Fallback to basic search if RAG fails or no API key (or no results?)
+                        // Actually, if RAG finds nothing, we could fallback, but let's just use RAG if key exists.
+                        if (!apiKeyToUse || foundCount === 0) {
+                            // Basic string match fallback
+                            let fallbackFound = 0;
+                            const lowerQueries = queries.map(q => q.toLowerCase());
+                            this.workspaceFiles.forEach(f => {
+                                if (!f.content) return;
+                                const lines = f.content.split('\n');
+                                lines.forEach((line, idx) => {
+                                    const lowerLine = line.toLowerCase();
+                                    if (lowerQueries.some(q => lowerLine.includes(q))) {
+                                        fallbackFound++;
+                                        const start = Math.max(0, idx - 1);
+                                        const end = Math.min(lines.length - 1, idx + 1);
+                                        responseContent += `\n[File: ${f.name}, Line ${idx + 1}]\n`;
+                                        for (let i = start; i <= end; i++) {
+                                            responseContent += `${i === idx ? '>> ' : '   '}${lines[i]}\n`;
+                                        }
+                                    }
+                                });
                             });
-                        });
+                            foundCount += fallbackFound;
+                        }
 
                         if (foundCount === 0) responseContent = `No matches found for any of the queries in workspace files.`;
                         toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
@@ -1672,22 +1700,25 @@ Important:
                     } else if (fc.name === 'semantic_search_workspace') {
                         const query = fc.args.query as string;
                         let responseContent = `Semantic search results for "${query}":\n`;
+                        const apiKeyToUse = customApiKey || this.apiKey;
                         
-                        // 1. Generate embedding for query
-                        const queryEmbedding = await this.generateEmbedding(query);
-                        
-                        if (!queryEmbedding) {
-                             responseContent = "Error: Could not generate embedding for query.";
+                        if (!apiKeyToUse) {
+                             responseContent = "Error: API key required for semantic search.";
                         } else {
-                            // 2. Search in workspace chunks
-                            const results = await this.searchInWorkspace(queryEmbedding);
-                            
-                            if (results.length > 0) {
-                                results.forEach((res, idx) => {
-                                    responseContent += `\n[Result ${idx + 1} - File: ${res.filename} (Score: ${res.score.toFixed(2)})]\n${res.content}\n`;
-                                });
-                            } else {
-                                responseContent = "No semantically relevant information found.";
+                            try {
+                                const filenames = this.workspaceFiles.map(f => f.name);
+                                const results = await RAGService.search(query, undefined, apiKeyToUse, 5, filenames);
+                                
+                                if (results.length > 0) {
+                                    results.forEach((res, idx) => {
+                                        responseContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${res.chunk.content}\n`;
+                                    });
+                                } else {
+                                    responseContent = "No semantically relevant information found.";
+                                }
+                            } catch (e) {
+                                console.error("[RAG] Semantic search error:", e);
+                                responseContent = "Error: Failed to perform semantic search.";
                             }
                         }
                         toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
@@ -2119,26 +2150,50 @@ Important:
                         }
                         if (onChunk) onChunk("", `\n📖 Citit ${filenames.length} fișiere din workspace...\n`);
                     } else if (toolCall.function.name === 'search_workspace_files') {
-                        const queries = (args.queries as string[]).map(q => q.toLowerCase());
+                        const queries = args.queries as string[];
                         let foundCount = 0;
                         toolResultContent = `Search results for [${queries.join(', ')}] in workspace files:\n`;
+                        const apiKeyToUse = apiKey || this.apiKey;
 
-                        this.workspaceFiles.forEach(f => {
-                            if (!f.content) return;
-                            const lines = f.content.split('\n');
-                            lines.forEach((line, idx) => {
-                                const lowerLine = line.toLowerCase();
-                                if (queries.some(q => lowerLine.includes(q))) {
-                                    foundCount++;
-                                    const start = Math.max(0, idx - 1);
-                                    const end = Math.min(lines.length - 1, idx + 1);
-                                    toolResultContent += `\n[File: ${f.name}, Line ${idx + 1}]\n`;
-                                    for (let i = start; i <= end; i++) {
-                                        toolResultContent += `${i === idx ? '>> ' : '   '}${lines[i]}\n`;
+                        if (apiKeyToUse) {
+                            const filenames = this.workspaceFiles.map(f => f.name);
+                            for (const query of queries) {
+                                try {
+                                    const results = await RAGService.search(query, undefined, apiKeyToUse, 3, filenames);
+                                    if (results.length > 0) {
+                                        foundCount += results.length;
+                                        toolResultContent += `\n--- Results for "${query}" ---\n`;
+                                        results.forEach((res, idx) => {
+                                            toolResultContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${res.chunk.content}\n`;
+                                        });
                                     }
+                                } catch (e) {
+                                    console.error("[RAG] Search error in tool:", e);
                                 }
+                            }
+                        }
+
+                        if (!apiKeyToUse || foundCount === 0) {
+                            let fallbackFound = 0;
+                            const lowerQueries = queries.map(q => q.toLowerCase());
+                            this.workspaceFiles.forEach(f => {
+                                if (!f.content) return;
+                                const lines = f.content.split('\n');
+                                lines.forEach((line, idx) => {
+                                    const lowerLine = line.toLowerCase();
+                                    if (lowerQueries.some(q => lowerLine.includes(q))) {
+                                        fallbackFound++;
+                                        const start = Math.max(0, idx - 1);
+                                        const end = Math.min(lines.length - 1, idx + 1);
+                                        toolResultContent += `\n[File: ${f.name}, Line ${idx + 1}]\n`;
+                                        for (let i = start; i <= end; i++) {
+                                            toolResultContent += `${i === idx ? '>> ' : '   '}${lines[i]}\n`;
+                                        }
+                                    }
+                                });
                             });
-                        });
+                            foundCount += fallbackFound;
+                        }
 
                         if (foundCount === 0) toolResultContent = `No matches found for any of the queries in workspace files.`;
                         if (onChunk) onChunk("", `\n🔍 Căutat ${queries.length} termeni în workspace...\n`);
@@ -2155,18 +2210,24 @@ Important:
                     } else if (toolCall.function.name === 'semantic_search_workspace') {
                         const query = args.query as string;
                         let toolResultContent = `Semantic search results for "${query}":\n`;
+                        const apiKeyToUse = apiKey || this.apiKey;
                         
-                        const queryEmbedding = await this.generateEmbedding(query);
-                        if (!queryEmbedding) {
-                            toolResultContent = "Error: Could not generate embedding for query.";
+                        if (!apiKeyToUse) {
+                            toolResultContent = "Error: API key required for semantic search.";
                         } else {
-                            const results = await this.searchInWorkspace(queryEmbedding);
-                            if (results.length > 0) {
-                                results.forEach((res, idx) => {
-                                    toolResultContent += `\n[Result ${idx + 1} - File: ${res.filename} (Score: ${res.score.toFixed(2)})]\n${res.content}\n`;
-                                });
-                            } else {
-                                toolResultContent = "No semantically relevant information found.";
+                            try {
+                                const filenames = this.workspaceFiles.map(f => f.name);
+                                const results = await RAGService.search(query, undefined, apiKeyToUse, 5, filenames);
+                                if (results.length > 0) {
+                                    results.forEach((res, idx) => {
+                                        toolResultContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${res.chunk.content}\n`;
+                                    });
+                                } else {
+                                    toolResultContent = "No semantically relevant information found.";
+                                }
+                            } catch (e) {
+                                console.error("[RAG] Semantic search error:", e);
+                                toolResultContent = "Error: Failed to perform semantic search.";
                             }
                         }
                         if (onChunk) onChunk("", `\n🧠 Căutare semantică: "${query}"...\n`);
@@ -2280,63 +2341,7 @@ Important:
     return buffer;
   }
 
-  // --- Semantic Search Helpers ---
-  private async generateEmbedding(text: string): Promise<number[] | null> {
-      if (!this.ai) return null;
-      try {
-          const result = await this.ai.models.embedContent({
-              model: "text-embedding-004",
-              contents: [{ parts: [{ text }] }]
-          });
-          return result.embeddings?.[0]?.values || null;
-      } catch (e) {
-          console.error("Embedding Error:", e);
-          return null;
-      }
-  }
 
-  private async searchInWorkspace(queryEmbedding: number[]): Promise<{ filename: string, content: string, score: number }[]> {
-      // Lazy chunking and embedding of workspace files (in a real app, this would be pre-computed)
-      const chunks: { filename: string, content: string, embedding: number[] }[] = [];
-      
-      // Note: This is a simplified on-the-fly implementation. 
-      // For production, embeddings should be computed on file upload and stored.
-      for (const file of this.workspaceFiles) {
-          if (!file.content) continue;
-          
-          // Split file into chunks (approx 500 chars)
-          const fileChunks = file.content.match(/.{1,500}/g) || [];
-          
-          // Limit to first 20 chunks per file for performance in this demo
-          for (const chunkText of fileChunks.slice(0, 20)) {
-              const embedding = await this.generateEmbedding(chunkText);
-              if (embedding) {
-                  chunks.push({ filename: file.name, content: chunkText, embedding });
-              }
-          }
-      }
-
-      // Calculate Cosine Similarity
-      const results = chunks.map(chunk => {
-          const score = this.cosineSimilarity(queryEmbedding, chunk.embedding);
-          return { ...chunk, score };
-      });
-
-      // Sort by score and return top 5
-      return results.sort((a, b) => b.score - a.score).slice(0, 5);
-  }
-
-  private cosineSimilarity(vecA: number[], vecB: number[]): number {
-      let dotProduct = 0;
-      let normA = 0;
-      let normB = 0;
-      for (let i = 0; i < vecA.length; i++) {
-          dotProduct += vecA[i] * vecB[i];
-          normA += vecA[i] * vecA[i];
-          normB += vecB[i] * vecB[i];
-      }
-      return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-  }
 
   // --- Context Builder ---
   private async buildSystemContext(

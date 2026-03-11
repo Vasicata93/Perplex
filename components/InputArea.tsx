@@ -596,7 +596,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
                  {showAttachMenu && (
                     <motion.div 
                         ref={attachScrollRef}
-                        drag="y"
+                        drag={isMobile ? "y" : false}
                         dragControls={attachDragControls}
                         dragListener={false}
                         dragConstraints={{ top: 0, bottom: 0 }}
@@ -607,10 +607,13 @@ export const InputArea: React.FC<InputAreaProps> = ({
                                 setShowAttachMenu(false);
                             }
                         }}
-                        initial={{ y: '100%' }}
-                        animate={{ y: 0 }}
-                        exit={{ y: '100%' }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                        initial={isMobile ? { y: '100%', opacity: 0 } : { opacity: 0, y: 10, scale: 0.95 }}
+                        animate={isMobile ? { y: 0, opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+                        exit={isMobile ? { y: '100%', opacity: 0 } : { opacity: 0, y: 10, scale: 0.95 }}
+                        transition={isMobile 
+                            ? { duration: 0.18, ease: [0.4, 0, 0.2, 1] }
+                            : { duration: 0.2, ease: "easeOut" }
+                        }
                         onPointerDown={(e: React.PointerEvent) => handleDragStart(e, attachDragControls, attachScrollRef)}
                         className={`fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 right-0 w-full max-h-[90vh] overflow-y-auto overscroll-none bg-pplx-card border-t border-pplx-border rounded-t-2xl shadow-xl p-4 z-50 pb-8 md:absolute md:bottom-12 md:left-0 ${compact ? 'md:w-full' : 'md:w-80'} md:border md:rounded-xl md:p-3 md:pb-3 md:border-b custom-scrollbar touch-none`}
                     >
@@ -894,7 +897,8 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 <AnimatePresence>
                 {showFocusMenu && (
                     <motion.div 
-                        drag="y"
+                        ref={focusScrollRef}
+                        drag={isMobile ? "y" : false}
                         dragControls={focusDragControls}
                         dragListener={false}
                         dragConstraints={{ top: 0, bottom: 0 }}
@@ -905,12 +909,15 @@ export const InputArea: React.FC<InputAreaProps> = ({
                                 setShowFocusMenu(false);
                             }
                         }}
-                        initial={{ y: '100%' }}
-                        animate={{ y: 0 }}
-                        exit={{ y: '100%' }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                        initial={isMobile ? { y: '100%', opacity: 0 } : { opacity: 0, y: 10, scale: 0.95 }}
+                        animate={isMobile ? { y: 0, opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+                        exit={isMobile ? { y: '100%', opacity: 0 } : { opacity: 0, y: 10, scale: 0.95 }}
+                        transition={isMobile 
+                            ? { duration: 0.18, ease: [0.4, 0, 0.2, 1] }
+                            : { duration: 0.2, ease: "easeOut" }
+                        }
                         onPointerDown={(e: React.PointerEvent) => handleDragStart(e, focusDragControls, focusScrollRef)}
-                        className={`fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 right-0 w-full bg-pplx-card border-t border-pplx-border rounded-t-2xl shadow-xl p-2 z-50 pb-8 md:absolute md:bottom-12 md:right-0 ${compact ? 'md:w-full' : 'md:w-80'} md:border md:rounded-xl md:p-1 md:pb-1 md:border-b overscroll-none touch-none`}
+                        className={`fixed ${settings?.enableMobileDock ? 'bottom-[72px]' : 'bottom-0'} left-0 right-0 w-full max-h-[90vh] overflow-y-auto overscroll-none bg-pplx-card border-t border-pplx-border rounded-t-2xl shadow-xl p-2 z-50 pb-8 md:absolute md:bottom-12 md:right-0 ${compact ? 'md:w-full' : 'md:w-80'} md:border md:rounded-xl md:p-1 md:pb-1 md:border-b custom-scrollbar touch-none`}
                     >
                         {/* Mobile Drag Handle */}
                         <div 
@@ -920,108 +927,106 @@ export const InputArea: React.FC<InputAreaProps> = ({
                             <div className="w-12 h-1 bg-gray-600/50 rounded-full" />
                         </div>
 
-                        <div ref={focusScrollRef} className="max-h-[85vh] md:max-h-[300px] overflow-y-auto overscroll-contain custom-scrollbar">
-                            {FOCUS_MODES.map((mode) => (
-                                <div key={mode.id}>
-                                    <button
-                                        onClick={() => { 
-                                            if (mode.id === FocusMode.ALL) {
-                                                setFocusModes([FocusMode.WEB_SEARCH, FocusMode.LIBRARY]);
-                                            } else {
-                                                setFocusModes(prev => {
-                                                    if (prev.includes(mode.id)) {
-                                                        // Don't allow empty focus modes if possible, or just toggle
-                                                        const next = prev.filter(id => id !== mode.id);
-                                                        return next.length === 0 ? [mode.id] : next;
-                                                    } else {
-                                                        // If selecting one, remove 'ALL' if it was there (though we handle ALL specially)
-                                                        return [...prev.filter(id => id !== FocusMode.ALL), mode.id];
-                                                    }
-                                                });
-                                            }
-                                        }}
-                                        className={`w-full flex items-center justify-between px-3 py-3 rounded-lg text-sm group transition-all ${
-                                            focusModes.includes(mode.id) ? 'bg-pplx-hover' : 'hover:bg-pplx-hover'
-                                        }`}
-                                    >
-                                        <div className="flex items-center space-x-3">
-                                            <mode.icon size={20} className={focusModes.includes(mode.id) ? 'text-pplx-accent' : 'text-gray-400 group-hover:text-pplx-text'} />
-                                            <div className="flex flex-col text-left">
-                                                <span className={focusModes.includes(mode.id) ? 'text-pplx-text font-medium' : 'text-gray-400 group-hover:text-pplx-text'}>
-                                                    {mode.label}
-                                                </span>
-                                            </div>
+                        {FOCUS_MODES.map((mode) => (
+                            <div key={mode.id}>
+                                <button
+                                    onClick={() => { 
+                                        if (mode.id === FocusMode.ALL) {
+                                            setFocusModes([FocusMode.WEB_SEARCH, FocusMode.LIBRARY]);
+                                        } else {
+                                            setFocusModes(prev => {
+                                                if (prev.includes(mode.id)) {
+                                                    // Don't allow empty focus modes if possible, or just toggle
+                                                    const next = prev.filter(id => id !== mode.id);
+                                                    return next.length === 0 ? [mode.id] : next;
+                                                } else {
+                                                    // If selecting one, remove 'ALL' if it was there (though we handle ALL specially)
+                                                    return [...prev.filter(id => id !== FocusMode.ALL), mode.id];
+                                                }
+                                            });
+                                        }
+                                    }}
+                                    className={`w-full flex items-center justify-between px-3 py-3 rounded-lg text-sm group transition-all ${
+                                        focusModes.includes(mode.id) ? 'bg-pplx-hover' : 'hover:bg-pplx-hover'
+                                    }`}
+                                >
+                                    <div className="flex items-center space-x-3">
+                                        <mode.icon size={20} className={focusModes.includes(mode.id) ? 'text-pplx-accent' : 'text-gray-400 group-hover:text-pplx-text'} />
+                                        <div className="flex flex-col text-left">
+                                            <span className={focusModes.includes(mode.id) ? 'text-pplx-text font-medium' : 'text-gray-400 group-hover:text-pplx-text'}>
+                                                {mode.label}
+                                            </span>
                                         </div>
-                                        <div className={`w-9 h-5 rounded-full relative transition-colors ${
-                                            focusModes.includes(mode.id) ? 'bg-pplx-accent' : 'bg-gray-600'
-                                        }`}>
-                                            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${
-                                                focusModes.includes(mode.id) ? 'left-[18px]' : 'left-[2px]'
-                                            }`} />
+                                    </div>
+                                    <div className={`w-9 h-5 rounded-full relative transition-colors ${
+                                        focusModes.includes(mode.id) ? 'bg-pplx-accent' : 'bg-gray-600'
+                                    }`}>
+                                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${
+                                            focusModes.includes(mode.id) ? 'left-[18px]' : 'left-[2px]'
+                                        }`} />
+                                    </div>
+                                </button>
+
+                                {/* Discrete separator after Library */}
+                                {mode.id === FocusMode.LIBRARY && (
+                                    <div className="my-1 h-px bg-pplx-border/50 w-full mx-auto opacity-50" />
+                                )}
+
+                                {/* Library Sub-Selection Logic */}
+                                {mode.id === FocusMode.LIBRARY && focusModes.includes(FocusMode.LIBRARY) && (
+                                    <div className="pl-10 pr-2 pb-2 animate-fadeIn bg-pplx-secondary/10 rounded-b-lg mb-1">
+                                        <div className="text-xs text-pplx-muted mb-2 pt-2 border-t border-pplx-border/50">Select Knowledge Sources:</div>
+                                        
+                                        <div className="relative mb-2">
+                                            <Search size={12} className="absolute left-2 top-2 text-pplx-muted" />
+                                            <input 
+                                                className="w-full bg-pplx-input rounded text-xs py-1.5 pl-7 pr-2 text-pplx-text outline-none"
+                                                placeholder="Search pages..."
+                                                value={librarySearch}
+                                                onChange={(e) => setLibrarySearch(e.target.value)}
+                                            />
                                         </div>
-                                    </button>
 
-                                    {/* Discrete separator after Library */}
-                                    {mode.id === FocusMode.LIBRARY && (
-                                        <div className="my-1 h-px bg-pplx-border/50 w-full mx-auto opacity-50" />
-                                    )}
-
-                                    {/* Library Sub-Selection Logic */}
-                                    {mode.id === FocusMode.LIBRARY && focusModes.includes(FocusMode.LIBRARY) && (
-                                        <div className="pl-10 pr-2 pb-2 animate-fadeIn bg-pplx-secondary/10 rounded-b-lg mb-1">
-                                            <div className="text-xs text-pplx-muted mb-2 pt-2 border-t border-pplx-border/50">Select Knowledge Sources:</div>
+                                        <div className="max-h-[50vh] md:max-h-32 overflow-y-auto custom-scrollbar space-y-1">
+                                            {/* Select All Toggle */}
+                                            <button 
+                                                onClick={() => setSelectedLibraryIds(selectedLibraryIds.length === notes.length ? [] : notes.map(n => n.id))}
+                                                className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-pplx-hover rounded text-xs text-pplx-text font-medium"
+                                            >
+                                                <span>All Pages ({notes.length})</span>
+                                                {selectedLibraryIds.length === notes.length && <CheckCircle2 size={12} className="text-pplx-accent" />}
+                                            </button>
                                             
-                                            <div className="relative mb-2">
-                                                <Search size={12} className="absolute left-2 top-2 text-pplx-muted" />
-                                                <input 
-                                                    className="w-full bg-pplx-input rounded text-xs py-1.5 pl-7 pr-2 text-pplx-text outline-none"
-                                                    placeholder="Search pages..."
-                                                    value={librarySearch}
-                                                    onChange={(e) => setLibrarySearch(e.target.value)}
-                                                />
-                                            </div>
-
-                                            <div className="max-h-[50vh] md:max-h-32 overflow-y-auto custom-scrollbar space-y-1">
-                                                {/* Select All Toggle */}
-                                                <button 
-                                                    onClick={() => setSelectedLibraryIds(selectedLibraryIds.length === notes.length ? [] : notes.map(n => n.id))}
-                                                    className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-pplx-hover rounded text-xs text-pplx-text font-medium"
-                                                >
-                                                    <span>All Pages ({notes.length})</span>
-                                                    {selectedLibraryIds.length === notes.length && <CheckCircle2 size={12} className="text-pplx-accent" />}
-                                                </button>
-                                                
-                                                {notes
-                                                    .filter(n => n.title.toLowerCase().includes(librarySearch.toLowerCase()))
-                                                    .map(note => (
-                                                        <button 
-                                                            key={note.id}
-                                                            onClick={() => {
-                                                                if (selectedLibraryIds.includes(note.id)) {
-                                                                    setSelectedLibraryIds(prev => prev.filter(id => id !== note.id));
-                                                                } else {
-                                                                    setSelectedLibraryIds(prev => [...prev, note.id]);
-                                                                }
-                                                            }}
-                                                            className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-pplx-hover rounded text-xs text-pplx-muted hover:text-pplx-text text-left"
-                                                        >
-                                                            <div className="flex items-center gap-2 truncate">
-                                                                <span>{note.emoji || '📄'}</span>
-                                                                <span className="truncate max-w-[120px]">{note.title || 'Untitled'}</span>
-                                                            </div>
-                                                            <div className={`w-3 h-3 rounded-sm border ${selectedLibraryIds.includes(note.id) ? 'bg-pplx-accent border-pplx-accent' : 'border-pplx-muted'}`} />
-                                                        </button>
-                                                ))}
-                                                {notes.length === 0 && <div className="text-[10px] text-pplx-muted italic px-2">No pages in library.</div>}
-                                            </div>
-                                            <div className="text-[9px] text-pplx-muted mt-2 text-center opacity-70">
-                                                {selectedLibraryIds.length === 0 ? "Default: All pages used" : `${selectedLibraryIds.length} pages selected`}
-                                            </div>
+                                            {notes
+                                                .filter(n => n.title.toLowerCase().includes(librarySearch.toLowerCase()))
+                                                .map(note => (
+                                                    <button 
+                                                        key={note.id}
+                                                        onClick={() => {
+                                                            if (selectedLibraryIds.includes(note.id)) {
+                                                                setSelectedLibraryIds(prev => prev.filter(id => id !== note.id));
+                                                            } else {
+                                                                setSelectedLibraryIds(prev => [...prev, note.id]);
+                                                            }
+                                                        }}
+                                                        className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-pplx-hover rounded text-xs text-pplx-muted hover:text-pplx-text text-left"
+                                                    >
+                                                        <div className="flex items-center gap-2 truncate">
+                                                            <span>{note.emoji || '📄'}</span>
+                                                            <span className="truncate max-w-[120px]">{note.title || 'Untitled'}</span>
+                                                        </div>
+                                                        <div className={`w-3 h-3 rounded-sm border ${selectedLibraryIds.includes(note.id) ? 'bg-pplx-accent border-pplx-accent' : 'border-pplx-muted'}`} />
+                                                    </button>
+                                            ))}
+                                            {notes.length === 0 && <div className="text-[10px] text-pplx-muted italic px-2">No pages in library.</div>}
                                         </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
+                                        <div className="text-[9px] text-pplx-muted mt-2 text-center opacity-70">
+                                            {selectedLibraryIds.length === 0 ? "Default: All pages used" : `${selectedLibraryIds.length} pages selected`}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
                     </motion.div>
                 )}
                 </AnimatePresence>
@@ -1040,8 +1045,15 @@ export const InputArea: React.FC<InputAreaProps> = ({
                         <Cpu size={iconSize} />
                         {hoveredTooltip === 'model' && !showModelMenu && <Tooltip text="AI Model" />}
                     </button>
+                    <AnimatePresence>
                     {showModelMenu && (
-                        <div className="absolute bottom-12 right-0 w-56 bg-pplx-card border border-pplx-border rounded-xl shadow-xl p-1 z-50 animate-fadeIn">
+                        <motion.div 
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            transition={{ duration: 0.2, ease: "easeOut" }}
+                            className="absolute bottom-12 right-0 w-56 bg-pplx-card border border-pplx-border rounded-xl shadow-xl p-1 z-50"
+                        >
                             <div className="px-2 py-1.5 text-[10px] uppercase font-bold text-pplx-muted">Cloud</div>
                             <button onClick={() => { setSelectedModelId('gemini-pro'); setShowModelMenu(false); }} className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-pplx-hover hover:text-pplx-text rounded-lg flex justify-between items-center group">
                                 <span>Gemini Pro 1.5/2.0</span>
@@ -1074,8 +1086,9 @@ export const InputArea: React.FC<InputAreaProps> = ({
                                     ))}
                                 </>
                             )}
-                        </div>
+                        </motion.div>
                     )}
+                    </AnimatePresence>
                  </div>
              )}
 

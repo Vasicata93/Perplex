@@ -16,6 +16,7 @@ interface SettingsModalProps {
   onClose: () => void;
   settings: AppSettings;
   onSave: (newSettings: AppSettings) => void;
+  onPreview: (newSettings: Partial<AppSettings>) => void;
 }
 
 type TabType = 'profile' | 'general' | 'models' | 'memory';
@@ -204,7 +205,7 @@ const OfflineModelCard: React.FC<OfflineModelCardProps> = ({ model, isDownloaded
     );
 };
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings, onSave }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings, onSave, onPreview }) => {
   const [formData, setFormData] = useState<AppSettings>(settings);
   const [activeTab, setActiveTab] = useState<TabType>('general');
   const [memories, setMemories] = useState<MemoryItem[]>([]);
@@ -217,6 +218,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
   const [memorySearch, setMemorySearch] = useState('');
   const [memoryFilter, setMemoryFilter] = useState<MemoryCategory | 'all'>('all');
   const [isAddingMemory, setIsAddingMemory] = useState(false);
+
+  // Helper to update both local state and app preview
+  const updateFormData = (updates: Partial<AppSettings>) => {
+    setFormData(prev => {
+      const updated = { ...prev, ...updates };
+      onPreview(updates);
+      return updated;
+    });
+  };
   const [newMemoryContent, setNewMemoryContent] = useState('');
   const [newMemoryCategory, setNewMemoryCategory] = useState<MemoryCategory>('about_me');
 
@@ -250,7 +260,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
 
   useEffect(() => {
     setFormData(settings);
-    if (isOpen) {
+    // Only reset mobile view and other states when the modal is FIRST opened
+    // or when settings are explicitly updated from outside.
+    // We check if it was previously closed to avoid resetting on every preview update.
+  }, [settings]);
+
+  // Separate effect for opening logic
+  const prevIsOpen = useRef(isOpen);
+  useEffect(() => {
+    if (isOpen && !prevIsOpen.current) {
         setIsMobileDetail(false); 
         setIsCategoriesCollapsed(false); 
         
@@ -261,11 +279,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
         }
         MemoryService.getMemories().then(setMemories);
     }
-  }, [settings, isOpen]);
+    prevIsOpen.current = isOpen;
+  }, [isOpen, settings.modelProvider]);
 
   if (!isOpen) return null;
 
-  const handleSave = () => { onSave(formData); onClose(); };
+  const handleSave = () => { onSave(formData); };
 
   const handleMobileNav = (tab: TabType) => {
       setActiveTab(tab);
@@ -281,8 +300,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
         const file = e.target.files[0];
         const reader = new FileReader();
         reader.onload = () => {
-            setFormData({
-                ...formData,
+            updateFormData({
                 userProfile: { ...formData.userProfile, avatar: reader.result as string }
             });
         };
@@ -336,12 +354,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                   updatedLocalModels.push(completedModel);
               }
 
-              setFormData(prev => ({ 
-                  ...prev, 
+              updateFormData({ 
                   localModels: updatedLocalModels,
-                  activeLocalModelId: prev.activeLocalModelId || model.id,
-                  modelProvider: prev.modelProvider === ModelProvider.LOCAL ? prev.modelProvider : ModelProvider.LOCAL
-              }));
+                  activeLocalModelId: formData.activeLocalModelId || model.id,
+                  modelProvider: formData.modelProvider === ModelProvider.LOCAL ? formData.modelProvider : ModelProvider.LOCAL
+              });
               
               // Clear progress after short delay
               setTimeout(() => {
@@ -363,7 +380,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
       if (id === formData.activeLocalModelId) {
           newActiveId = newModels.length > 0 ? newModels[0].id : '';
       }
-      setFormData({ ...formData, localModels: newModels, activeLocalModelId: newActiveId });
+      updateFormData({ localModels: newModels, activeLocalModelId: newActiveId });
   };
 
   const filteredMemories = memories.filter(m => {
@@ -496,7 +513,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
         <div className={`${isMobileDetail ? 'flex' : 'hidden'} md:flex flex-col flex-1 min-w-0 bg-pplx-primary md:bg-pplx-sidebar/30 overflow-hidden w-full h-full absolute md:static inset-0 z-30`}>
             
             {/* Mobile Header: Blurred & Clean (No Border) */}
-            <div className="md:hidden flex items-center gap-4 p-4 pt-6 pb-4 bg-pplx-primary/95 backdrop-blur-md sticky top-0 z-20">
+            <div className="md:hidden flex items-center gap-4 p-4 pt-safe pb-4 bg-pplx-primary/95 backdrop-blur-md sticky top-0 z-20">
                 <button 
                     onClick={() => setIsMobileDetail(false)} 
                     className="p-3 -ml-2 rounded-full hover:bg-pplx-secondary text-pplx-text transition-all active:scale-95"
@@ -525,7 +542,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                     ].map((opt) => (
                                         <button
                                             key={opt.id}
-                                            onClick={() => setFormData({ ...formData, theme: opt.id as any })}
+                                            onClick={() => updateFormData({ theme: opt.id as any })}
                                             className={`flex flex-col items-center justify-center py-5 px-2 rounded-2xl transition-all duration-300 ${
                                                 formData.theme === opt.id
                                                 ? 'bg-pplx-card text-pplx-text shadow-xl shadow-black/5 ring-1 ring-black/5 dark:ring-white/10'
@@ -554,7 +571,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                         onChange={(e) => {
                                             const val = parseInt(e.target.value);
                                             const size = val === 0 ? 'small' : val === 1 ? 'medium' : 'large';
-                                            setFormData({ ...formData, textSize: size });
+                                            updateFormData({ textSize: size });
                                         }}
                                         className="w-full h-1.5 bg-pplx-secondary rounded-lg appearance-none cursor-pointer accent-pplx-text"
                                     />
@@ -569,7 +586,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                     label="Mobile Dock"
                                     description="Show a persistent bottom navigation bar on mobile."
                                     checked={formData.enableMobileDock}
-                                    onChange={() => setFormData({ ...formData, enableMobileDock: !formData.enableMobileDock })}
+                                    onChange={() => updateFormData({ enableMobileDock: !formData.enableMobileDock })}
                                 />
                             </div>
                         </div>
@@ -581,7 +598,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                     <div className="relative group">
                                         <select 
                                             value={formData.interfaceLanguage}
-                                            onChange={(e) => setFormData({ ...formData, interfaceLanguage: e.target.value as any })}
+                                            onChange={(e) => updateFormData({ interfaceLanguage: e.target.value as any })}
                                             className="w-full bg-pplx-input text-pplx-text text-sm rounded-2xl px-5 py-4 outline-none appearance-none transition-all cursor-pointer hover:bg-pplx-secondary"
                                         >
                                             <option value="en">English (Interface)</option>
@@ -594,7 +611,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                     <div className="relative group">
                                         <select 
                                             value={formData.aiProfile.language}
-                                            onChange={(e) => setFormData({ ...formData, aiProfile: { ...formData.aiProfile, language: e.target.value } })}
+                                            onChange={(e) => updateFormData({ aiProfile: { ...formData.aiProfile, language: e.target.value } })}
                                             className="w-full bg-pplx-input text-pplx-text text-sm rounded-2xl px-5 py-4 outline-none appearance-none transition-all cursor-pointer hover:bg-pplx-secondary"
                                         >
                                             <option value="English">English (AI Response)</option>
@@ -613,7 +630,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                     label="Pro Search"
                                     description="Enable real-time web grounding."
                                     checked={formData.useSearch}
-                                    onChange={() => setFormData({ ...formData, useSearch: !formData.useSearch })}
+                                    onChange={() => updateFormData({ useSearch: !formData.useSearch })}
                                     isBeta={true}
                                 />
                              </div>
@@ -635,7 +652,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                              
                              <div className="flex gap-2 mb-4 bg-pplx-secondary/30 p-1 rounded-xl">
                                 <button 
-                                    onClick={() => setFormData({ ...formData, searchProvider: 'tavily' })}
+                                    onClick={() => updateFormData({ searchProvider: 'tavily' })}
                                     className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all duration-200 ${
                                         formData.searchProvider === 'tavily' 
                                         ? 'bg-pplx-text text-pplx-primary shadow-md transform scale-[1.02]' 
@@ -645,7 +662,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                     Tavily
                                 </button>
                                 <button 
-                                    onClick={() => setFormData({ ...formData, searchProvider: 'brave' })}
+                                    onClick={() => updateFormData({ searchProvider: 'brave' })}
                                     className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all duration-200 ${
                                         formData.searchProvider === 'brave' 
                                         ? 'bg-pplx-text text-pplx-primary shadow-md transform scale-[1.02]' 
@@ -660,13 +677,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                 {formData.searchProvider === 'tavily' ? (
                                     <div className="relative group/input animate-fadeIn">
                                         <Key className="absolute left-4 top-4 text-pplx-muted opacity-50" size={16} />
-                                        <input type="password" value={formData.tavilyApiKey} onChange={(e) => setFormData({ ...formData, tavilyApiKey: e.target.value })} placeholder="tvly-..." className="w-full bg-pplx-input rounded-2xl pl-11 pr-4 py-3.5 text-sm text-pplx-text placeholder-pplx-muted/40 outline-none transition-all font-mono" />
+                                        <input type="password" value={formData.tavilyApiKey} onChange={(e) => updateFormData({ tavilyApiKey: e.target.value })} placeholder="tvly-..." className="w-full bg-pplx-input rounded-2xl pl-11 pr-4 py-3.5 text-sm text-pplx-text placeholder-pplx-muted/40 outline-none transition-all font-mono" />
                                         <div className="absolute right-4 top-4 text-[10px] text-pplx-muted font-bold opacity-50 uppercase">Tavily Key</div>
                                     </div>
                                 ) : (
                                     <div className="relative group/input animate-fadeIn">
                                         <Flame className="absolute left-4 top-4 text-pplx-muted opacity-50" size={16} />
-                                        <input type="password" value={formData.braveApiKey || ''} onChange={(e) => setFormData({ ...formData, braveApiKey: e.target.value })} placeholder="BSA-..." className="w-full bg-pplx-input rounded-2xl pl-11 pr-4 py-3.5 text-sm text-pplx-text placeholder-pplx-muted/40 outline-none transition-all font-mono" />
+                                        <input type="password" value={formData.braveApiKey || ''} onChange={(e) => updateFormData({ braveApiKey: e.target.value })} placeholder="BSA-..." className="w-full bg-pplx-input rounded-2xl pl-11 pr-4 py-3.5 text-sm text-pplx-text placeholder-pplx-muted/40 outline-none transition-all font-mono" />
                                         <div className="absolute right-4 top-4 text-[10px] text-pplx-muted font-bold opacity-50 uppercase">Brave Key</div>
                                     </div>
                                 )}
@@ -702,7 +719,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                             <div className="space-y-4 animate-fadeIn">
                                 {/* Gemini Card */}
                                 <div className={`group rounded-3xl p-6 transition-all duration-300 cursor-pointer select-none ${formData.modelProvider === ModelProvider.GEMINI ? 'bg-pplx-card shadow-lg ring-1 ring-black/5 dark:ring-white/10' : 'bg-pplx-card/50 hover:bg-pplx-card'}`}>
-                                    <div className="flex items-center justify-between" onClick={() => setFormData({ ...formData, modelProvider: ModelProvider.GEMINI })}>
+                                    <div className="flex items-center justify-between" onClick={() => updateFormData({ modelProvider: ModelProvider.GEMINI })}>
                                         <div className="flex items-center gap-4">
                                             <div className={`p-3 rounded-2xl ${formData.modelProvider === ModelProvider.GEMINI ? 'bg-pplx-text text-pplx-primary' : 'bg-pplx-secondary text-pplx-muted'}`}><Sparkles size={20} /></div>
                                             <div><h4 className="text-base font-semibold text-pplx-text">Google Gemini</h4><p className="text-xs text-pplx-muted mt-0.5">Gemini 1.5 Pro & Flash</p></div>
@@ -714,7 +731,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                         <div className="mt-5 pt-5 border-t border-pplx-border/50 animate-fadeIn">
                                              <div className="relative">
                                                 <Key className="absolute left-4 top-4 text-pplx-muted opacity-50" size={16} />
-                                                <input type="password" value={formData.geminiApiKey || ''} onChange={(e) => setFormData({ ...formData, geminiApiKey: e.target.value })} placeholder="Override API Key (Optional)..." className="w-full bg-pplx-input rounded-2xl pl-11 pr-4 py-3.5 text-sm text-pplx-text outline-none font-mono" />
+                                                <input type="password" value={formData.geminiApiKey || ''} onChange={(e) => updateFormData({ geminiApiKey: e.target.value })} placeholder="Override API Key (Optional)..." className="w-full bg-pplx-input rounded-2xl pl-11 pr-4 py-3.5 text-sm text-pplx-text outline-none font-mono" />
                                             </div>
                                         </div>
                                     )}
@@ -722,7 +739,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
 
                                 {/* OpenRouter Card */}
                                 <div className={`group rounded-3xl p-6 transition-all duration-300 cursor-pointer select-none ${formData.modelProvider === ModelProvider.OPENROUTER ? 'bg-pplx-card shadow-lg ring-1 ring-black/5 dark:ring-white/10' : 'bg-pplx-card/50 hover:bg-pplx-card'}`}>
-                                    <div className="flex items-center justify-between" onClick={() => setFormData({ ...formData, modelProvider: ModelProvider.OPENROUTER })}>
+                                    <div className="flex items-center justify-between" onClick={() => updateFormData({ modelProvider: ModelProvider.OPENROUTER })}>
                                         <div className="flex items-center gap-4">
                                             <div className={`p-3 rounded-2xl ${formData.modelProvider === ModelProvider.OPENROUTER ? 'bg-pplx-text text-pplx-primary' : 'bg-pplx-secondary text-pplx-muted'}`}><Globe size={20} /></div>
                                             <div><h4 className="text-base font-semibold text-pplx-text">OpenRouter</h4><p className="text-xs text-pplx-muted mt-0.5">Aggregated Models</p></div>
@@ -734,7 +751,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                         <div className="mt-5 pt-5 border-t border-pplx-border/50 space-y-3 animate-fadeIn">
                                             <div className="relative">
                                                 <Key className="absolute left-4 top-4 text-pplx-muted opacity-50" size={16} />
-                                                <input type="password" value={formData.openRouterApiKey} onChange={(e) => setFormData({ ...formData, openRouterApiKey: e.target.value })} placeholder="sk-or-..." className="w-full bg-pplx-input rounded-2xl pl-11 pr-4 py-3.5 text-sm text-pplx-text outline-none font-mono" />
+                                                <input type="password" value={formData.openRouterApiKey} onChange={(e) => updateFormData({ openRouterApiKey: e.target.value })} placeholder="sk-or-..." className="w-full bg-pplx-input rounded-2xl pl-11 pr-4 py-3.5 text-sm text-pplx-text outline-none font-mono" />
                                             </div>
                                             <div className="relative">
                                                 <Activity className="absolute left-4 top-4 text-pplx-muted opacity-50" size={16} />
@@ -742,7 +759,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                                     list="openrouter-models"
                                                     type="text" 
                                                     value={formData.openRouterModelId} 
-                                                    onChange={(e) => setFormData({ ...formData, openRouterModelId: e.target.value })} 
+                                                    onChange={(e) => updateFormData({ openRouterModelId: e.target.value })} 
                                                     placeholder="Select or type model ID..." 
                                                     className="w-full bg-pplx-input rounded-2xl pl-11 pr-4 py-3.5 text-sm text-pplx-text outline-none font-mono" 
                                                 />
@@ -759,7 +776,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
 
                                 {/* OpenAI Card */}
                                 <div className={`group rounded-3xl p-6 transition-all duration-300 cursor-pointer select-none ${formData.modelProvider === ModelProvider.OPENAI ? 'bg-pplx-card shadow-lg ring-1 ring-black/5 dark:ring-white/10' : 'bg-pplx-card/50 hover:bg-pplx-card'}`}>
-                                    <div className="flex items-center justify-between" onClick={() => setFormData({ ...formData, modelProvider: ModelProvider.OPENAI })}>
+                                    <div className="flex items-center justify-between" onClick={() => updateFormData({ modelProvider: ModelProvider.OPENAI })}>
                                         <div className="flex items-center gap-4">
                                             <div className={`p-3 rounded-2xl ${formData.modelProvider === ModelProvider.OPENAI ? 'bg-pplx-text text-pplx-primary' : 'bg-pplx-secondary text-pplx-muted'}`}><Zap size={20} /></div>
                                             <div><h4 className="text-base font-semibold text-pplx-text">OpenAI</h4><p className="text-xs text-pplx-muted mt-0.5">GPT-4o & GPT-3.5</p></div>
@@ -771,11 +788,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                         <div className="mt-5 pt-5 border-t border-pplx-border/50 space-y-3 animate-fadeIn">
                                             <div className="relative">
                                                 <Key className="absolute left-4 top-4 text-pplx-muted opacity-50" size={16} />
-                                                <input type="password" value={formData.openAiApiKey} onChange={(e) => setFormData({ ...formData, openAiApiKey: e.target.value })} placeholder="sk-..." className="w-full bg-pplx-input rounded-2xl pl-11 pr-4 py-3.5 text-sm text-pplx-text outline-none font-mono" />
+                                                <input type="password" value={formData.openAiApiKey} onChange={(e) => updateFormData({ openAiApiKey: e.target.value })} placeholder="sk-..." className="w-full bg-pplx-input rounded-2xl pl-11 pr-4 py-3.5 text-sm text-pplx-text outline-none font-mono" />
                                             </div>
                                             <div className="relative">
                                                 <Activity className="absolute left-4 top-4 text-pplx-muted opacity-50" size={16} />
-                                                <input type="text" value={formData.openAiModelId} onChange={(e) => setFormData({ ...formData, openAiModelId: e.target.value })} placeholder="gpt-4o" className="w-full bg-pplx-input rounded-2xl pl-11 pr-4 py-3.5 text-sm text-pplx-text outline-none font-mono" />
+                                                <input type="text" value={formData.openAiModelId} onChange={(e) => updateFormData({ openAiModelId: e.target.value })} placeholder="gpt-4o" className="w-full bg-pplx-input rounded-2xl pl-11 pr-4 py-3.5 text-sm text-pplx-text outline-none font-mono" />
                                             </div>
                                         </div>
                                     )}
@@ -813,7 +830,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                                     isActive={isActive}
                                                     progress={progress}
                                                     onDownload={() => handleDownloadModel(model)}
-                                                    onSelect={() => setFormData({ ...formData, activeLocalModelId: model.id, modelProvider: ModelProvider.LOCAL })}
+                                                    onSelect={() => updateFormData({ activeLocalModelId: model.id, modelProvider: ModelProvider.LOCAL })}
                                                     onDelete={() => handleDeleteModel(model.id)}
                                                 />
                                             );
@@ -837,7 +854,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                     <div className="flex flex-col pb-4 animate-fadeIn">
                          <div className="hidden md:block"><SectionHeader title={t.memory} desc="Manage what the AI remembers." /></div>
                          <div className="bg-pplx-card rounded-3xl px-6 border-none shadow-sm mb-6">
-                            <ToggleRow label="Enable Memory" description="Allow the AI to recall facts about you." checked={formData.enableMemory} onChange={() => setFormData({ ...formData, enableMemory: !formData.enableMemory })} />
+                            <ToggleRow label="Enable Memory" description="Allow the AI to recall facts about you." checked={formData.enableMemory} onChange={() => updateFormData({ enableMemory: !formData.enableMemory })} />
                         </div>
                         {formData.enableMemory ? (
                             <div className="bg-pplx-card rounded-3xl border-none shadow-lg overflow-hidden">
@@ -946,25 +963,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                              <div className="flex-1 text-center md:text-left space-y-2">
                                 <h5 className="text-xl font-bold text-pplx-text">Your Avatar</h5>
                                 <p className="text-sm text-pplx-muted max-w-sm mx-auto md:mx-0 opacity-70">Personalize your chat experience.</p>
-                                {formData.userProfile.avatar && <button onClick={() => setFormData({...formData, userProfile: {...formData.userProfile, avatar: undefined}})} className="text-xs text-red-400 hover:text-red-300 hover:underline font-medium pt-2">Remove</button>}
+                                {formData.userProfile.avatar && <button onClick={() => updateFormData({ userProfile: {...formData.userProfile, avatar: undefined}})} className="text-xs text-red-400 hover:text-red-300 hover:underline font-medium pt-2">Remove</button>}
                              </div>
                         </div>
 
                         <div className="space-y-6">
                             <InputGroup label="Name">
-                                <input className="w-full bg-pplx-input border-none rounded-2xl px-5 py-4 text-base text-pplx-text outline-none transition-all placeholder-pplx-muted/50" value={formData.userProfile.name} onChange={(e) => setFormData({...formData, userProfile: {...formData.userProfile, name: e.target.value}})} placeholder="How should the AI call you?" />
+                                <input className="w-full bg-pplx-input border-none rounded-2xl px-5 py-4 text-base text-pplx-text outline-none transition-all placeholder-pplx-muted/50" value={formData.userProfile.name} onChange={(e) => updateFormData({ userProfile: {...formData.userProfile, name: e.target.value}})} placeholder="How should the AI call you?" />
                             </InputGroup>
                              <InputGroup label="Location" description="For weather & local news.">
-                                <input className="w-full bg-pplx-input border-none rounded-2xl px-5 py-4 text-base text-pplx-text outline-none transition-all placeholder-pplx-muted/50" value={formData.userProfile.location} onChange={(e) => setFormData({...formData, userProfile: {...formData.userProfile, location: e.target.value}})} placeholder="City, Country" />
+                                <input className="w-full bg-pplx-input border-none rounded-2xl px-5 py-4 text-base text-pplx-text outline-none transition-all placeholder-pplx-muted/50" value={formData.userProfile.location} onChange={(e) => updateFormData({ userProfile: {...formData.userProfile, location: e.target.value}})} placeholder="City, Country" />
                             </InputGroup>
                             <InputGroup label="Bio">
-                                <textarea className="w-full bg-pplx-input border-none rounded-2xl px-5 py-4 text-base text-pplx-text outline-none h-32 resize-none transition-all placeholder-pplx-muted/50" value={formData.userProfile.bio} onChange={(e) => setFormData({...formData, userProfile: {...formData.userProfile, bio: e.target.value}})} placeholder="Tell the AI about your profession and interests..." />
+                                <textarea className="w-full bg-pplx-input border-none rounded-2xl px-5 py-4 text-base text-pplx-text outline-none h-32 resize-none transition-all placeholder-pplx-muted/50" value={formData.userProfile.bio} onChange={(e) => updateFormData({ userProfile: {...formData.userProfile, bio: e.target.value}})} placeholder="Tell the AI about your profession and interests..." />
                             </InputGroup>
                         </div>
                         <div className="pt-8">
                              <h5 className="text-sm font-bold text-pplx-text mb-6 flex items-center gap-2"><Sparkles size={16} className="text-pplx-text opacity-70" /> System Persona</h5>
                              <InputGroup label="Custom Instructions">
-                                <textarea className="w-full bg-pplx-input border-none rounded-2xl px-5 py-4 text-base text-pplx-text outline-none h-40 resize-none font-mono text-xs transition-all placeholder-pplx-muted/50" value={formData.aiProfile.systemInstructions} onChange={(e) => setFormData({...formData, aiProfile: {...formData.aiProfile, systemInstructions: e.target.value}})} placeholder="You are a helpful assistant. Be concise..." />
+                                <textarea className="w-full bg-pplx-input border-none rounded-2xl px-5 py-4 text-base text-pplx-text outline-none h-40 resize-none font-mono text-xs transition-all placeholder-pplx-muted/50" value={formData.aiProfile.systemInstructions} onChange={(e) => updateFormData({ aiProfile: {...formData.aiProfile, systemInstructions: e.target.value}})} placeholder="You are a helpful assistant. Be concise..." />
                             </InputGroup>
                         </div>
                      </div>
@@ -975,7 +992,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
             {/* Mobile Action Footer (Fixed Bottom inside the Flex container) */}
             <div className={`md:hidden p-4 bg-pplx-primary/95 backdrop-blur-md flex gap-3 z-30 shrink-0 transition-all duration-300 ${formData.enableMobileDock ? 'pb-[80px]' : 'pb-8'}`}>
                 <button 
-                    onClick={() => setIsMobileDetail(false)} 
+                    onClick={onClose} 
                     className="flex-1 py-2.5 rounded-xl text-xs font-medium text-pplx-text bg-pplx-secondary hover:bg-pplx-hover transition-colors"
                 >
                     {t.cancel}

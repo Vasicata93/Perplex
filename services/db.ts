@@ -11,7 +11,8 @@ export const STORES = {
   CACHE: 'cache',
   BUFFER: 'memory_buffer', // New Short-Term RAM
   PROJECTS: 'projects',     // New Project State
-  CALENDAR: 'calendar'      // New Calendar Store
+  CALENDAR: 'calendar',     // New Calendar Store
+  EMBEDDINGS: 'embeddings'  // New Vector Store for RAG
 };
 
 export class DB {

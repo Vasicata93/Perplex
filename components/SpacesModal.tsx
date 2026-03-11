@@ -97,7 +97,7 @@ export const SpacesModal: React.FC<SpacesModalProps> = ({ isOpen, onClose, space
         
         {/* Left Sidebar: List of Spaces (Hidden on mobile if editing) */}
         <div className={`w-full md:w-1/3 border-r border-pplx-border bg-pplx-primary flex-col ${editingSpace ? 'hidden md:flex' : 'flex'} h-full`}>
-            <div className="p-4 border-b border-pplx-border flex justify-between items-center shrink-0">
+            <div className="p-4 pt-safe border-b border-pplx-border flex justify-between items-center shrink-0">
                 <h2 className="text-lg font-semibold text-pplx-text">Spaces</h2>
                 <button onClick={onClose} className="md:hidden text-pplx-muted hover:text-pplx-text"><X size={20}/></button>
             </div>
@@ -144,7 +144,7 @@ export const SpacesModal: React.FC<SpacesModalProps> = ({ isOpen, onClose, space
                 } else {
                     onClose();
                 }
-            }} className="absolute top-4 right-4 text-pplx-muted hover:text-pplx-text z-10 bg-pplx-sidebar/80 p-1 rounded-full backdrop-blur-sm">
+            }} className="absolute top-[calc(1rem+env(safe-area-inset-top))] md:top-4 right-4 text-pplx-muted hover:text-pplx-text z-10 bg-pplx-sidebar/80 p-1 rounded-full backdrop-blur-sm">
                 <X size={24} />
             </button>
 

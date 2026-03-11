@@ -16,6 +16,7 @@ import { TornadoIndicator } from './components/TornadoIndicator';
 import { MessageRenderer } from './components/MessageRenderer';
 import { PerplexityLogo } from './constants';
 import { Role, Message, Thread, AppSettings, DEFAULT_SETTINGS, ModelProvider, FocusMode, Attachment, Space, Note, ProMode, PendingAction, CalendarEvent } from './types';
+import { RAGService } from './services/ragService';
 import { LLMService } from './services/geminiService';
 import { BlockService } from './services/blockService';
 import { Block } from './types/blockStructure';
@@ -26,6 +27,8 @@ import {
     RefreshCw, Share2, FolderPlus, Pencil, Check, ArrowDown, MessageSquare, ImageIcon, Plus
 } from 'lucide-react';
 import { db, STORES } from './services/db';
+import { Capacitor } from '@capacitor/core';
+import { StatusBar, Style } from '@capacitor/status-bar';
 
 import { SpaceFilesModal } from './components/SpaceFilesModal';
 
@@ -179,8 +182,38 @@ function App() {
   const [sideChatThreadId, setSideChatThreadId] = useState<string | null>(null);
 
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
-
+  const [backupSettings, setBackupSettings] = useState<AppSettings | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUpdateSettings = (newSettings: Partial<AppSettings>, persist: boolean = true) => {
+    setSettings(prev => {
+      const updated = { ...prev, ...newSettings };
+      if (persist && isLoaded) {
+        db.set(STORES.SETTINGS, 'app_settings', updated);
+      }
+      return updated;
+    });
+  };
+
+  const handleOpenSettings = () => {
+    setBackupSettings(settings);
+    setSettingsOpen(true);
+  };
+
+  const handleSaveSettings = (newSettings: AppSettings) => {
+    setSettings(newSettings);
+    db.set(STORES.SETTINGS, 'app_settings', newSettings);
+    setSettingsOpen(false);
+    setBackupSettings(null);
+  };
+
+  const handleCancelSettings = () => {
+    if (backupSettings) {
+      setSettings(backupSettings);
+    }
+    setSettingsOpen(false);
+    setBackupSettings(null);
+  };
 
   // Initialize Service
   const [llmService] = useState(() => new LLMService());
@@ -286,6 +319,40 @@ function App() {
     }
   }, [settings.theme, settings.textSize]);
 
+  // --- STATUS BAR & THEME COLOR DYNAMIC UPDATE ---
+  useEffect(() => {
+    const updateStatusBar = async () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      
+      // Determine the background color based on the current view
+      // Default colors from index.html
+      let bgColor = isDark ? '#191919' : '#FFFFFF';
+      
+      // Update meta tag for PWA
+      let metaThemeColor = document.querySelector('meta[name="theme-color"]');
+      if (!metaThemeColor) {
+        metaThemeColor = document.createElement('meta');
+        metaThemeColor.setAttribute('name', 'theme-color');
+        document.head.appendChild(metaThemeColor);
+      }
+      metaThemeColor.setAttribute('content', bgColor);
+
+      // Update Capacitor Status Bar
+      if (Capacitor.isNativePlatform()) {
+        try {
+          await StatusBar.setBackgroundColor({ color: bgColor });
+          await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light });
+        } catch (e) {
+          console.warn('StatusBar plugin not available or failed:', e);
+        }
+      }
+    };
+
+    // Run after a short delay to ensure DOM classes are updated
+    const timeout = setTimeout(updateStatusBar, 100);
+    return () => clearTimeout(timeout);
+  }, [settings.theme, activeView, activeThreadId, activeNoteId]);
+
   // Load Data
   useEffect(() => {
     const loadData = async () => {
@@ -367,7 +434,6 @@ function App() {
   };
 
   // Save Data
-  useEffect(() => { if (isLoaded) db.set(STORES.SETTINGS, 'app_settings', settings); }, [settings, isLoaded]);
   useEffect(() => { if (isLoaded) db.set(STORES.THREADS, 'all_threads', threads); }, [threads, isLoaded]);
   useEffect(() => { if (isLoaded) db.set(STORES.SPACES, 'all_spaces', spaces); }, [spaces, isLoaded]);
   useEffect(() => { if (isLoaded) db.set(STORES.NOTES, 'all_notes', notes); }, [notes, isLoaded]);
@@ -380,8 +446,43 @@ function App() {
   const handleNewThread = () => { setActiveView('chat'); setActiveThreadId(null); setActiveNoteId(null); setIsDashboardMode(false); stopAudio(); };
   const handleBackToNewThread = () => { handleNewThread(); };
 
-  const handleSaveSpace = (space: Space) => { setSpaces(prev => { const exists = prev.find(s => s.id === space.id); if (exists) return prev.map(s => s.id === space.id ? space : s); return [...prev, space]; }); };
-  const handleDeleteSpace = (id: string) => { setSpaces(prev => prev.filter(s => s.id !== id)); if (activeSpaceId === id) setActiveSpaceId(null); };
+  const handleSaveSpace = async (space: Space) => { 
+      setSpaces(prev => { 
+          const exists = prev.find(s => s.id === space.id); 
+          if (exists) return prev.map(s => s.id === space.id ? space : s); 
+          return [...prev, space]; 
+      }); 
+
+      // Trigger RAG indexing for all text files in the space
+      if (settings.geminiApiKey && space.files) {
+          try {
+              // 1. Index new/existing files
+              for (const file of space.files) {
+                  if (file.type === 'text' && file.content) {
+                      // Create a pseudo-ID based on name and size to detect changes
+                      const fileId = `${space.id}_${file.name}_${file.content.length}`;
+                      await RAGService.indexDocument(space.id, fileId, file.name, file.content, settings.geminiApiKey);
+                  }
+              }
+              // Note: We aren't cleaning up deleted files here yet for simplicity, 
+              // but we should ideally remove chunks for files no longer in space.files.
+          } catch (e) {
+              console.error("[RAG] Error indexing space:", e);
+          }
+      }
+  };
+  
+  const handleDeleteSpace = async (id: string) => { 
+      setSpaces(prev => prev.filter(s => s.id !== id)); 
+      if (activeSpaceId === id) setActiveSpaceId(null); 
+      
+      // Clean up RAG chunks
+      try {
+          await RAGService.deleteSpace(id);
+      } catch (e) {
+          console.error("[RAG] Error deleting space chunks:", e);
+      }
+  };
   const handleNewNote = (parentId?: string, initialContent: string = '', initialTags: string[] = []) => { 
       const newNote: Note = { 
           id: generateId(), 
@@ -751,10 +852,6 @@ function App() {
     }
     
     handleNewNote(undefined, content, tags);
-  };
-
-  const handleUpdateSettings = (newSettings: Partial<AppSettings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
   };
 
   // --- Interaction Handlers ---
@@ -1353,7 +1450,7 @@ function App() {
   useEffect(() => {
     const handlePopState = () => {
         let handled = false;
-        if (settingsOpen) { setSettingsOpen(false); handled = true; } 
+        if (settingsOpen) { handleCancelSettings(); handled = true; } 
         else if (spacesModalOpen) { setSpacesModalOpen(false); handled = true; } 
         else if (sidebarOpen && window.innerWidth < 768) { setSidebarOpen(false); handled = true; } 
         else if (isDashboardMode) { setIsDashboardMode(false); handled = true; } 
@@ -1420,7 +1517,7 @@ function App() {
           onNewThread={handleNewThread} 
           onNewNote={handleNewNote} 
           onManageSpaces={() => setSpacesModalOpen(true)} 
-          openSettings={() => setSettingsOpen(true)}
+          openSettings={handleOpenSettings}
           onDeleteThread={handleDeleteThread}
           onDuplicateNote={handleDuplicateNote}
           onMoveNote={handleMoveTo}
@@ -1491,7 +1588,7 @@ function App() {
 
         {activeView === 'library' && (
              <>
-                <div className="flex items-center h-10 px-3 select-none bg-pplx-primary border-none z-50 w-full relative border-b border-pplx-border/50 md:border-none">
+                <div className="flex items-center h-auto px-3 py-2 select-none bg-pplx-primary border-none z-50 w-full relative border-b border-pplx-border/50 md:border-none pt-safe">
                      <div className="flex-1 flex items-center min-w-0">
                          {!sidebarOpen && ( <button onClick={() => setSidebarOpen(true)} className="p-1 mr-2 text-pplx-muted hover:text-pplx-text hover:bg-pplx-hover rounded transition-colors"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M4 12H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M4 18H12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></button> )}
                         
@@ -1516,10 +1613,10 @@ function App() {
 
         {/* Home Header (Mobile Only) */}
         {!activeThreadId && activeView === 'chat' && !activeSpaceId && (
-            <div className="md:hidden absolute top-0 left-0 right-0 z-20 p-6 pt-10 flex flex-col items-start gap-4 pointer-events-none">
+            <div className="md:hidden absolute top-0 left-0 right-0 z-20 p-6 pt-10 flex flex-col items-start gap-4 pointer-events-none pt-safe">
                 {/* Profile Section (Click to Open Settings) */}
                 <div 
-                    onClick={() => setSettingsOpen(true)}
+                    onClick={handleOpenSettings}
                     className="flex items-center gap-4 pointer-events-auto cursor-pointer active:opacity-80 transition-opacity"
                 >
                      {/* Avatar (Larger) - Simple, no border/bg colors */}
@@ -1561,7 +1658,7 @@ function App() {
         {activeThreadId && activeView === 'chat' && (
             <>
                 {/* TOP GRADIENT MASK */}
-                <div className="fixed top-0 left-0 right-0 h-14 md:h-32 bg-gradient-to-b from-[#121212] md:from-pplx-primary via-[#121212]/80 md:via-pplx-primary/80 to-transparent pointer-events-none z-30" />
+                <div className="fixed top-0 left-0 right-0 h-14 md:h-32 bg-gradient-to-b from-[#121212] md:from-pplx-primary via-[#121212]/80 md:via-pplx-primary/80 to-transparent pointer-events-none z-30 pt-safe" />
                 
                 <div className="absolute top-0 left-0 right-0 z-40 pointer-events-none [&>div]:!bg-transparent [&>div]:!backdrop-blur-none [&>div]:pointer-events-auto">
                     {(() => {
@@ -2146,7 +2243,13 @@ function App() {
         </button>
       )}
 
-      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} onSave={setSettings} />
+      <SettingsModal 
+        isOpen={settingsOpen} 
+        onClose={handleCancelSettings} 
+        settings={settings} 
+        onSave={handleSaveSettings} 
+        onPreview={(newSettings) => handleUpdateSettings(newSettings, false)}
+      />
       <SpacesModal 
         isOpen={spacesModalOpen} 
         onClose={() => {

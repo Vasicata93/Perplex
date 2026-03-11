@@ -190,7 +190,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       >
         <div className="w-[280px] h-full flex flex-col">
           {/* Header - Fixed layout: Logo Left, Close Button Right */}
-          <div className="flex items-center justify-between p-4 mb-2">
+          <div className="flex items-center justify-between p-4 mb-2 pt-safe">
               <div className="flex items-center cursor-pointer opacity-90 hover:opacity-100 transition-opacity" onClick={() => handleNavClick(() => { onChangeView('chat'); onNewThread(); })}>
                 <PerplexityLogo className="w-9 h-9 text-pplx-text" />
                 <span className="ml-2.5 text-xl font-medium tracking-tight text-pplx-text font-serif">perplex</span>
@@ -422,7 +422,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
       {/* Mobile Full-Screen Library Modal */}
       {isMobileLibraryOpen && (
-        <div className="fixed inset-0 z-[100] bg-pplx-sidebar flex flex-col md:hidden animate-in slide-in-from-bottom-4 duration-150 overflow-x-hidden">
+        <div className="fixed inset-0 z-[100] bg-pplx-sidebar flex flex-col md:hidden animate-in slide-in-from-bottom-4 duration-150 overflow-x-hidden pt-safe">
             <div className="flex items-center justify-between p-4 shrink-0">
                 <button 
                     onClick={() => setIsMobileLibraryOpen(false)} 
