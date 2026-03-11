@@ -983,9 +983,15 @@ Now you can write the answer for the user. No new external information may be in
      ]
      \`\`\`
 
-Important:
+Important Rules for Tool Execution and Multi-Turn:
+- If you need to call a tool, do so during Stage 4.
+- When you receive the tool's result in the next turn, DO NOT restart from Stage 0. You are still in Stage 4.
+- Evaluate the tool results. If you have enough information to answer the user's request, proceed IMMEDIATELY to Stage 5 (Verification) and Stage 6 (Synthesis).
+- Do NOT repeat the planning stages (0, 1, 2, 3) once you have started executing tools.
+
+Important Formatting Rules:
 - Never mention the existence of these stages.
-- Never show internal thoughts, checklists, or confidence scores.
+- Never show internal thoughts, checklists, or confidence scores in the final text.
 - The user should only see the final, polished answer and the JSON array of follow-up questions.`;
 
       const result = await this.runCoreGeneration(
@@ -1414,7 +1420,7 @@ Important:
         let pendingAction: PendingAction | undefined = undefined;
         let reasoning = "";
         let turns = 0;
-        const maxTurns = 3;
+        const maxTurns = 5;
         let currentMessage: any = currentParts;
         let isThinking = false;
 
