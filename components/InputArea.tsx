@@ -431,8 +431,8 @@ export const InputArea: React.FC<InputAreaProps> = ({
 
   // Box Styles
   const boxClass = centered
-    ? "bg-gradient-to-t from-[#0a0a0a] to-[#2a2a2a] border border-white/60 shadow-[0_0_30px_rgba(255,255,255,0.25)] rounded-[24px] flex flex-col transition-all duration-300 md:bg-none md:bg-pplx-card md:border-pplx-border md:shadow-md md:rounded-3xl"
-    : "bg-gradient-to-t from-[#0a0a0a] to-[#2a2a2a] border border-white/60 shadow-[0_0_30px_rgba(255,255,255,0.25)] rounded-[24px] flex flex-col transition-all duration-300 md:bg-none md:bg-pplx-card md:border-pplx-border md:shadow-xl md:rounded-3xl";
+    ? "bg-gradient-to-t from-[#161616] to-[#2a2a2a] border border-white/60 shadow-[0_0_35px_rgba(255,255,255,0.18)] rounded-[24px] flex flex-col transition-all duration-300 md:bg-none md:bg-pplx-input md:border-pplx-border md:shadow-md md:rounded-3xl"
+    : "bg-gradient-to-t from-[#161616] to-[#2a2a2a] border border-white/60 shadow-[0_0_35px_rgba(255,255,255,0.18)] rounded-[24px] flex flex-col transition-all duration-300 md:bg-none md:bg-pplx-input md:border-pplx-border md:shadow-xl md:rounded-3xl";
 
   // -- Sizing Constants --
   const buttonPadding = centered ? 'p-2 sm:px-2.5 sm:py-1.5' : 'p-2 sm:px-2.5 sm:py-1.5';
@@ -441,7 +441,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
   
   // Mobile: Dark circle/pill matching the image (Dark Grey/Black background, Light icon)
   // Desktop: transparent background, muted text, hover to text-primary
-  const mobileButtonFixedBg = "bg-[#1F1F1F] text-[#E0E0E0] border border-white/5 shadow-lg backdrop-blur-md hover:bg-[#2F2F2F] transition-all sm:bg-transparent dark:sm:bg-transparent sm:text-pplx-muted dark:sm:text-pplx-muted sm:hover:text-pplx-text sm:scale-100 sm:border-none sm:shadow-none sm:hover:bg-transparent";
+  const mobileButtonFixedBg = "bg-pplx-secondary text-pplx-text border border-pplx-border shadow-lg backdrop-blur-md hover:bg-pplx-hover transition-all sm:bg-transparent dark:sm:bg-transparent sm:text-pplx-muted dark:sm:text-pplx-muted sm:hover:text-pplx-text sm:scale-100 sm:border-none sm:shadow-none sm:hover:bg-transparent";
 
   // -- Components --
   const Tooltip = ({ text }: { text: string }) => (
@@ -453,7 +453,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
 
   return (
     <div className={containerClass}>
-      <div className={`${boxClass} ${compact ? 'border-none shadow-none bg-transparent' : ''}`}>
+      <div className={`${boxClass} ${compact ? 'md:border-none md:shadow-none md:bg-transparent' : ''}`}>
         
         {/* Attachments Preview */}
         {attachments.length > 0 && (

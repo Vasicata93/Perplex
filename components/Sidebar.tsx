@@ -11,9 +11,7 @@ import { Thread, Space, Note, UserProfile } from '../types';
 
 interface SidebarProps {
   isOpen: boolean;
-  isCollapsed: boolean;
   toggleSidebar: () => void;
-  toggleCollapse: () => void;
   threads: Thread[];
   spaces: Space[];
   notes: Note[];

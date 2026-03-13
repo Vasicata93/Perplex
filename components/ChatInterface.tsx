@@ -57,7 +57,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const filteredMessages = messages.filter(m => m.role !== Role.SYSTEM);
 
   return (
-    <div className={`flex flex-col h-full relative overflow-hidden ${isSidePanel ? 'bg-pplx-card' : 'bg-pplx-bg'}`}>
+    <div className={`flex flex-col h-full relative overflow-hidden ${isSidePanel ? 'bg-pplx-card' : 'bg-pplx-primary'}`}>
       {/* Top Gradient Fade */}
       <div className={`absolute top-0 left-0 right-0 bg-gradient-to-b from-pplx-card to-transparent z-10 pointer-events-none ${isSidePanel ? 'h-6 opacity-80' : 'h-12'}`} />
 

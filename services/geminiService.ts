@@ -727,7 +727,11 @@ export class LLMService {
 
       const agentSystemPrompt = `CURRENT SYSTEM TIME: ${timeStr}
 
-You are an advanced reasoning agent. You MUST silently execute all 7 stages below internally before producing any response. Never show the stage names, numbers, or this process to the user. The user sees only the final synthesized response from Stage 6.
+You are an advanced reasoning agent. You MUST execute all 7 stages below internally.
+If you have a native 'thought' or 'reasoning' capability (like Gemini 3.1 Pro), use it for Stages 0-5.
+If you do NOT have a native reasoning capability, you MUST wrap your internal thoughts for Stages 0-5 inside <thinking>...</thinking> tags.
+
+The final synthesized response from Stage 6 MUST be provided as your final output text, OUTSIDE of any thinking or reasoning block. Never show the stage names, numbers, or internal process to the user in the final text.
 
 You operate as a single agent that can:
 - Plan multi-step work,
@@ -944,7 +948,7 @@ Internally produce:
 ------------------------------------
 STAGE 6 — CALIBRATION AND SYNTHESIS
 ------------------------------------
-Now you can write the answer for the user. No new external information may be introduced here; you can only use what was gathered and verified in previous stages.
+Now you MUST write the final answer for the user. This content MUST be outside of any thinking block.
 
 1) Choose response format:
    - Simple confirmations (DIRECT REPLY):
@@ -992,7 +996,8 @@ Important Rules for Tool Execution and Multi-Turn:
 Important Formatting Rules:
 - Never mention the existence of these stages.
 - Never show internal thoughts, checklists, or confidence scores in the final text.
-- The user should only see the final, polished answer and the JSON array of follow-up questions.`;
+- The user should only see the final, polished answer and the JSON array of follow-up questions.
+- YOUR FINAL ANSWER MUST BE OUTSIDE OF ANY <thinking> OR <thought> TAGS.`;
 
       const result = await this.runCoreGeneration(
           shortTermHistory, 
@@ -1125,9 +1130,9 @@ Important Formatting Rules:
         // Keep files in direct context, but also available in workspaceFiles for tools
     }
 
-    const systemInstruction = systemInstructionOverride || await this.buildSystemContext(
+    const systemInstruction = await this.buildSystemContext(
         prompt, 
-        modeInstruction + kbSummary,
+        (systemInstructionOverride ? systemInstructionOverride + "\n\n" : "") + modeInstruction + kbSummary,
         enableMemory, 
         userProfile, 
         aiProfile, 
@@ -1458,7 +1463,21 @@ Important Formatting Rules:
                     let remainingText = text;
                     while (remainingText.length > 0) {
                         if (!isThinking) {
-                            const startIndex = remainingText.indexOf('<thinking>');
+                            const startThinking = remainingText.indexOf('<thinking>');
+                            const startThought = remainingText.indexOf('<thought>');
+                            
+                            // Find the earliest start tag
+                            let startIndex = -1;
+                            let tagLength = 0;
+                            
+                            if (startThinking !== -1 && (startThought === -1 || startThinking < startThought)) {
+                                startIndex = startThinking;
+                                tagLength = 10; // '<thinking>'.length
+                            } else if (startThought !== -1) {
+                                startIndex = startThought;
+                                tagLength = 9; // '<thought>'.length
+                            }
+
                             if (startIndex !== -1) {
                                 const before = remainingText.substring(0, startIndex);
                                 if (before) {
@@ -1466,14 +1485,28 @@ Important Formatting Rules:
                                     if (onChunk) onChunk(before, undefined);
                                 }
                                 isThinking = true;
-                                remainingText = remainingText.substring(startIndex + 10); // '<thinking>'.length
+                                remainingText = remainingText.substring(startIndex + tagLength);
                             } else {
                                 finalResponseText += remainingText;
                                 if (onChunk) onChunk(remainingText, undefined);
                                 remainingText = "";
                             }
                         } else {
-                            const endIndex = remainingText.indexOf('</thinking>');
+                            const endThinking = remainingText.indexOf('</thinking>');
+                            const endThought = remainingText.indexOf('</thought>');
+                            
+                            // Find the earliest end tag
+                            let endIndex = -1;
+                            let tagLength = 0;
+                            
+                            if (endThinking !== -1 && (endThought === -1 || endThinking < endThought)) {
+                                endIndex = endThinking;
+                                tagLength = 11; // '</thinking>'.length
+                            } else if (endThought !== -1) {
+                                endIndex = endThought;
+                                tagLength = 10; // '</thought>'.length
+                            }
+
                             if (endIndex !== -1) {
                                 const thought = remainingText.substring(0, endIndex);
                                 if (thought) {
@@ -1481,7 +1514,7 @@ Important Formatting Rules:
                                     if (onChunk) onChunk("", thought);
                                 }
                                 isThinking = false;
-                                remainingText = remainingText.substring(endIndex + 11); // '</thinking>'.length
+                                remainingText = remainingText.substring(endIndex + tagLength);
                             } else {
                                 reasoning += remainingText;
                                 if (onChunk) onChunk("", remainingText);
@@ -1933,21 +1966,47 @@ Important Formatting Rules:
                             let remaining = chunk;
                             while (remaining.length > 0) {
                                 if (!inThinkingTag) {
-                                    const startIdx = remaining.indexOf("<thinking>");
+                                    const startThinking = remaining.indexOf("<thinking>");
+                                    const startThought = remaining.indexOf("<thought>");
+                                    
+                                    let startIdx = -1;
+                                    let tagLen = 0;
+                                    
+                                    if (startThinking !== -1 && (startThought === -1 || startThinking < startThought)) {
+                                        startIdx = startThinking;
+                                        tagLen = 10;
+                                    } else if (startThought !== -1) {
+                                        startIdx = startThought;
+                                        tagLen = 9;
+                                    }
+
                                     if (startIdx !== -1) {
                                         // Found start tag
                                         const textPart = remaining.substring(0, startIdx);
                                         if (textPart && onChunk) onChunk(textPart, undefined);
                                         
                                         inThinkingTag = true;
-                                        remaining = remaining.substring(startIdx + 10); // Skip <thinking>
+                                        remaining = remaining.substring(startIdx + tagLen);
                                     } else {
                                         // No start tag, just text
                                         if (onChunk) onChunk(remaining, undefined);
                                         remaining = "";
                                     }
                                 } else {
-                                    const endIdx = remaining.indexOf("</thinking>");
+                                    const endThinking = remaining.indexOf("</thinking>");
+                                    const endThought = remaining.indexOf("</thought>");
+                                    
+                                    let endIdx = -1;
+                                    let tagLen = 0;
+                                    
+                                    if (endThinking !== -1 && (endThought === -1 || endThinking < endThought)) {
+                                        endIdx = endThinking;
+                                        tagLen = 11;
+                                    } else if (endThought !== -1) {
+                                        endIdx = endThought;
+                                        tagLen = 10;
+                                    }
+
                                     if (endIdx !== -1) {
                                         // Found end tag
                                         const thoughtPart = remaining.substring(0, endIdx);
@@ -1955,7 +2014,7 @@ Important Formatting Rules:
                                         if (onChunk) onChunk("", thoughtPart);
                                         
                                         inThinkingTag = false;
-                                        remaining = remaining.substring(endIdx + 11); // Skip </thinking>
+                                        remaining = remaining.substring(endIdx + tagLen);
                                     } else {
                                         // Still in thinking tag
                                         finalReasoning += remaining;
@@ -1992,8 +2051,8 @@ Important Formatting Rules:
 
             // If no tool calls, we are done
             if (toolCalls.length === 0) {
-                // Strip thinking tags from final content for clean text
-                const cleanContent = currentTurnContent.replace(/<thinking>[\s\S]*?<\/thinking>/g, "").trim();
+                // Strip thinking/thought tags from final content for clean text
+                const cleanContent = currentTurnContent.replace(/<(thinking|thought)>[\s\S]*?<\/\1>/g, "").trim();
                 if (cleanContent) {
                     finalContent = cleanContent;
                 } else if (!finalContent) {
@@ -2004,7 +2063,7 @@ Important Formatting Rules:
             }
 
             // If we have content in this turn but also tool calls, preserve it
-            const turnCleanContent = currentTurnContent.replace(/<thinking>[\s\S]*?<\/thinking>/g, "").trim();
+            const turnCleanContent = currentTurnContent.replace(/<(thinking|thought)>[\s\S]*?<\/\1>/g, "").trim();
             if (turnCleanContent) {
                 finalContent += (finalContent ? "\n\n" : "") + turnCleanContent;
             }

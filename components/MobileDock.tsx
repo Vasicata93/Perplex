@@ -244,7 +244,7 @@ export const MobileDock: React.FC<MobileDockProps> = ({
 
         {/* Main Dock Bar */}
         <div className="flex items-center gap-2.5 px-4">
-          <div className="bg-[#1a1a1a]/60 backdrop-blur-3xl border border-white/10 rounded-full p-1 flex items-center gap-1 shadow-2xl relative overflow-hidden supports-[backdrop-filter]:bg-[#1a1a1a]/40">
+          <div className="bg-pplx-sidebar/60 backdrop-blur-3xl border border-white/10 rounded-full p-1 flex items-center gap-1 shadow-2xl relative overflow-hidden supports-[backdrop-filter]:bg-pplx-sidebar/40">
             {/* Subtle Dock Shine */}
             <div className="absolute inset-0 bg-gradient-to-b from-white/[0.05] to-transparent pointer-events-none" />
             
@@ -254,7 +254,7 @@ export const MobileDock: React.FC<MobileDockProps> = ({
               className={`relative flex items-center justify-center w-[43px] h-[43px] rounded-full transition-all duration-300 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] ${
                 activeView === 'home' || isHomeBackActive
                   ? 'bg-[#e8dcc4] text-black' 
-                  : 'bg-[#2a2a2a] text-white/70 hover:text-white'
+                  : 'bg-pplx-secondary text-white/70 hover:text-white'
               }`}
             >
               {getHomeIcon()}
@@ -278,7 +278,7 @@ export const MobileDock: React.FC<MobileDockProps> = ({
                   className={`relative flex items-center justify-center w-[38px] h-[38px] rounded-full transition-all duration-300 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] ${
                     isActive 
                       ? 'bg-[#e8dcc4] text-black' 
-                      : 'bg-[#2a2a2a] text-white/70 hover:text-white'
+                      : 'bg-pplx-secondary text-white/70 hover:text-white'
                   }`}
                 >
                   {getShortcutIcon(slotIndex)}

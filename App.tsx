@@ -38,7 +38,6 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSpaceFilesModalOpen, setIsSpaceFilesModalOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   // NEW: Lifted state from Sidebar to App to control expansion via Back button
   const [expandedSidebarSection, setExpandedSidebarSection] = useState<string | null>(null);
   
@@ -1499,9 +1498,7 @@ function App() {
     <div className="flex h-[100dvh] w-full bg-pplx-primary text-pplx-text overflow-hidden font-sans transition-colors duration-150" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       <Sidebar 
           isOpen={sidebarOpen} 
-          isCollapsed={sidebarCollapsed} 
           toggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
-          toggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)} 
           threads={threads} 
           spaces={spaces} 
           notes={notes} 
@@ -1530,7 +1527,7 @@ function App() {
       />
 
       <main 
-        className={`flex-1 h-full flex flex-col relative overflow-hidden transition-all duration-150 bg-[#121212] md:bg-pplx-primary`}
+        className={`flex-1 h-full flex flex-col relative overflow-hidden transition-all duration-150 bg-pplx-primary`}
         style={{ 
           paddingBottom: settings.enableMobileDock && window.innerWidth < 640 
             ? 'calc(72px + env(safe-area-inset-bottom))' 
@@ -1539,7 +1536,7 @@ function App() {
       >
         {/* Premium Dark Background Effect for Home Page */}
         {!activeThreadId && activeView === 'chat' && (
-            <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden flex items-center justify-center bg-[#121212] md:dark:bg-[#191919] md:bg-[#FFFFFF] transition-colors duration-150">
+            <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden flex items-center justify-center bg-pplx-primary transition-colors duration-150">
                 
                 {/* MOBILE BACKGROUND: Golden Glow Top-Left */}
                 <div className="absolute inset-0 md:hidden">
@@ -1658,7 +1655,7 @@ function App() {
         {activeThreadId && activeView === 'chat' && (
             <>
                 {/* TOP GRADIENT MASK */}
-                <div className="fixed top-0 left-0 right-0 h-14 md:h-32 bg-gradient-to-b from-[#121212] md:from-pplx-primary via-[#121212]/80 md:via-pplx-primary/80 to-transparent pointer-events-none z-30 pt-safe" />
+                <div className="fixed top-0 left-0 right-0 h-14 md:h-32 bg-gradient-to-b from-pplx-primary md:from-pplx-primary via-pplx-primary/80 md:via-pplx-primary/80 to-transparent pointer-events-none z-30 pt-safe" />
                 
                 <div className="absolute top-0 left-0 right-0 z-40 pointer-events-none [&>div]:!bg-transparent [&>div]:!backdrop-blur-none [&>div]:pointer-events-auto">
                     {(() => {
@@ -2171,7 +2168,7 @@ function App() {
                 <div className="fixed bottom-[130px] left-0 right-0 h-14 bg-gradient-to-t from-pplx-primary via-pplx-primary/80 to-transparent pointer-events-none z-10 hidden md:block" />
                 {/* Mobile version usually has input fixed differently, but this helps fade content on scroll */}
                 <div 
-                    className="fixed left-0 right-0 h-14 bg-gradient-to-t from-[#121212] to-transparent pointer-events-none z-10 md:hidden" 
+                    className="fixed left-0 right-0 h-14 bg-gradient-to-t from-pplx-primary to-transparent pointer-events-none z-10 md:hidden" 
                     style={{ 
                         bottom: settings.enableMobileDock 
                             ? 'calc(120px + env(safe-area-inset-bottom))' 
@@ -2179,7 +2176,7 @@ function App() {
                     }}
                 />
 
-                <div className={`w-full bg-[#121212] md:bg-pplx-primary pt-2 px-4 z-30 shrink-0 border-t border-transparent transition-all duration-500 ${settings.enableMobileDock ? 'sm:pb-6' : 'pb-0'} ${activeView === 'chat' && !activeThreadId && !activeSpace ? 'md:pb-[35vh]' : 'md:pb-0'}`}>
+                <div className={`w-full bg-pplx-primary pt-2 px-4 z-30 shrink-0 border-t border-transparent transition-all duration-500 ${settings.enableMobileDock ? 'sm:pb-6' : 'pb-0'} ${activeView === 'chat' && !activeThreadId && !activeSpace ? 'md:pb-[35vh]' : 'md:pb-0'}`}>
                     <div className="pointer-events-auto">
                           <InputArea 
                             key={activeThreadId || 'home'} 
