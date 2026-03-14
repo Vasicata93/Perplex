@@ -7,6 +7,8 @@ import { TavilyService } from "./tavilyService";
 import { db, STORES } from "./db";
 import { getHolidays } from "../src/services/holidayService";
 import { RAGService } from "./ragService";
+import { buildAgentSystemPrompt } from "../src/agent/AgentOrchestrator";
+import { DEFAULT_AGENT_CONFIG } from "../src/agent/types";
 
 // --- Tool Definitions ---
 
@@ -654,13 +656,23 @@ export class LLMService {
       }
   }
 
-  private async triggerMemoryConsolidation(prompt: string, responseText: string, enableMemory: boolean, geminiApiKey?: string) {
+  private async triggerMemoryConsolidation(
+      prompt: string, 
+      responseText: string, 
+      enableMemory: boolean, 
+      provider: ModelProvider,
+      openRouterKey: string,
+      openRouterModel: string,
+      openAiKey: string, 
+      openAiModel: string,
+      geminiApiKey?: string
+  ) {
       if (enableMemory) {
           await memoryManager.processNewMessage({ id: crypto.randomUUID(), role: Role.MODEL, content: responseText, timestamp: Date.now() }, 'current_session');
           const buffer = memoryManager.workingMemory.getMessages();
           const shouldConsolidate = buffer.length >= 5 || prompt.toLowerCase().includes("remember this") || prompt.toLowerCase().includes("salvează");
           if (shouldConsolidate) {
-              this.runConsolidation(geminiApiKey);
+              this.runConsolidation(provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
           }
       }
   }
@@ -709,11 +721,12 @@ export class LLMService {
       if (!useAgenticResearch) {
           if (onChunk) customOnChunk("", "⚡ Mod Chat Simplu (Fără etape)...\n");
           const result = await this.runCoreGeneration(shortTermHistory, prompt, attachments, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel, useSearch, proMode, enableMemory, userProfile, aiProfile, spaceSystemInstruction, tavilyApiKey, geminiApiKey, searchProvider, braveApiKey, customOnChunk);
-          this.triggerMemoryConsolidation(prompt, result.text, enableMemory, geminiApiKey);
+          this.triggerMemoryConsolidation(prompt, result.text, enableMemory, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
           result.reasoning = accumulatedReasoning + (result.reasoning || "");
           return result;
       }
 
+          // ─── Build the 5-Step Agent System Prompt ───────────────────────
       const now = new Date();
       const timeStr = now.toLocaleString('en-US', { 
           weekday: 'long', 
@@ -725,279 +738,25 @@ export class LLMService {
           timeZoneName: 'short'
       });
 
-      const agentSystemPrompt = `CURRENT SYSTEM TIME: ${timeStr}
+      // Get memory context for the orchestrator
+      let memoryContextStr = '';
+      if (enableMemory) {
+          memoryContextStr = await memoryManager.formatContextString(prompt);
+      }
 
-You are an advanced reasoning agent. You MUST execute all 7 stages below internally.
-If you have a native 'thought' or 'reasoning' capability (like Gemini 3.1 Pro), use it for Stages 0-5.
-If you do NOT have a native reasoning capability, you MUST wrap your internal thoughts for Stages 0-5 inside <thinking>...</thinking> tags.
+      // Build the base system context (identity, profiles, protocols)
+      const baseSystemContext = await this.buildSystemContext(
+          prompt, '', enableMemory, userProfile, aiProfile, spaceSystemInstruction, false, false
+      );
 
-The final synthesized response from Stage 6 MUST be provided as your final output text, OUTSIDE of any thinking or reasoning block. Never show the stage names, numbers, or internal process to the user in the final text.
-
-You operate as a single agent that can:
-- Plan multi-step work,
-- Call tools when needed,
-- Reflect on its own reasoning,
-- Verify information against multiple sources,
-- Synthesize clear, structured answers.
-
---------------------------------
-STAGE 0 — ROUTER (MODE SELECTION)
---------------------------------
-Before doing anything else, classify the user request into ONE of these modes:
-
-1) DIRECT REPLY
-   - Use this only when:
-     - The user greets you, thanks you, or asks for a simple confirmation.
-     - The answer is fully determined by the current conversation context or your system instructions.
-   - If classified as DIRECT REPLY:
-     - Skip Stages 1–5.
-     - Go directly to Stage 6 and produce a concise answer.
-     - Do NOT call any tools unless the user explicitly asks for a side-effect (e.g., “create event”, “save note”).
-
-2) STANDARD
-   - Use this when:
-     - The request has a clear, narrow scope.
-     - It can be solved with 0–3 simple tool calls and minimal research.
-     - Examples: basic factual lookups, simple calendar operations, small document edits.
-
-3) DEEP RESEARCH
-   - Use this when:
-     - The task involves multi-source research, financial/crypto/stock data, complex comparisons, or open-ended analysis.
-     - The answer requires combining several pieces of evidence or tools.
-   - Whenever you are unsure between STANDARD and DEEP RESEARCH, ALWAYS choose DEEP RESEARCH.
-
-Internally record:
-- The selected mode (DIRECT REPLY / STANDARD / DEEP RESEARCH).
-- A one-sentence justification for the selected mode.
-
-Do NOT expose this classification to the user.
-
---------------------------------
-STAGE 1 — MEMORY AND CONTEXT SCAN
---------------------------------
-Before calling any external tool:
-
-1) Scan persistent memory (if available):
-   - Retrieve known preferences, past decisions, ongoing projects, or user configurations that are relevant to this request.
-   - Prefer specific, recent, and task-related memories over generic history.
-
-2) Scan recent conversation context:
-   - Identify prior messages that define:
-     - Current topic,
-     - Constraints (budget, time, risk level, tools allowed),
-     - Partial answers or previous attempts for the same task.
-
-3) Decide what you ALREADY know:
-   - Identify facts from memory and context that directly help answer the question.
-   - Note explicitly (internally) which parts of the task you can solve without any new tool calls.
-
-Internally produce:
-- A short internal summary:
-  - What is already known (from memory/context),
-  - What is still missing and will require tools or external search.
-
-Do NOT show this summary to the user.
-
---------------------------------
-STAGE 2 — INTENT DECOMPOSITION
---------------------------------
-Separate what the user wrote from what the user actually needs.
-
-1) Explicit intent:
-   - Restate (internally) the literal request in one or two clear sentences.
-
-2) Implicit intent:
-   - Infer the underlying goal or “why” behind the request.
-   - Consider:
-     - Is the user trying to decide, to compare, to learn basics, or to optimize something?
-     - Are they more likely to care about safety, speed, cost, accuracy, or simplicity?
-
-3) Task decomposition:
-   - Break the request into all sub-questions and sub-tasks required for a complete answer.
-   - For analytical or financial requests, think in terms of:
-     - Data you must fetch (prices, volumes, fundamentals, news, regulations, etc.),
-     - Transformations you must perform (comparisons, ratios, scenarios),
-     - Judgments you must make (risks, trade-offs, recommendations),
-     - Explanations needed for a non-expert user.
-
-4) Definition of “done”:
-   - Write internally a checklist of what the final response MUST include to fully satisfy the user.
-   - This checklist will be used again in Stage 5 to verify completeness.
-
-Do NOT reveal this decomposition or checklist to the user.
-
------------------------------------------------
-STAGE 3 — DOMAIN CLASSIFICATION AND TOOL PLANNING
------------------------------------------------
-Decide which domains and tools are relevant and plan the route.
-
-1) Domain classification:
-   - Classify the request into one or more domains such as:
-     - General knowledge / web search,
-     - Financial & markets (stocks, crypto, macro),
-     - Calendars & scheduling,
-     - Notes, documents, and workspace edits,
-     - Code / data analysis,
-     - Other specialized tools available in your environment.
-
-2) Minimal tool set:
-   - Select ONLY the tools that are actually needed to satisfy the checklist from Stage 2.
-   - Avoid “tool bloat”: do not load or call irrelevant tools.
-
-3) Plan the sequence:
-   - Design an ordered action plan, for example:
-     - Step A: Quick web or data lookup to get core facts.
-     - Step B: Follow-up search for missing pieces or conflicting information.
-     - Step C: Optional deeper research (e.g., news, reports, documentation).
-   - Specify which steps:
-     - Must happen first,
-     - Can run in parallel,
-     - Are optional fallbacks if a main step fails.
-
-4) Effort scaling:
-   - For STANDARD mode:
-     - Keep the number of tool calls low and focused.
-   - For DEEP RESEARCH mode:
-     - Allow more extensive tool usage,
-     - But still favor high-quality, diverse sources over brute-force calls.
-
-Internally produce:
-- A brief step-by-step plan listing:
-  - Which tools to call,
-  - In what order,
-  - For what specific sub-questions.
-
-Do NOT execute tools in this stage. Planning only.
-
-------------------------
-STAGE 4 — EXECUTION LOOP
-------------------------
-Execute the plan from Stage 3 as faithfully as possible.
-
-1) Follow the planned order:
-   - Call tools in the planned sequence.
-   - Where the plan allows, parallelize independent steps, but keep the logic consistent with the plan.
-
-2) Collect results without concluding:
-   - For each tool call, store:
-     - Raw result,
-     - Its source (URL, dataset, system),
-     - How it connects to the sub-question it was meant to answer.
-
-3) Adaptive fallback:
-   - If a tool fails, is unavailable, or returns clearly insufficient data:
-     - Decide immediately whether the missing information is critical.
-     - If critical:
-       - Attempt ONE reasonable fallback (alternative tool, different query, different data source).
-     - If fallback also fails:
-       - Mark that specific gap for Stage 5 as “unresolved”.
-
-4) Avoid over-searching:
-   - Stop additional tool calls once:
-     - All items in the Stage 2 checklist are satisfied with adequate evidence,
-     - Or it becomes clear that some items cannot be resolved with available tools.
-
-Internally produce:
-- A structured set of findings:
-  - For each sub-question:
-    - What you found,
-    - From which sources,
-    - Where information is missing or uncertain.
-
-Do NOT start writing the user-facing answer yet.
-
----------------------------------
-STAGE 5 — VERIFICATION AND CONFIDENCE
----------------------------------
-Check your work against the intent and evidence.
-
-1) Completeness check:
-   - Compare the findings from Stage 4 against the Stage 2 checklist.
-   - Mark each item as:
-     - Fully covered,
-     - Partially covered,
-     - Not covered (with reason).
-
-2) Consistency and conflict resolution:
-   - Look for contradictions between sources.
-   - If two sources disagree:
-     - Prefer more authoritative, recent, or primary sources (e.g., official docs, recognized institutions) over weaker ones.
-     - If conflict cannot be resolved, treat that part as uncertain.
-
-3) Confidence assessment:
-   - Assign an internal confidence level to your overall answer:
-     - HIGH: Data is recent enough, cross-checked, and consistent.
-     - MEDIUM: Some parts rely on limited or indirect evidence.
-     - LOW: Important pieces are missing or conflicting.
-
-4) Extra search (optional):
-   - If confidence is MEDIUM or LOW and a single focused search is likely to resolve the doubt:
-     - Perform ONE additional targeted search/tool call now.
-     - Update the confidence level if appropriate.
-
-5) Transparency rule:
-   - If confidence is LOW on any critical data (especially financial, legal, medical, or safety-related):
-     - You MUST mention this limitation explicitly in the final answer in Stage 6.
-
-Internally produce:
-- A short diagnostic note:
-  - Main strengths of your evidence,
-  - Main gaps or uncertainties,
-  - Final confidence level.
-
-------------------------------------
-STAGE 6 — CALIBRATION AND SYNTHESIS
-------------------------------------
-Now you MUST write the final answer for the user. This content MUST be outside of any thinking block.
-
-1) Choose response format:
-   - Simple confirmations (DIRECT REPLY):
-     - Give a short, direct answer.
-   - Analytical or research answers:
-     - Use clear headings, short paragraphs, and bullet points where useful.
-     - Present numbers, dates, and key facts clearly and with their sources when relevant.
-
-2) Synthesize, don’t dump:
-   - Distill the information into:
-     - Direct answers to the explicit question,
-     - Context and reasoning at the right level of detail for a non-expert user,
-     - Concrete, actionable recommendations or next steps where appropriate.
-   - Do NOT paste raw tool outputs.
-   - Do NOT expose your internal notes, plans, or stage descriptions.
-
-3) Source and time awareness:
-   - For factual or financial data, mention:
-     - The type of source (e.g., official docs, major news outlet, exchange API),
-     - The approximate recency of the data (e.g., “as of March 2026”),
-     - Any major limitations discovered in Stage 5.
-
-4) User alignment:
-   - Respect any user-stated constraints (budget, risk level, time horizon).
-   - If the user’s request conflicts with safety, law, or platform policies:
-     - Provide a safe alternative or partial answer rather than refusing without explanation.
-
-5) Follow-up questions:
-   - At the very end of your response, propose exactly THREE useful follow-up questions that could help the user go deeper or clarify next steps.
-   - Output these three follow-up questions as a JSON array inside a Markdown code block, for example:
-     \`\`\`json
-     [
-       "Example follow-up question 1?",
-       "Example follow-up question 2?",
-       "Example follow-up question 3?"
-     ]
-     \`\`\`
-
-Important Rules for Tool Execution and Multi-Turn:
-- If you need to call a tool, do so during Stage 4.
-- When you receive the tool's result in the next turn, DO NOT restart from Stage 0. You are still in Stage 4.
-- Evaluate the tool results. If you have enough information to answer the user's request, proceed IMMEDIATELY to Stage 5 (Verification) and Stage 6 (Synthesis).
-- Do NOT repeat the planning stages (0, 1, 2, 3) once you have started executing tools.
-
-Important Formatting Rules:
-- Never mention the existence of these stages.
-- Never show internal thoughts, checklists, or confidence scores in the final text.
-- The user should only see the final, polished answer and the JSON array of follow-up questions.
-- YOUR FINAL ANSWER MUST BE OUTSIDE OF ANY <thinking> OR <thought> TAGS.`;
+      // Build the full 5-step agent system prompt via the orchestrator
+      const { systemPrompt: agentSystemPrompt } = buildAgentSystemPrompt({
+          userMessage: prompt,
+          baseSystemContext,
+          memoryContext: memoryContextStr,
+          currentDateTime: timeStr,
+          config: DEFAULT_AGENT_CONFIG
+      });
 
       const result = await this.runCoreGeneration(
           shortTermHistory, 
@@ -1023,7 +782,7 @@ Important Formatting Rules:
           agentSystemPrompt
       );
 
-      this.triggerMemoryConsolidation(prompt, result.text, enableMemory, geminiApiKey);
+      this.triggerMemoryConsolidation(prompt, result.text, enableMemory, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
       result.reasoning = accumulatedReasoning + (result.reasoning || "");
       
       return result;
@@ -1259,19 +1018,20 @@ Important Formatting Rules:
   }
 
   // --- Synthesis Engine (Consolidation) ---
-  private async runConsolidation(customApiKey?: string) {
+  private async runConsolidation(
+      provider: ModelProvider,
+      openRouterKey: string,
+      openRouterModel: string,
+      openAiKey: string, 
+      openAiModel: string,
+      geminiApiKey?: string
+  ) {
       console.log("[Memory] Starting Consolidation...");
       this.notifyLearningState(true);
       
       try {
         const buffer = memoryManager.workingMemory.getMessages();
         if (buffer.length === 0) return;
-
-        let clientToUse = this.ai;
-        if (customApiKey) {
-            try { clientToUse = new GoogleGenAI({ apiKey: customApiKey }); } catch(e) {}
-        }
-        if (!clientToUse) return;
 
         const currentMemories = memoryManager.semanticMemory.getAllEntries();
         const currentProjects = await db.get<any[]>(STORES.PROJECTS, 'all') || [];
@@ -1286,11 +1046,11 @@ Important Formatting Rules:
         4. If the buffer contains only noise, return empty arrays.
         
         BUFFER (Recent Conversation):
-        ${buffer.map(b => `${b.role.toUpperCase()}: ${b.content}`).join('\n')}
+        ${buffer.map((b: any) => `${b.role.toUpperCase()}: ${b.content}`).join('\n')}
 
         EXISTING CONTEXT (Do not duplicate these):
         - Projects: ${currentProjects.map(p => p.title).join(', ')}
-        - Facts: ${currentMemories.slice(0, 20).map(m => m.content).join(', ')}...
+        - Facts: ${currentMemories.slice(0, 20).map((m: any) => m.content).join(', ')}...
 
         Return JSON ONLY:
         {
@@ -1300,24 +1060,77 @@ Important Formatting Rules:
         }
         `;
 
-        const response = await clientToUse.models.generateContent({
-            model: "gemini-3-flash-preview", 
-            contents: [{ parts: [{ text: consolidationPrompt }] }],
-            config: { responseMimeType: "application/json" }
-        });
-
         let jsonText = "";
-        try {
-            jsonText = response.text || "";
-        } catch (e) {
-            // Fallback if text getter fails (e.g. mixed content warning)
-            if (response.candidates?.[0]?.content?.parts) {
-                for (const part of response.candidates[0].content.parts) {
-                    if (part.text) jsonText += part.text;
+
+        if (provider === ModelProvider.GEMINI) {
+            let clientToUse = this.ai;
+            if (geminiApiKey) {
+                try { clientToUse = new GoogleGenAI({ apiKey: geminiApiKey }); } catch(e) {}
+            }
+            if (!clientToUse) return;
+
+            const response = await clientToUse.models.generateContent({
+                model: "gemini-3-flash-preview", 
+                contents: [{ parts: [{ text: consolidationPrompt }] }],
+                config: { responseMimeType: "application/json" }
+            });
+
+            try {
+                jsonText = response.text || "";
+            } catch (e) {
+                // Fallback if text getter fails (e.g. mixed content warning)
+                if (response.candidates?.[0]?.content?.parts) {
+                    for (const part of response.candidates[0].content.parts) {
+                        if (part.text) jsonText += part.text;
+                    }
                 }
             }
+        } else if (provider === ModelProvider.OPENROUTER || provider === ModelProvider.OPENAI) {
+            const isRouter = provider === ModelProvider.OPENROUTER;
+            const endpoint = isRouter ? 'https://openrouter.ai/api/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions';
+            const apiKey = isRouter ? openRouterKey : openAiKey;
+            const modelName = isRouter ? openRouterModel : openAiModel;
+            
+            if (!apiKey) {
+                console.warn(`[Memory] No API key provided for ${provider}. Consolidation aborted.`);
+                this.notifyLearningState(false);
+                return;
+            }
+
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            };
+
+            if (isRouter) {
+                headers['HTTP-Referer'] = window.location.origin;
+                headers['X-Title'] = "Perplex Clone";
+            }
+
+            const body = {
+                model: modelName,
+                messages: [{ role: 'user', content: consolidationPrompt }],
+                // Note: Not all providers support response_format: { type: "json_object" }, 
+                // but we prompt for it nicely.
+                temperature: 0.1
+            };
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(body)
+            });
+
+            if (!response.ok) {
+                console.error(`[Memory] Consolidation fetch failed for ${provider}: ${response.status} ${await response.text()}`);
+                this.notifyLearningState(false);
+                return;
+            }
+            
+            const data = await response.json();
+            jsonText = data.choices?.[0]?.message?.content || "";
         }
-        
+
         if (jsonText) {
             try {
                 const updates = this.extractJson(jsonText);
@@ -2455,6 +2268,34 @@ Important Formatting Rules:
   ): Promise<string> {
       const parts: string[] = [];
 
+      // [1] Agent Identity + Core Instructions
+      if (aiProfile.systemInstructions) {
+          parts.push(aiProfile.systemInstructions);
+      } else {
+          parts.push("You are a helpful AI assistant. Answer concisely and accurately. Use Markdown formatting.");
+      }
+
+      if (aiProfile.language && aiProfile.language !== 'English') {
+          parts.push(`\nPlease respond in ${aiProfile.language}.`);
+      }
+
+      if (modeInstruction) {
+          parts.push("\nMODE INSTRUCTION: " + modeInstruction);
+      }
+
+      if (spaceSystemInstruction) {
+          parts.push(`\nWorkspace Instructions:\n${spaceSystemInstruction}`);
+      }
+
+      if (userProfile.bio || userProfile.location || userProfile.name) {
+          let userStr = "\nUser Profile:";
+          if (userProfile.name) userStr += `\n- Name: ${userProfile.name}`;
+          if (userProfile.location) userStr += `\n- Location: ${userProfile.location}`;
+          if (userProfile.bio) userStr += `\n- Bio: ${userProfile.bio}`;
+          parts.push(userStr);
+      }
+
+      // [2] Current Date and Time
       const now = new Date();
       const timeStr = now.toLocaleString('en-US', { 
           weekday: 'long', 
@@ -2475,9 +2316,18 @@ Important Formatting Rules:
    - If the date has already passed this year, use the NEXT year.
    - NEVER assume a past year unless explicitly stated.
 4. ALWAYS confirm the calculated absolute date internally before calling a tool.
-5. When adding events, if the user doesn't specify a year, apply the logic above.
+5. When adding events, if the user doesn't specify a year, apply the logic above.`);
 
-**REAL-TIME INFORMATION PROTOCOL:**
+      // [3-6] Memory Layers (Topic Filtered)
+      if (enableMemory) {
+          const memoryContext = await memoryManager.formatContextString(prompt);
+          if (memoryContext) {
+              parts.push(memoryContext);
+          }
+      }
+
+      // [7-8] Global Tools / Skills / Protocols
+      parts.push(`\n**REAL-TIME INFORMATION PROTOCOL:**
 1. If the user asks about "today", "recent", "news", "crypto", "stocks", or "current events", you **MUST** use the available search tool (e.g., \`perform_search\` or built-in Google Search).
 2. Your internal knowledge is frozen in time. For any dynamic topic, the web is your source of truth.
 3. When searching for "today's news", explicitly include the current date (${timeStr}) in your search queries to get the most relevant results.
@@ -2503,16 +2353,6 @@ Important Formatting Rules:
 4. **TOOL USAGE:** If the file content is truncated or summarized (indicated by a system message), you **MUST** use the \`read_workspace_files\` tool to retrieve the full content before answering specific questions about it.
 5. **ANALYSIS:** When asked about a source, first analyze its structure, key points, and details *before* formulating your response.`);
 
-      if (aiProfile.systemInstructions) {
-          parts.push(aiProfile.systemInstructions);
-      } else {
-          parts.push("You are a helpful AI assistant. Answer concisely and accurately. Use Markdown formatting.");
-      }
-
-      if (modeInstruction) {
-          parts.push("\nMODE INSTRUCTION: " + modeInstruction);
-      }
-      
       // Simulate Reasoning via XML for non-Gemini models
       if (forceXmlThinking) {
           parts.push("\nIMPORTANT: Before answering, you must output your internal thought process inside <thinking>...</thinking> tags. Analyze the request, plan your search strategy, and critique your findings inside these tags. The user will see this as a 'Thought Process'. Then provide your final answer outside the tags.");
@@ -2545,29 +2385,6 @@ Important Formatting Rules:
 
       // Explicit Citation Instruction for Generic Models
       parts.push("\nCITATION RULES: If you use the 'perform_search' tool, you must cite the results in your final answer. Use the format [1], [2], etc., corresponding to the order of the sources provided by the tool. Do NOT invent sources.");
-
-      if (userProfile.bio || userProfile.location || userProfile.name) {
-          let userStr = "\n\nUser Profile:";
-          if (userProfile.name) userStr += `\n- Name: ${userProfile.name}`;
-          if (userProfile.location) userStr += `\n- Location: ${userProfile.location}`;
-          if (userProfile.bio) userStr += `\n- Bio: ${userProfile.bio}`;
-          parts.push(userStr);
-      }
-
-      if (enableMemory) {
-          const memoryContext = await memoryManager.formatContextString(prompt);
-          if (memoryContext) {
-              parts.push(memoryContext);
-          }
-      }
-
-      if (spaceSystemInstruction) {
-          parts.push(`\n\nCurrent Workspace Instructions:\n${spaceSystemInstruction}`);
-      }
-
-      if (aiProfile.language && aiProfile.language !== 'English') {
-          parts.push(`\n\nPlease respond in ${aiProfile.language}.`);
-      }
 
       // Add capabilities instruction for Saving
       parts.push("\n\nCAPABILITIES: You can save information to the user's library. CRITICAL RULE: ONLY use `save_to_library` if the user EXPLICITLY and DIRECTLY commands you to 'save this', 'create a page', or 'remember this'. DO NOT call this tool automatically at the end of a research task or conversation. If the user just asks a question or asks for research, DO NOT save it.");
