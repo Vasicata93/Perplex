@@ -228,11 +228,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <div ref={messagesEndRef} className="h-4" />
       </div>
 
-      {/* Bottom Gradient Fade */}
-      <div className="absolute bottom-[100px] left-0 right-0 h-12 bg-gradient-to-t from-pplx-card via-pplx-card/50 to-transparent z-10 pointer-events-none" />
-
       {/* Input Area */}
       <div className={`p-4 bg-pplx-card relative z-20 ${isSidePanel ? 'md:p-4 p-2' : ''}`}>
+        {/* Bottom Gradient Fade - Perfectly glued to input box */}
+        <div className="absolute bottom-[calc(100%-16px)] left-0 right-0 h-12 bg-gradient-to-t from-pplx-card via-pplx-card/50 to-transparent z-10 pointer-events-none" />
         <InputArea 
           onSendMessage={(text, focusModes, _proMode, atts) => onSendMessage(text, focusModes, atts)}
           isThinking={isThinking}

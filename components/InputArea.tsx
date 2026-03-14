@@ -431,8 +431,8 @@ export const InputArea: React.FC<InputAreaProps> = ({
 
   // Box Styles
   const boxClass = centered
-    ? "bg-gradient-to-t from-[#161616] to-[#2a2a2a] border border-white/60 shadow-[0_0_35px_rgba(255,255,255,0.18)] rounded-[24px] flex flex-col transition-all duration-300 md:bg-none md:bg-pplx-input md:border-pplx-border md:shadow-md md:rounded-3xl"
-    : "bg-gradient-to-t from-[#161616] to-[#2a2a2a] border border-white/60 shadow-[0_0_35px_rgba(255,255,255,0.18)] rounded-[24px] flex flex-col transition-all duration-300 md:bg-none md:bg-pplx-input md:border-pplx-border md:shadow-xl md:rounded-3xl";
+    ? "bg-white dark:bg-gradient-to-t dark:from-[#161616] dark:to-[#2a2a2a] border border-pplx-border dark:border-white/60 shadow-[0_0_35px_rgba(0,0,0,0.05)] dark:shadow-[0_0_35px_rgba(255,255,255,0.18)] rounded-[24px] flex flex-col transition-all duration-300 md:bg-none md:bg-pplx-input md:border-pplx-border md:shadow-md md:rounded-3xl"
+    : "bg-white dark:bg-gradient-to-t dark:from-[#161616] dark:to-[#2a2a2a] border border-pplx-border dark:border-white/60 shadow-[0_0_35px_rgba(0,0,0,0.05)] dark:shadow-[0_0_35px_rgba(255,255,255,0.18)] rounded-[24px] flex flex-col transition-all duration-300 md:bg-none md:bg-pplx-input md:border-pplx-border md:shadow-xl md:rounded-3xl";
 
   // -- Sizing Constants --
   const buttonPadding = centered ? 'p-2 sm:px-2.5 sm:py-1.5' : 'p-2 sm:px-2.5 sm:py-1.5';

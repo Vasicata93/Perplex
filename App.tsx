@@ -2164,19 +2164,19 @@ function App() {
                 
                 </div>
 
-                {/* BOTTOM GRADIENT MASK */}
-                <div className="fixed bottom-[130px] left-0 right-0 h-14 bg-gradient-to-t from-pplx-primary via-pplx-primary/80 to-transparent pointer-events-none z-10 hidden md:block" />
-                {/* Mobile version usually has input fixed differently, but this helps fade content on scroll */}
-                <div 
-                    className="fixed left-0 right-0 h-14 bg-gradient-to-t from-pplx-primary to-transparent pointer-events-none z-10 md:hidden" 
-                    style={{ 
-                        bottom: settings.enableMobileDock 
-                            ? 'calc(120px + env(safe-area-inset-bottom))' 
-                            : '120px' 
-                    }}
-                />
-
-                <div className={`w-full bg-pplx-primary pt-2 px-4 z-30 shrink-0 border-t border-transparent transition-all duration-500 ${settings.enableMobileDock ? 'sm:pb-6' : 'pb-0'} ${activeView === 'chat' && !activeThreadId && !activeSpace ? 'md:pb-[35vh]' : 'md:pb-0'}`}>
+                <div className={`w-full bg-pplx-primary pt-2 px-4 z-30 shrink-0 border-t border-transparent transition-all duration-500 relative ${settings.enableMobileDock ? 'sm:pb-6' : 'pb-0'} ${activeView === 'chat' && !activeThreadId && !activeSpace ? 'md:pb-[35vh]' : 'md:pb-0'}`}>
+                    {/* BOTTOM GRADIENT MASK (Desktop) - Perfectly glued to input box */}
+                    <div className="absolute bottom-[calc(100%-8px)] left-0 right-0 h-14 bg-gradient-to-t from-pplx-primary via-pplx-primary/80 to-transparent pointer-events-none z-10 hidden md:block" />
+                    
+                    {/* Mobile version usually has input fixed differently, but this helps fade content on scroll */}
+                    <div 
+                        className="fixed left-0 right-0 h-14 bg-gradient-to-t from-pplx-primary to-transparent pointer-events-none z-10 md:hidden" 
+                        style={{ 
+                            bottom: settings.enableMobileDock 
+                                ? 'calc(120px + env(safe-area-inset-bottom))' 
+                                : '120px' 
+                        }}
+                    />
                     <div className="pointer-events-auto">
                           <InputArea 
                             key={activeThreadId || 'home'} 

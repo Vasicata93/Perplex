@@ -81,17 +81,17 @@ export const MobileDock: React.FC<MobileDockProps> = ({
   const getShortcutIcon = (slotIndex: number) => {
     const noteId = shortcuts[slotIndex];
     
-    if (noteId === 'favorites') return <Star size={18} className={activeView === 'favorites' ? 'text-black' : 'text-white/60'} fill={activeView === 'favorites' ? 'black' : 'none'} />;
-    if (noteId === 'calendar') return <Calendar size={18} className={activeView === 'calendar' ? 'text-black' : 'text-white/60'} />;
+    if (noteId === 'favorites') return <Star size={18} className={activeView === 'favorites' ? 'text-black' : 'text-pplx-muted dark:text-white/60'} fill={activeView === 'favorites' ? 'black' : 'none'} />;
+    if (noteId === 'calendar') return <Calendar size={18} className={activeView === 'calendar' ? 'text-black' : 'text-pplx-muted dark:text-white/60'} />;
     
     const note = notes.find(n => n.id === noteId);
     
     if (!note) {
       // Default icons for empty slots as requested: favorites, calendar, folder
-      if (slotIndex === 0) return <Star size={18} className="text-white/60" />;
-      if (slotIndex === 1) return <Calendar size={18} className="text-white/60" />;
-      if (slotIndex === 2) return <Folder size={18} className="text-white/60" />;
-      return <Plus size={16} className="text-white/60" />;
+      if (slotIndex === 0) return <Star size={18} className="text-pplx-muted dark:text-white/60" />;
+      if (slotIndex === 1) return <Calendar size={18} className="text-pplx-muted dark:text-white/60" />;
+      if (slotIndex === 2) return <Folder size={18} className="text-pplx-muted dark:text-white/60" />;
+      return <Plus size={16} className="text-pplx-muted dark:text-white/60" />;
     }
 
     return (
@@ -110,10 +110,11 @@ export const MobileDock: React.FC<MobileDockProps> = ({
 
   // Helper to get Home Icon
   const getHomeIcon = () => {
-      if (backDestination === 'chat') return <MessageSquareText size={20} strokeWidth={2.5} fill={activeView === 'chat' ? 'black' : 'none'} />;
-      if (backDestination === 'library') return <Library size={20} strokeWidth={2.5} />;
-      if (backDestination === 'calendar') return <Calendar size={20} strokeWidth={2.5} />;
-      return <Home size={20} strokeWidth={2.5} fill={activeView === 'home' ? 'black' : 'none'} />;
+      const iconClass = activeView === 'home' || isHomeBackActive ? 'text-black' : 'text-pplx-muted dark:text-white/70';
+      if (backDestination === 'chat') return <MessageSquareText size={20} strokeWidth={2.5} className={iconClass} fill={activeView === 'chat' ? 'black' : 'none'} />;
+      if (backDestination === 'library') return <Library size={20} strokeWidth={2.5} className={iconClass} />;
+      if (backDestination === 'calendar') return <Calendar size={20} strokeWidth={2.5} className={iconClass} />;
+      return <Home size={20} strokeWidth={2.5} className={iconClass} fill={activeView === 'home' ? 'black' : 'none'} />;
   };
 
   return (
@@ -244,22 +245,22 @@ export const MobileDock: React.FC<MobileDockProps> = ({
 
         {/* Main Dock Bar */}
         <div className="flex items-center gap-2.5 px-4">
-          <div className="bg-pplx-sidebar/60 backdrop-blur-3xl border border-white/10 rounded-full p-1 flex items-center gap-1 shadow-2xl relative overflow-hidden supports-[backdrop-filter]:bg-pplx-sidebar/40">
+          <div className="bg-pplx-sidebar/80 dark:bg-pplx-sidebar/60 backdrop-blur-3xl border border-pplx-border dark:border-white/10 rounded-full p-1.5 flex items-center gap-1.5 shadow-2xl relative overflow-hidden supports-[backdrop-filter]:bg-pplx-sidebar/70 dark:supports-[backdrop-filter]:bg-pplx-sidebar/40">
             {/* Subtle Dock Shine */}
-            <div className="absolute inset-0 bg-gradient-to-b from-white/[0.05] to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-b from-white/[0.2] dark:from-white/[0.05] to-transparent pointer-events-none" />
             
             {/* Home / Back Button */}
             <button
               onClick={() => onNavigate('home')}
-              className={`relative flex items-center justify-center w-[43px] h-[43px] rounded-full transition-all duration-300 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] ${
+              className={`relative flex items-center justify-center w-[44px] h-[44px] rounded-full transition-all duration-300 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] ${
                 activeView === 'home' || isHomeBackActive
-                  ? 'bg-[#e8dcc4] text-black' 
-                  : 'bg-pplx-secondary text-white/70 hover:text-white'
+                  ? 'bg-[#e8dcc4] text-black scale-105 z-10' 
+                  : 'bg-pplx-secondary/80 dark:bg-pplx-secondary text-pplx-muted dark:text-white/70 hover:text-pplx-text dark:hover:text-white'
               }`}
             >
               {getHomeIcon()}
               {/* Button Shine */}
-              <div className="absolute inset-0 rounded-full bg-gradient-to-b from-white/[0.08] to-transparent pointer-events-none" />
+              <div className="absolute inset-0 rounded-full bg-gradient-to-b from-white/[0.15] dark:from-white/[0.08] to-transparent pointer-events-none" />
             </button>
 
             {/* Customizable Slots */}
@@ -275,15 +276,15 @@ export const MobileDock: React.FC<MobileDockProps> = ({
                   onMouseDown={() => handleTouchStart(slotIndex)}
                   onMouseUp={handleTouchEnd}
                   onMouseLeave={handleTouchEnd}
-                  className={`relative flex items-center justify-center w-[38px] h-[38px] rounded-full transition-all duration-300 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] ${
+                  className={`relative flex items-center justify-center w-[40px] h-[40px] rounded-full transition-all duration-300 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] ${
                     isActive 
-                      ? 'bg-[#e8dcc4] text-black' 
-                      : 'bg-pplx-secondary text-white/70 hover:text-white'
+                      ? 'bg-[#e8dcc4] text-black scale-105 z-10' 
+                      : 'bg-pplx-secondary/80 dark:bg-pplx-secondary text-pplx-muted dark:text-white/70 hover:text-pplx-text dark:hover:text-white'
                   }`}
                 >
                   {getShortcutIcon(slotIndex)}
                   {/* Button Shine */}
-                  <div className="absolute inset-0 rounded-full bg-gradient-to-b from-white/[0.08] to-transparent pointer-events-none" />
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-b from-white/[0.15] dark:from-white/[0.08] to-transparent pointer-events-none" />
                 </button>
               );
             })}
