@@ -24,7 +24,7 @@ import {
     User, BookOpen, FileText, Globe, Copy, ChevronLeft, ChevronRight, X,
     Star, MoreHorizontal, Download, Upload, Trash2, Wifi, Lock, FileEdit, ClipboardCopy,
     CopyPlus, Languages, FolderInput, Undo2, Brain, ArrowRight,
-    RefreshCw, Share2, FolderPlus, Pencil, Check, ArrowDown, MessageSquare, ImageIcon, Plus
+    RefreshCw, Share2, FolderPlus, Pencil, Check, ArrowDown, MessageSquare, Plus
 } from 'lucide-react';
 import { db, STORES } from './services/db';
 import { Capacitor } from '@capacitor/core';
@@ -1207,7 +1207,6 @@ function App() {
                     content: response.text, 
                     citations: response.citations, 
                     relatedQuestions: response.relatedQuestions,
-                    searchImages: response.searchImages,
                     isThinking: false,
                     reasoning: response.reasoning // Capture reasoning
                 } : m), 
@@ -1405,7 +1404,6 @@ function App() {
                 content: response.text, // Final clean text (related questions json removed)
                 citations: response.citations, 
                 relatedQuestions: response.relatedQuestions,
-                searchImages: response.searchImages,
                 isThinking: false,
                 reasoning: response.reasoning // Capture reasoning
             } : m), 
@@ -1975,19 +1973,7 @@ function App() {
                                             </div> 
                                         )}
                                         
-                                        {/* Search Images Grid */}
-                                        {msg.role === Role.MODEL && msg.searchImages && msg.searchImages.length > 0 && (
-                                            <div className="mb-4 mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 w-full">
-                                                {msg.searchImages.slice(0, 4).map((imgUrl, i) => (
-                                                    <div key={i} className="relative aspect-video rounded-lg overflow-hidden border border-pplx-border group cursor-pointer bg-pplx-secondary">
-                                                        <img src={imgUrl} alt={`Search Result ${i}`} className="w-full h-full object-cover hover:scale-105 transition-transform duration-150" loading="lazy" />
-                                                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                             <ImageIcon size={20} className="text-white drop-shadow-lg" />
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
+
 
                                         {/* Text Content Bubble OR Edit Mode */}
                                         {editingMessageId === msg.id ? (

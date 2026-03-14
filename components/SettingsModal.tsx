@@ -221,11 +221,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
 
   // Helper to update both local state and app preview
   const updateFormData = (updates: Partial<AppSettings>) => {
-    setFormData(prev => {
-      const updated = { ...prev, ...updates };
-      onPreview(updates);
-      return updated;
-    });
+    setFormData(prev => ({ ...prev, ...updates }));
+    // Use setTimeout to defer the onPreview call to avoid the "Cannot update a component while rendering" warning
+    setTimeout(() => onPreview(updates), 0);
   };
   const [newMemoryContent, setNewMemoryContent] = useState('');
   const [newMemoryCategory, setNewMemoryCategory] = useState<MemoryCategory>('about_me');

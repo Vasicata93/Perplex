@@ -105,7 +105,6 @@ export interface AgentResult {
     text: string;
     citations: Citation[];
     relatedQuestions: string[];
-    searchImages: string[];
     pendingAction?: PendingAction;
     reasoning?: string;
 }

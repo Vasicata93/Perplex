@@ -4,7 +4,7 @@ import { InputArea } from './InputArea';
 import { MessageRenderer } from './MessageRenderer';
 import { TornadoIndicator } from './TornadoIndicator';
 import { PerplexityLogo } from '../constants';
-import { User, BookOpen, Globe, Copy, Check, RefreshCw, Share2, Volume2, ImageIcon, FileText, Pencil } from 'lucide-react';
+import { User, BookOpen, Globe, Copy, Check, RefreshCw, Share2, Volume2, FileText, Pencil } from 'lucide-react';
 
 interface ChatInterfaceProps {
   messages: Message[];
@@ -132,19 +132,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     </div>
                   )}
 
-                  {/* Search Images */}
-                  {msg.role === Role.MODEL && msg.searchImages && msg.searchImages.length > 0 && (
-                    <div className="mb-4 mt-2 grid grid-cols-2 gap-2 w-full">
-                      {msg.searchImages.slice(0, 4).map((imgUrl, i) => (
-                        <div key={i} className="relative aspect-video rounded-lg overflow-hidden border border-pplx-border group cursor-pointer bg-pplx-secondary">
-                          <img src={imgUrl} alt="search" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
-                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <ImageIcon size={18} className="text-white drop-shadow-lg" />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+
 
                   {/* Content Bubble OR Edit Mode */}
                   {editingMessageId === msg.id ? (

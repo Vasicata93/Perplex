@@ -37,7 +37,7 @@ export class Orchestrator {
         // 3. Reasoning Loop
         let turns = 0;
         const maxTurns = 5;
-        let finalResult: AgentResult = { text: '', citations: [], relatedQuestions: [], searchImages: [] };
+        let finalResult: AgentResult = { text: '', citations: [], relatedQuestions: [] };
 
         while (turns < maxTurns) {
             // Context Builder

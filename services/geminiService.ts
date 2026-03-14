@@ -690,7 +690,7 @@ export class LLMService {
       braveApiKey?: string,
       onChunk?: (text: string, reasoning?: string) => void,
       useAgenticResearch: boolean = false
-  ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; searchImages: string[]; pendingAction?: PendingAction; reasoning?: string }> {
+  ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
       
       this.abortController = new AbortController();
       const shortTermHistory = history.slice(-5); // 5 messages short-term memory
@@ -1054,7 +1054,7 @@ Important Formatting Rules:
     braveApiKey?: string,
     onChunk?: (text: string, reasoning?: string) => void,
     systemInstructionOverride?: string
-  ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; searchImages: string[]; pendingAction?: PendingAction; reasoning?: string }> {
+  ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
     
     // Reset AbortController
     this.abortController = new AbortController();
@@ -1141,7 +1141,7 @@ Important Formatting Rules:
         provider !== ModelProvider.GEMINI && (forceSearch || virtualFiles.length > 0) // Force explicit tool instruction for generics
     );
 
-    let result: { text: string; citations: Citation[]; relatedQuestions: string[]; searchImages: string[]; pendingAction?: PendingAction; reasoning?: string } = { text: "", citations: [] as Citation[], relatedQuestions: [] as string[], searchImages: [] as string[] };
+    let result: { text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string } = { text: "", citations: [] as Citation[], relatedQuestions: [] as string[] };
 
     // 4. Route to Provider
     if (provider === ModelProvider.GEMINI) {
@@ -1347,19 +1347,19 @@ Important Formatting Rules:
     customApiKey?: string,
     onChunk?: (text: string, reasoning?: string) => void,
     useReadFiles: boolean = false
-  ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; searchImages: string[]; pendingAction?: PendingAction; reasoning?: string }> {
+  ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
     
     let clientToUse = this.ai;
     if (customApiKey) {
         try {
             clientToUse = new GoogleGenAI({ apiKey: customApiKey });
         } catch (e) {
-            return { text: "Error: Invalid Gemini API Key.", citations: [], relatedQuestions: [], searchImages: [] };
+            return { text: "Error: Invalid Gemini API Key.", citations: [], relatedQuestions: [] };
         }
     }
 
     if (!clientToUse) {
-        return { text: "Eroare: API Key pentru Gemini nu este configurat.", citations: [], relatedQuestions: [], searchImages: [] };
+        return { text: "Eroare: API Key pentru Gemini nu este configurat.", citations: [], relatedQuestions: [] };
     }
 
     const modelId = (enableReasoning || proMode === ProMode.REASONING || proMode === ProMode.THINKING) 
@@ -1421,7 +1421,6 @@ Important Formatting Rules:
         
         let finalResponseText = "";
         let citations: Citation[] = [];
-        let searchImages: string[] = [];
         let pendingAction: PendingAction | undefined = undefined;
         let reasoning = "";
         let turns = 0;
@@ -1784,13 +1783,12 @@ Important Formatting Rules:
             text: cleanText || "", 
             citations: Array.from(new Map(citations.map(c => [c.uri, c])).values()), 
             relatedQuestions: questions, 
-            searchImages: searchImages,
             pendingAction,
             reasoning
         };
     } catch (error: any) {
         console.error("Gemini API Error:", error);
-        return { text: `Error: ${(error as any).message || 'Request Failed'}`, citations: [], relatedQuestions: [], searchImages: [] };
+        return { text: `Error: ${(error as any).message || 'Request Failed'}`, citations: [], relatedQuestions: [] };
     }
   }
 
@@ -1810,7 +1808,7 @@ Important Formatting Rules:
     onChunk?: (text: string, reasoning?: string) => void,
     useReadFiles: boolean = false,
     _proMode: ProMode = ProMode.STANDARD
-  ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; searchImages: string[]; pendingAction?: PendingAction; reasoning?: string }> {
+  ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
     
     // 1. Prepare Messages
     const messages: any[] = [];
@@ -1865,7 +1863,6 @@ Important Formatting Rules:
     let turns = 0;
     const maxTurns = 5; // Allow up to 5 tool-use hops
     const collectedCitations: Citation[] = [];
-    let collectedImages: string[] = [];
     let pendingAction: PendingAction | undefined = undefined;
 
     // --- MAIN AGENT LOOP ---
@@ -2095,7 +2092,9 @@ Important Formatting Rules:
                              if (searchData && searchData.results.length > 0) {
                                  // Add to collections
                                  searchData.results.forEach(res => collectedCitations.push({ title: res.title, uri: res.url }));
-                                 if (searchData.images) collectedImages = [...collectedImages, ...searchData.images];
+                                 if (searchData.images) {
+                                     // Images removed as requested
+                                 }
                                  
                                  // Format for Model
                                  toolResultContent = TavilyService.formatContext(searchData);
@@ -2321,7 +2320,7 @@ Important Formatting Rules:
 
         } catch (error: any) {
             console.error("Generic API Loop Error:", error);
-            return { text: `Error: ${error.message}`, citations: [], relatedQuestions: [], searchImages: [] };
+            return { text: `Error: ${error.message}`, citations: [], relatedQuestions: [] };
         }
     } // End While
 
@@ -2343,13 +2342,11 @@ Important Formatting Rules:
 
     // 3. Deduplicate Citations
     const uniqueCitations = Array.from(new Map(collectedCitations.map(item => [item.uri, item])).values());
-    const uniqueImages = Array.from(new Set(collectedImages));
 
     return { 
         text: finalContent || "", 
         citations: uniqueCitations,
         relatedQuestions: extracted.questions,
-        searchImages: uniqueImages,
         pendingAction,
         reasoning: finalReasoning
     };

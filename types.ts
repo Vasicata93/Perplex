@@ -25,7 +25,6 @@ export interface Message {
   citations?: Citation[];
   attachments?: Attachment[];
   relatedQuestions?: string[]; // Suggested follow-up questions
-  searchImages?: string[];     // Images returned from search tools
   timestamp: number;
   isThinking?: boolean; // UI State: Is currently generating?
   reasoning?: string;   // Content: The internal thought process
