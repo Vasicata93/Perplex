@@ -2,7 +2,7 @@
 
 import { GoogleGenAI, Tool, FunctionDeclaration, Type, Content, Modality, ThinkingLevel } from "@google/genai";
 import { Message, Role, Citation, Attachment, UserProfile, AiProfile, ModelProvider, LocalModelConfig, ProMode, PendingAction, CalendarEvent } from "../types";
-import { MemoryService } from "./memoryService";
+import { memoryManager } from "../memory";
 import { TavilyService } from "./tavilyService";
 import { db, STORES } from "./db";
 import { getHolidays } from "../src/services/holidayService";
@@ -656,8 +656,8 @@ export class LLMService {
 
   private async triggerMemoryConsolidation(prompt: string, responseText: string, enableMemory: boolean, geminiApiKey?: string) {
       if (enableMemory) {
-          await MemoryService.addToBuffer('model', responseText);
-          const buffer = await MemoryService.getBuffer();
+          await memoryManager.processNewMessage({ id: crypto.randomUUID(), role: Role.MODEL, content: responseText, timestamp: Date.now() }, 'current_session');
+          const buffer = memoryManager.workingMemory.getMessages();
           const shouldConsolidate = buffer.length >= 5 || prompt.toLowerCase().includes("remember this") || prompt.toLowerCase().includes("salvează");
           if (shouldConsolidate) {
               this.runConsolidation(geminiApiKey);
@@ -696,7 +696,7 @@ export class LLMService {
       const shortTermHistory = history.slice(-5); // 5 messages short-term memory
 
       if (enableMemory) {
-          await MemoryService.addToBuffer('user', prompt);
+          await memoryManager.processNewMessage({ id: crypto.randomUUID(), role: Role.USER, content: prompt, timestamp: Date.now() }, 'current_session');
       }
 
       let accumulatedReasoning = "";
@@ -1061,7 +1061,7 @@ Important Formatting Rules:
 
     // 1. Add User Observation to Buffer
     if (enableMemory) {
-        await MemoryService.addToBuffer('user', prompt);
+        await memoryManager.processNewMessage({ id: crypto.randomUUID(), role: Role.USER, content: prompt, timestamp: Date.now() }, 'current_session');
     }
 
     // 2. Determine System Logic based on ProMode
@@ -1264,7 +1264,7 @@ Important Formatting Rules:
       this.notifyLearningState(true);
       
       try {
-        const buffer = await MemoryService.getBuffer();
+        const buffer = memoryManager.workingMemory.getMessages();
         if (buffer.length === 0) return;
 
         let clientToUse = this.ai;
@@ -1273,8 +1273,8 @@ Important Formatting Rules:
         }
         if (!clientToUse) return;
 
-        const currentMemories = await MemoryService.getMemories();
-        const currentProjects = await MemoryService.getProjects();
+        const currentMemories = memoryManager.semanticMemory.getAllEntries();
+        const currentProjects = await db.get<any[]>(STORES.PROJECTS, 'all') || [];
 
         const consolidationPrompt = `
         You are the Memory Manager. Your goal is to keep the Long-Term Memory clean, concise, and useful.
@@ -1321,7 +1321,44 @@ Important Formatting Rules:
         if (jsonText) {
             try {
                 const updates = this.extractJson(jsonText);
-                await MemoryService.applyConsolidation(updates);
+                // memoryManager.memoryConsolidation.runConsolidation(); // Not exactly the same, but we can skip this or implement a custom update logic if needed. For now, let's just use the new manager.
+                // The new memory system handles consolidation automatically based on message count.
+                // If we need to explicitly save new facts from the LLM response:
+                if (updates.new_facts && Array.isArray(updates.new_facts)) {
+                    for (const fact of updates.new_facts) {
+                        await memoryManager.saveExplicitMemory(fact.content, fact.category || 'other');
+                    }
+                }
+                // Projects update
+                if (updates.project_updates && Array.isArray(updates.project_updates)) {
+                    const projects = await db.get<any[]>(STORES.PROJECTS, 'all') || [];
+                    updates.project_updates.forEach((update: any) => {
+                        const existing = projects.find(p => p.title.toLowerCase() === update.title.toLowerCase());
+                        if (existing) {
+                            if (update.progress) existing.progress = update.progress;
+                            if (update.nextStep) existing.nextStep = update.nextStep;
+                            if (update.status) existing.status = update.status;
+                            existing.lastUpdated = Date.now();
+                        } else {
+                            projects.push({
+                                id: crypto.randomUUID(),
+                                title: update.title,
+                                status: update.status || 'active',
+                                progress: update.progress || 'Started',
+                                nextStep: update.nextStep || 'Planning',
+                                techStack: update.techStack || [],
+                                lastUpdated: Date.now()
+                            });
+                        }
+                    });
+                    await db.set(STORES.PROJECTS, 'all', projects);
+                }
+                // Skills update
+                if (updates.new_skills && Array.isArray(updates.new_skills)) {
+                    for (const skill of updates.new_skills) {
+                        await memoryManager.saveExplicitMemory(skill, 'skills' as any);
+                    }
+                }
             } catch (jsonError) {
                 console.error("[Memory] JSON Parse failed during consolidation");
             }
@@ -2518,7 +2555,7 @@ Important Formatting Rules:
       }
 
       if (enableMemory) {
-          const memoryContext = await MemoryService.getContextString(prompt);
+          const memoryContext = await memoryManager.formatContextString(prompt);
           if (memoryContext) {
               parts.push(memoryContext);
           }

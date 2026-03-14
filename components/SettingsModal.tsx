@@ -7,8 +7,9 @@ import {
     Moon, Sun, Type, Laptop, Cloud, Sparkles, Camera,
     ChevronRight, ArrowLeft, Flame, Download, Smartphone
 } from 'lucide-react';
-import { AppSettings, ModelProvider, LocalModelConfig, MemoryItem, MemoryCategory } from '../types';
-import { MemoryService } from '../services/memoryService';
+import { AppSettings, ModelProvider, LocalModelConfig, MemoryCategory } from '../types';
+import { SemanticMemoryEntry } from '../memory';
+import { memoryManager } from '../memory';
 import { UI_STRINGS, AVAILABLE_OFFLINE_MODELS } from '../constants';
 
 interface SettingsModalProps {
@@ -208,7 +209,7 @@ const OfflineModelCard: React.FC<OfflineModelCardProps> = ({ model, isDownloaded
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings, onSave, onPreview }) => {
   const [formData, setFormData] = useState<AppSettings>(settings);
   const [activeTab, setActiveTab] = useState<TabType>('general');
-  const [memories, setMemories] = useState<MemoryItem[]>([]);
+  const [memories, setMemories] = useState<SemanticMemoryEntry[]>([]);
   const [modelType, setModelType] = useState<'cloud' | 'local'>('cloud');
   
   // Mobile Navigation State
@@ -275,7 +276,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
         } else {
             setModelType('cloud');
         }
-        MemoryService.getMemories().then(setMemories);
+        memoryManager.init().then(() => setMemories(memoryManager.semanticMemory.getAllEntries()));
     }
     prevIsOpen.current = isOpen;
   }, [isOpen, settings.modelProvider]);
@@ -308,22 +309,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
 
   const handleAddMemory = async () => {
       if (!newMemoryContent.trim()) return;
-      await MemoryService.addMemory(newMemoryContent, newMemoryCategory);
-      const updated = await MemoryService.getMemories();
+      await memoryManager.saveExplicitMemory(newMemoryContent, newMemoryCategory as any);
+      const updated = memoryManager.semanticMemory.getAllEntries();
       setMemories(updated);
       setNewMemoryContent('');
       setIsAddingMemory(false);
   };
 
   const handleDeleteMemory = async (id: string) => {
-      await MemoryService.deleteMemory(id);
-      const updated = await MemoryService.getMemories();
+      memoryManager.semanticMemory.deleteEntry(id);
+      await memoryManager.saveState();
+      const updated = memoryManager.semanticMemory.getAllEntries();
       setMemories(updated);
   };
 
   const handleClearMemory = async () => {
       if (confirm('Are you sure you want to forget everything about you? This cannot be undone.')) {
-          await MemoryService.clearMemories();
+          memoryManager.semanticMemory.clear();
+          await memoryManager.saveState();
           setMemories([]);
       }
   };

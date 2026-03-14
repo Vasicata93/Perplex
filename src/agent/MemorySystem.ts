@@ -1,5 +1,6 @@
 import { MemorySnapshot, WorkingMemory, EpisodicMemory, PersistentMemory } from './types';
-import { MemoryService } from '../../services/memoryService';
+import { memoryManager } from '../../memory';
+import { Role } from '../../types';
 
 export class MemorySystem {
     private workingMemory: WorkingMemory;
@@ -32,11 +33,16 @@ export class MemorySystem {
     }
 
     public async addToBuffer(role: 'user' | 'model' | 'tool', content: string) {
-        await MemoryService.addToBuffer(role, content);
+        let mappedRole: Role;
+        if (role === 'user') mappedRole = Role.USER;
+        else if (role === 'model') mappedRole = Role.MODEL;
+        else mappedRole = Role.SYSTEM;
+        
+        await memoryManager.processNewMessage({ id: crypto.randomUUID(), role: mappedRole, content, timestamp: Date.now() }, 'current_session');
     }
 
     public async getContextString(query: string): Promise<string> {
-        return await MemoryService.getContextString(query);
+        return await memoryManager.formatContextString(query);
     }
 
     public updateWorkingMemory(key: keyof WorkingMemory, value: any) {
@@ -53,8 +59,7 @@ export class MemorySystem {
     }
 
     public async consolidate() {
-        // Trigger consolidation logic from MemoryService
-        // This is async and handled by the background service usually
-        // But we can expose a trigger here
+        // Trigger consolidation logic from MemoryManager
+        memoryManager.memoryConsolidation.runConsolidation();
     }
 }
