@@ -80,26 +80,24 @@ export interface Note {
 
 // ENUM for Memory Categories
 export type MemoryCategory = 
-  | 'about_me' 
-  | 'work' 
-  | 'projects' 
-  | 'relationships' 
-  | 'preferences' 
-  | 'health' 
-  | 'diet'       
-  | 'hobbies'    
-  | 'entertainment' 
-  | 'coding'     
-  | 'goals'      
-  | 'events'     
-  | 'style'      
-  | 'learning' 
-  | 'travel' 
-  | 'explicit_save' 
-  | 'skills'     // New: Procedural rules
-  | 'workflows'  // New: Recurring habits
-  | 'finance'    // New: Added based on analysis
-  | 'other';
+  | 'AboutUser'
+  | 'Work'
+  | 'Projects'
+  | 'Coding'
+  | 'Learning'
+  | 'Goals'
+  | 'Finance'
+  | 'Preferences'
+  | 'CommunicationStyle'
+  | 'Relationships'
+  | 'Health'
+  | 'Diet'
+  | 'Hobbies'
+  | 'Travel'
+  | 'Entertainment'
+  | 'Events'
+  | 'Notes'
+  | 'Another';
 
 export type MemoryType = 'fact' | 'goal' | 'skill' | 'project' | 'preference';
 

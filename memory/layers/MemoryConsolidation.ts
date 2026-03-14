@@ -53,7 +53,7 @@ export class MemoryConsolidation {
       if (event.importance_score >= 8 && event.access_count > 5) {
         // Promote to Semantic Memory
         this.semanticMemory.addOrUpdateEntry(
-          'events', // Default category for events
+          'Events', // Default category for events
           event.summary,
           event.importance_score,
           event.tags,
@@ -92,7 +92,7 @@ export class MemoryConsolidation {
       if (insight.confidence >= 0.9 && insight.based_on_sessions.length > 2) {
         // Promote to Semantic Memory
         this.semanticMemory.addOrUpdateEntry(
-          'preferences', // Default category for insights
+          'Preferences', // Default category for insights
           insight.insight,
           8, // High importance
           [insight.pattern_detected],

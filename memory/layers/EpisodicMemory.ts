@@ -34,7 +34,7 @@ export class EpisodicMemory {
     // Calculate score for all entries
     const scoredEntries = this.entries.map(entry => ({
       entry,
-      score: calculateMemoryScore(entry.importance_score, entry.last_accessed, entry.access_count, now)
+      score: calculateMemoryScore(entry)
     }));
 
     // Sort by score descending

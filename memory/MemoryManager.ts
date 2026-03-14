@@ -188,7 +188,7 @@ export class MemoryManager {
   /**
    * Explicit user request to save information (Trigger 3)
    */
-  public async saveExplicitMemory(content: string, category: import('./types').SemanticCategory = 'other'): Promise<void> {
+  public async saveExplicitMemory(content: string, category: import('./types').SemanticCategory = 'Another'): Promise<void> {
     await this.init();
     this.semanticMemory.addOrUpdateEntry(
       category,
@@ -207,7 +207,7 @@ export class MemoryManager {
     // Lightweight local check (regex or simple NLP) to detect explicit preferences, decisions, etc.
     if (content.toLowerCase().includes('i prefer')) {
       this.semanticMemory.addOrUpdateEntry(
-        'preferences',
+        'Preferences',
         content,
         6,
         ['preference'],

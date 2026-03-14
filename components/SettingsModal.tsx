@@ -227,7 +227,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
     setTimeout(() => onPreview(updates), 0);
   };
   const [newMemoryContent, setNewMemoryContent] = useState('');
-  const [newMemoryCategory, setNewMemoryCategory] = useState<MemoryCategory>('about_me');
+  const [newMemoryCategory, setNewMemoryCategory] = useState<MemoryCategory>('AboutUser');
 
   // Offline Model State
   const [downloadProgress, setDownloadProgress] = useState<{[key: string]: number}>({});
@@ -238,23 +238,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
 
   const MEMORY_CATEGORIES: { id: MemoryCategory | 'all', label: string, icon: any }[] = [
     { id: 'all', label: 'All', icon: Brain },
-    { id: 'about_me', label: 'About Me', icon: User },
-    { id: 'work', label: 'Work', icon: Briefcase },
-    { id: 'projects', label: 'Projects', icon: Folder },
-    { id: 'coding', label: 'Coding', icon: Code },
-    { id: 'learning', label: 'Learning', icon: GraduationCap },
-    { id: 'goals', label: 'Goals', icon: Target },
-    { id: 'preferences', label: 'Preferences', icon: Heart },
-    { id: 'style', label: 'Style', icon: Feather },
-    { id: 'relationships', label: 'Relationships', icon: Users },
-    { id: 'health', label: 'Health', icon: Activity },
-    { id: 'diet', label: 'Diet', icon: Utensils },
-    { id: 'hobbies', label: 'Hobbies', icon: Palette },
-    { id: 'entertainment', label: 'Entertainment', icon: Film },
-    { id: 'travel', label: 'Travel', icon: Plane },
-    { id: 'events', label: 'Events', icon: Calendar },
-    { id: 'explicit_save', label: 'Notes', icon: StickyNote },
-    { id: 'other', label: 'Other', icon: Globe },
+    { id: 'AboutUser', label: 'About Me', icon: User },
+    { id: 'Work', label: 'Work', icon: Briefcase },
+    { id: 'Projects', label: 'Projects', icon: Folder },
+    { id: 'Coding', label: 'Coding', icon: Code },
+    { id: 'Learning', label: 'Learning', icon: GraduationCap },
+    { id: 'Goals', label: 'Goals', icon: Target },
+    { id: 'Finance', label: 'Finance', icon: Activity },
+    { id: 'Preferences', label: 'Preferences', icon: Heart },
+    { id: 'CommunicationStyle', label: 'Style', icon: Feather },
+    { id: 'Relationships', label: 'Relationships', icon: Users },
+    { id: 'Health', label: 'Health', icon: Activity },
+    { id: 'Diet', label: 'Diet', icon: Utensils },
+    { id: 'Hobbies', label: 'Hobbies', icon: Palette },
+    { id: 'Entertainment', label: 'Entertainment', icon: Film },
+    { id: 'Travel', label: 'Travel', icon: Plane },
+    { id: 'Events', label: 'Events', icon: Calendar },
+    { id: 'Notes', label: 'Notes', icon: StickyNote },
+    { id: 'Another', label: 'Other', icon: Globe },
   ];
 
   useEffect(() => {
