@@ -37,7 +37,7 @@ export class MemoryManager {
   /**
    * Called after every user message to update working memory and check triggers.
    */
-  public async processNewMessage(message: Message, sessionContext: string): Promise<void> {
+  public async processNewMessage(message: Message, _sessionContext: string): Promise<void> {
     // 1. Update Working Memory
     this.workingMemory.addMessage(message);
 
@@ -58,8 +58,8 @@ export class MemoryManager {
   /**
    * Called at the end of a session to extract summaries and important facts.
    */
-  public async endSession(sessionId: string): Promise<void> {
-    const messages = this.workingMemory.getMessages();
+  public async endSession(_sessionId: string): Promise<void> {
+    const _messages = this.workingMemory.getMessages();
     
     // In a real implementation, this would call an LLM to extract topics, decisions, etc.
     // For now, we mock the extraction.

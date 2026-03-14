@@ -1,8 +1,7 @@
 import { SemanticMemory } from './SemanticMemory';
 import { EpisodicMemory } from './EpisodicMemory';
 import { ReflectionMemory } from './ReflectionMemory';
-import { SemanticCategory } from '../types';
-
+// Unused import removed
 /**
  * Layer 6 — Memory Consolidation
  * Purpose: Periodic background maintenance process that keeps the memory system clean, compressed, and relevant over time.

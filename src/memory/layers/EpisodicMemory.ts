@@ -28,7 +28,7 @@ export class EpisodicMemory {
     this.entries.push(newEntry);
   }
 
-  public getRelevantEvents(query: string, limit: number = 3): EpisodicMemoryEntry[] {
+  public getRelevantEvents(_query: string, limit: number = 3): EpisodicMemoryEntry[] {
     const now = Date.now();
 
     // Calculate score for all entries
