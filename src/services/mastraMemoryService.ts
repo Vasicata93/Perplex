@@ -1,13 +1,16 @@
 /**
  * mastraMemoryService.ts
  * 
- * Gestionează memoria Mastra cu stocare locală (IndexedDB).
- * Evită instanțierea Memory în browser (incompatibilități Node.js).
- * Folosește direct MastraIndexedDBStorage pentru operații CRUD.
+ * Gestionează memoria Agent Max cu stocare locală (IndexedDB).
+ * Folosește MastraIndexedDBStorage direct — nu instanțiază Memory în browser
+ * deoarece @mastra/memory are dependențe Node.js incompatibile cu browserul.
+ *
+ * Fluxul:
+ * 1. getMemoryContext() — citește istoricul din IndexedDB, returnează string pentru server
+ * 2. saveToMemory()    — salvează mesajele în IndexedDB după răspunsul serverului
  */
 import { MastraIndexedDBStorage } from './mastraIndexedDBStorage';
 
-// Singleton storage
 const storage = new MastraIndexedDBStorage();
 
 /**
@@ -35,24 +38,25 @@ export async function getMemoryContext(
             });
         }
 
-        // Citește ultimele mesaje din thread
+        // Citește ultimele 20 mesaje
         const result = await storage.listMessages({ threadId });
         const messages = result.messages || [];
-
         if (messages.length === 0) return { contextString: '', threadId };
 
-        // Ia ultimele 20 mesaje
         const recent = messages.slice(-20);
 
-        const contextLines = messages
+        const contextLines = recent
             .filter((m: any) => m.content)
             .map((m: any) => {
-                const content = typeof m.content === 'string'
-                    ? m.content
-                    : Array.isArray(m.content)
-                        ? m.content.map((c: any) => c.text || c.content || '').join(' ')
-                        : JSON.stringify(m.content);
-                return `[${m.role}]: ${content}`;
+                let text = '';
+                if (typeof m.content === 'string') {
+                    text = m.content;
+                } else if (Array.isArray(m.content)) {
+                    text = m.content.map((c: any) => c.text || c.content || '').join(' ');
+                } else {
+                    text = JSON.stringify(m.content);
+                }
+                return `[${m.role}]: ${text}`;
             })
             .join('\n');
 

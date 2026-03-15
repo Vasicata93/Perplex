@@ -1,25 +1,24 @@
 import { db, STORES } from '../../services/db';
 
 /**
- * Vector store local simplu — stochează embeddings în IndexedDB.
- * Nu mai extinde MastraVector din cauza incompatibilităților de tip în v1.8.x.
- * Folosit direct de mastraMemoryService fără instanțiere prin Mastra Memory.
+ * Vector store local — stochează embeddings în IndexedDB.
+ * Clasă standalone, fără extends, evită incompatibilitățile de tip cu @mastra/core v1.8.x
  */
 export class MastraIndexedDBVectorStore {
   constructor(private config: { id: string }) { }
 
-  async upsert({ vectors, metadata, ids }: { vectors: number[][], metadata?: any[], ids?: string[] }): Promise<string[]> {
+  async upsert(params: { vectors: number[][], metadata?: any[], ids?: string[] }): Promise<string[]> {
     const allChunks = await db.get<any[]>(STORES.EMBEDDINGS, 'all_chunks') || [];
     const newIds: string[] = [];
 
-    for (let i = 0; i < vectors.length; i++) {
-      const id = ids?.[i] || crypto.randomUUID();
+    for (let i = 0; i < params.vectors.length; i++) {
+      const id = params.ids?.[i] || crypto.randomUUID();
       const record = {
         id,
-        embedding: vectors[i],
-        metadata: metadata?.[i] || {},
-        content: metadata?.[i]?.text || '',
-        filename: metadata?.[i]?.filename || 'mastra',
+        embedding: params.vectors[i],
+        metadata: params.metadata?.[i] || {},
+        content: params.metadata?.[i]?.text || '',
+        filename: params.metadata?.[i]?.filename || 'mastra',
       };
       const existingIdx = allChunks.findIndex((c: any) => c.id === id);
       if (existingIdx !== -1) allChunks[existingIdx] = record;
@@ -31,11 +30,12 @@ export class MastraIndexedDBVectorStore {
     return newIds;
   }
 
-  async query({ queryVector, topK = 10 }: { queryVector: number[], topK?: number }): Promise<any[]> {
+  async queryVector(params: { queryVector: number[], topK?: number }): Promise<any[]> {
     const allChunks = await db.get<any[]>(STORES.EMBEDDINGS, 'all_chunks') || [];
+    const topK = params.topK ?? 10;
     const results = allChunks.map((chunk: any) => ({
       id: chunk.id,
-      score: this.cosineSimilarity(queryVector, chunk.embedding),
+      score: this.cosineSimilarity(params.queryVector, chunk.embedding),
       metadata: chunk.metadata
     }));
     results.sort((a, b) => b.score - a.score);
@@ -54,8 +54,10 @@ export class MastraIndexedDBVectorStore {
     return dot / (Math.sqrt(normA) * Math.sqrt(normB));
   }
 
-  async deleteVectors({ ids }: { ids: string[] }): Promise<void> {
+  async deleteVectors(params: { ids: string[] }): Promise<void> {
     const allChunks = await db.get<any[]>(STORES.EMBEDDINGS, 'all_chunks') || [];
-    await db.set(STORES.EMBEDDINGS, 'all_chunks', allChunks.filter((c: any) => !ids.includes(c.id)));
+    await db.set(STORES.EMBEDDINGS, 'all_chunks',
+      allChunks.filter((c: any) => !params.ids.includes(c.id))
+    );
   }
 }

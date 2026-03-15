@@ -2,7 +2,10 @@
 import type { MastraDBMessage, StorageThreadType } from '@mastra/core/memory';
 import { db, STORES } from '../../services/db';
 
-// Nu mai extends MemoryStorage — evită incompatibilitățile de tip din v1.8.x
+/**
+ * Storage adapter local pentru Mastra Memory — stochează în IndexedDB.
+ * Clasă standalone fără extends — evită incompatibilitățile cu @mastra/core v1.8.x
+ */
 export class MastraIndexedDBStorage {
 
   async getThreadById({ threadId }: { threadId: string }): Promise<StorageThreadType | null> {
@@ -17,9 +20,7 @@ export class MastraIndexedDBStorage {
 
   async updateThread({ id, title, metadata }: { id: string; title: string; metadata: Record<string, unknown> }): Promise<StorageThreadType> {
     const existing = await this.getThreadById({ threadId: id });
-    if (!existing) {
-      throw new Error(`Thread ${id} not found`);
-    }
+    if (!existing) throw new Error(`Thread ${id} not found`);
     const updated = { ...existing, title, metadata, updatedAt: new Date() } as StorageThreadType;
     await db.set(STORES.MASTRA_THREADS, id, updated);
     return updated;
@@ -40,17 +41,11 @@ export class MastraIndexedDBStorage {
       threads = threads.filter((t: any) => t.resourceId === filter.resourceId);
     }
     if (filter?.metadata) {
-      threads = threads.filter((t: any) => {
-        return Object.entries(filter.metadata!).every(([k, v]) => t.metadata?.[k] === v);
-      });
+      threads = threads.filter((t: any) =>
+        Object.entries(filter.metadata!).every(([k, v]) => t.metadata?.[k] === v)
+      );
     }
-    return {
-      threads,
-      total: threads.length,
-      page: 0,
-      perPage: false,
-      hasMore: false
-    };
+    return { threads, total: threads.length, page: 0, perPage: false, hasMore: false };
   }
 
   async listMessages({ threadId }: { threadId: string | string[] }): Promise<{ messages: MastraDBMessage[]; total: number; page: number; perPage: number | false; hasMore: boolean }> {
@@ -59,13 +54,7 @@ export class MastraIndexedDBStorage {
     const filtered = allMessages
       .filter((m: any) => m.threadId && threadIds.includes(m.threadId))
       .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    return {
-      messages: filtered,
-      total: filtered.length,
-      page: 0,
-      perPage: false,
-      hasMore: false
-    };
+    return { messages: filtered, total: filtered.length, page: 0, perPage: false, hasMore: false };
   }
 
   async saveMessages({ messages }: { messages: MastraDBMessage[] }): Promise<{ messages: MastraDBMessage[] }> {
@@ -76,16 +65,16 @@ export class MastraIndexedDBStorage {
   }
 
   async updateMessages({ messages }: { messages: any[] }): Promise<MastraDBMessage[]> {
-    const updatedMsgs: MastraDBMessage[] = [];
+    const updated: MastraDBMessage[] = [];
     for (const msg of messages) {
       const existing = await db.get<MastraDBMessage>(STORES.MASTRA_MESSAGES, msg.id);
       if (existing) {
-        const updated = { ...existing, ...msg };
-        await db.set(STORES.MASTRA_MESSAGES, updated.id, updated);
-        updatedMsgs.push(updated);
+        const u = { ...existing, ...msg };
+        await db.set(STORES.MASTRA_MESSAGES, u.id, u);
+        updated.push(u);
       }
     }
-    return updatedMsgs;
+    return updated;
   }
 
   async listMessagesById({ messageIds }: { messageIds: string[] }): Promise<{ messages: MastraDBMessage[] }> {
