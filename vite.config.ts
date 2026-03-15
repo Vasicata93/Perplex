@@ -49,6 +49,16 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
     },
+    server: {
+      proxy: {
+        '/api': {
+          target: 'http://localhost:3001',
+          changeOrigin: true,
+          secure: false,
+        }
+      }
+    },
+
     define: {
       'process.env.API_KEY': JSON.stringify(env.API_KEY),
       'process.env': {} 
