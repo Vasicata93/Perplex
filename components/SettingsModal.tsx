@@ -11,6 +11,7 @@ import { AppSettings, ModelProvider, LocalModelConfig, MemoryCategory } from '..
 import { SemanticMemoryEntry } from '../memory';
 import { memoryManager } from '../memory';
 import { UI_STRINGS, AVAILABLE_OFFLINE_MODELS } from '../constants';
+import { E2BService } from '../services/e2bService';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -231,6 +232,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
 
   // Offline Model State
   const [downloadProgress, setDownloadProgress] = useState<{[key: string]: number}>({});
+
+  const [e2bTestStatus, setE2bTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+
+  const handleTestE2BConnection = async () => {
+      setE2bTestStatus('testing');
+      const isValid = await E2BService.verifyConnection(formData.e2bApiKey);
+      setE2bTestStatus(isValid ? 'success' : 'error');
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -848,10 +857,67 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                 )}
                             </div>
                         )}
+
+                        {/* --- E2B Code Execution Section --- */}
+                        <div className="bg-pplx-card rounded-3xl p-6 shadow-sm border border-pplx-border/50 animate-fadeIn mt-8">
+                             <div className="flex items-center gap-3 mb-2">
+                                <Code size={20} className="text-pplx-accent" />
+                                <div><h3 className="text-lg font-bold text-pplx-text">Code Execution</h3><p className="text-xs text-pplx-muted opacity-80 mt-1">Connect E2B to enable secure code execution in an isolated cloud sandbox.</p></div>
+                             </div>
+                             
+                             <div className="mt-6 space-y-4">
+                                 <div className="relative">
+                                    <Key className="absolute left-4 top-4 text-pplx-muted opacity-50" size={16} />
+                                    <input 
+                                        type="password" 
+                                        value={formData.e2bApiKey || ''} 
+                                        onChange={(e) => {
+                                            updateFormData({ e2bApiKey: e.target.value });
+                                            setE2bTestStatus('idle');
+                                        }} 
+                                        placeholder="e2b_..." 
+                                        className="w-full bg-pplx-input rounded-2xl pl-11 pr-4 py-3.5 text-sm text-pplx-text outline-none font-mono placeholder-pplx-muted/40" 
+                                    />
+                                    <div className="absolute right-4 top-4 text-[10px] text-pplx-muted font-bold opacity-50 uppercase pointer-events-none">E2B API Key</div>
+                                </div>
+                                
+                                <div className="flex items-center justify-between mt-4">
+                                    <div className="flex items-center gap-2">
+                                        {e2bTestStatus === 'success' && <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 text-green-500 text-xs font-bold uppercase tracking-wider"><Check size={14} /> Connected</div>}
+                                        {e2bTestStatus === 'error' && <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 text-xs font-bold uppercase tracking-wider"><X size={14} /> Invalid key</div>}
+                                        {e2bTestStatus === 'idle' && formData.e2bApiKey && <div className="px-3 py-1.5 text-pplx-muted text-xs font-bold uppercase tracking-wider opacity-60">Saved</div>}
+                                    </div>
+
+                                    <button 
+                                        onClick={handleTestE2BConnection}
+                                        disabled={!formData.e2bApiKey || e2bTestStatus === 'testing'}
+                                        className="px-4 py-2 rounded-xl text-xs font-bold bg-pplx-secondary text-pplx-text hover:bg-pplx-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {e2bTestStatus === 'testing' ? 'Testing...' : 'Test Connection'}
+                                    </button>
+                                </div>
+
+                                <div className="mt-4 pt-4 border-t border-pplx-border/50 flex items-center justify-between">
+                                    <span className="text-xs font-medium text-pplx-muted opacity-80">Sandbox Mode:</span>
+                                    <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-md ${
+                                        e2bTestStatus === 'success' || (formData.e2bApiKey && e2bTestStatus !== 'error') 
+                                        ? 'bg-pplx-text text-pplx-primary' 
+                                        : 'bg-pplx-secondary text-pplx-muted'
+                                    }`}>
+                                        {e2bTestStatus === 'success' || (formData.e2bApiKey && e2bTestStatus !== 'error') ? 'Cloud Sandbox (E2B)' : 'Local Fallback (JS/TS only)'}
+                                    </span>
+                                </div>
+                                <p className="text-[11px] text-pplx-muted leading-relaxed opacity-60 mt-2">
+                                    When E2B is active, code runs in an isolated cloud environment supporting Python and TypeScript. Without a key, code runs locally in the browser with TypeScript support only. Get your API key at e2b.dev.
+                                </p>
+                             </div>
+                        </div>
+
                     </div>
                 )}
 
                 {/* --- MEMORY TAB --- */}
+
                 {activeTab === 'memory' && (
                     <div className="flex flex-col pb-4 animate-fadeIn">
                          <div className="hidden md:block"><SectionHeader title={t.memory} desc="Manage what the AI remembers." /></div>

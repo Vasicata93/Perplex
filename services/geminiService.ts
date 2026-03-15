@@ -9,6 +9,9 @@ import { getHolidays } from "../src/services/holidayService";
 import { RAGService } from "./ragService";
 import { buildAgentSystemPrompt } from "../src/agent/AgentOrchestrator";
 import { DEFAULT_AGENT_CONFIG } from "../src/agent/types";
+import { E2BService } from "./e2bService";
+import { AppSettings } from "../types";
+
 
 // --- Tool Definitions ---
 
@@ -199,6 +202,22 @@ const semanticSearchToolGemini: FunctionDeclaration = {
     }
 };
 
+const executeCodeToolGemini: FunctionDeclaration = {
+    name: "execute_code",
+    description: "Executes Python or TypeScript/JavaScript code in a secure E2B cloud sandbox. Use this to perform complex calculations, data analysis, format conversions, or verify algorithms. Do NOT use for basic logic. The result will contain stdout, stderr, and success status. If fallback is active, only TS/JS is supported.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            code: { type: Type.STRING, description: "The complete, standalone code to execute." },
+            language: { type: Type.STRING, enum: ["python", "typescript"], description: "The programming language to use." },
+            timeout: { type: Type.NUMBER, description: "Execution timeout in seconds (default 30, max 60)." },
+            packages: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of package names to install via pip/npm before execution." }
+        },
+        required: ["code", "language"]
+    }
+};
+
+
 const semanticSearchToolGeneric = {
     type: "function",
     function: {
@@ -218,6 +237,27 @@ const semanticSearchToolGeneric = {
         strict: true
     }
 };
+
+const executeCodeToolGeneric = {
+    type: "function",
+    function: {
+        name: "execute_code",
+        description: "Executes Python or TypeScript/JavaScript code in a secure E2B cloud sandbox. Use this to perform complex calculations, data analysis, format conversions, or verify algorithms. Do NOT use for basic logic. The result will contain stdout, stderr, and success status. If fallback is active, only TS/JS is supported.",
+        parameters: {
+            type: "object",
+            properties: {
+                code: { type: "string", description: "The complete, standalone code to execute." },
+                language: { type: "string", enum: ["python", "typescript"], description: "The programming language to use." },
+                timeout: { type: "number", description: "Execution timeout in seconds (default 30, max 60)." },
+                packages: { type: "array", items: { type: "string" }, description: "List of package names to install via pip/npm before execution." }
+            },
+            required: ["code", "language"],
+            additionalProperties: false
+        },
+        strict: true
+    }
+};
+
 
 const insertBlockToolGeneric = {
     type: "function",
@@ -1220,10 +1260,11 @@ export class LLMService {
     if (useSearch) {
         tools.push({ googleSearch: {} });
     }
-    tools.push({ functionDeclarations: [saveToolGemini, insertBlockToolGemini, replaceBlockToolGemini, deleteBlockToolGemini, getPageStructureToolGemini, updateTableToolGemini, listCalendarEventsTool, addCalendarEventTool, updateCalendarEventTool, deleteCalendarEventTool, getCurrentTimeToolGemini, getCalendarHolidaysToolGemini] });
+    tools.push({ functionDeclarations: [saveToolGemini, insertBlockToolGemini, replaceBlockToolGemini, deleteBlockToolGemini, getPageStructureToolGemini, updateTableToolGemini, listCalendarEventsTool, addCalendarEventTool, updateCalendarEventTool, deleteCalendarEventTool, getCurrentTimeToolGemini, getCalendarHolidaysToolGemini, executeCodeToolGemini] });
     if (useReadFiles) {
         tools.push({ functionDeclarations: [readFilesToolGemini, searchFilesToolGemini, getWorkspaceMapToolGemini, semanticSearchToolGemini] });
     }
+
 
     let thinkingConfig = undefined;
     if (enableReasoning || proMode === ProMode.REASONING || proMode === ProMode.THINKING) {
@@ -1611,9 +1652,39 @@ export class LLMService {
                         }
                         toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
                         if (onChunk) onChunk("", `\n🧠 Căutare semantică: "${query}"...\n`);
+                    } else if (fc.name === 'execute_code') {
+                        const { code, language, timeout, packages } = fc.args;
+                        if (onChunk) onChunk("", `\n⚙️ Se execută cod ${language} cu E2B Sandbox...\n`);
+                        
+                        // Fetch settings to get API key
+                        const appSettings = await db.get<AppSettings>(STORES.SETTINGS, 'app_settings');
+                        
+                        try {
+                            const execResult = await E2BService.executeCode({
+                                code: code as string,
+                                language: language as 'python' | 'typescript',
+                                timeout: (timeout as number) || 30,
+                                packages: (packages as string[]) || []
+                            }, appSettings as AppSettings);
+                            
+                            const content = `Execution finished (Mode: ${execResult.sandbox_mode}).
+Success: ${execResult.success}
+Exit Code: ${execResult.exit_code}
+Time: ${execResult.execution_time}ms
+STDOUT:
+${execResult.stdout || '<empty>'}
+STDERR:
+${execResult.stderr || '<empty>'}
+Error Type: ${execResult.error_type || 'None'}`;
+                            
+                            toolResponses.push({ functionResponse: { name: fc.name, response: { content } } });
+                        } catch (e: any) {
+                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: `Code execution failed unexpectedly: ${e.message}` } } });
+                        }
                     } else {
                         toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Error: Unknown tool." } } });
                     }
+
                 }
 
                 if (pendingAction) {
@@ -1705,7 +1776,7 @@ export class LLMService {
     // 2. Prepare Tools
     const tools = [];
     if (useSearch && searchApiKey) tools.push(searchToolGeneric);
-    tools.push(saveToolGeneric, insertBlockToolGeneric, replaceBlockToolGeneric, deleteBlockToolGeneric, getPageStructureToolGeneric, updateTableToolGeneric, listCalendarEventsToolGeneric, addCalendarEventToolGeneric, updateCalendarEventToolGeneric, deleteCalendarEventToolGeneric, getCurrentTimeToolGeneric, getCalendarHolidaysToolGeneric);
+    tools.push(saveToolGeneric, insertBlockToolGeneric, replaceBlockToolGeneric, deleteBlockToolGeneric, getPageStructureToolGeneric, updateTableToolGeneric, listCalendarEventsToolGeneric, addCalendarEventToolGeneric, updateCalendarEventToolGeneric, deleteCalendarEventToolGeneric, getCurrentTimeToolGeneric, getCalendarHolidaysToolGeneric, executeCodeToolGeneric);
     if (useReadFiles) tools.push(readFilesToolGeneric, searchFilesToolGeneric, getWorkspaceMapToolGeneric, semanticSearchToolGeneric);
 
     let finalContent = "";
@@ -2145,6 +2216,33 @@ export class LLMService {
                             }
                         }
                         if (onChunk) onChunk("", `\n🧠 Căutare semantică: "${query}"...\n`);
+                    } else if (toolCall.function.name === 'execute_code') {
+                        const { code, language, timeout, packages } = args;
+                        if (onChunk) onChunk("", `\n⚙️ Se execută cod ${language} cu E2B Sandbox...\n`);
+                        
+                        const appSettings = await db.get<AppSettings>(STORES.SETTINGS, 'app_settings');
+                        
+                        try {
+                            const execResult = await E2BService.executeCode({
+                                code: code,
+                                language: language,
+                                timeout: timeout || 30,
+                                packages: packages || []
+                            }, appSettings as AppSettings);
+                            
+                            toolResultContent = `Execution finished (Mode: ${execResult.sandbox_mode}).
+Success: ${execResult.success}
+Exit Code: ${execResult.exit_code}
+Time: ${execResult.execution_time}ms
+STDOUT:
+${execResult.stdout || '<empty>'}
+STDERR:
+${execResult.stderr || '<empty>'}
+Error Type: ${execResult.error_type || 'None'}`;
+                            
+                        } catch (e: any) {
+                            toolResultContent = `Code execution failed unexpectedly: ${e.message}`;
+                        }
                     } else {
                         toolResultContent = "Unknown tool.";
                     }

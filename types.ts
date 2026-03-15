@@ -204,6 +204,7 @@ export interface AppSettings {
   // Local/Custom Models Configuration
   localModels: LocalModelConfig[]; // Array of downloaded models
   activeLocalModelId: string;
+  e2bApiKey: string; // E2B API Key for code execution
 
   useSearch: boolean;
   defaultProMode: ProMode; // Default mode for the left button
@@ -238,6 +239,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
   localModels: [], // Starts empty, populated by downloads
   activeLocalModelId: '',
+  e2bApiKey: '',
   useSearch: true,
   defaultProMode: ProMode.STANDARD,
   enableMemory: true,
