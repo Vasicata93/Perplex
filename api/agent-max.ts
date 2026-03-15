@@ -21,11 +21,11 @@ function buildServerTools(clientData: {
         id: 'web_search',
         description: 'Searches the web for real-time information. Use for current events, news, prices, weather.',
         inputSchema: z.object({ query: z.string() }),
-        execute: async ({ context }) => {
+        execute: async ({ query }) => {
             const useBrave = clientData.searchProvider === 'brave' && clientData.braveApiKey;
             if (useBrave) {
                 const url = new URL('https://api.search.brave.com/res/v1/web/search');
-                url.searchParams.set('q', context.query);
+                url.searchParams.set('q', query);
                 url.searchParams.set('count', '5');
                 const r = await fetch(url.toString(), {
                     headers: { 'Accept': 'application/json', 'X-Subscription-Token': clientData.braveApiKey }
@@ -37,7 +37,7 @@ function buildServerTools(clientData: {
             const r = await fetch('https://api.tavily.com/search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ api_key: clientData.tavilyApiKey, query: context.query, max_results: 5 })
+                body: JSON.stringify({ api_key: clientData.tavilyApiKey, query, max_results: 5 })
             });
             const data = await r.json();
             return data.results?.map((x: any) => `${x.title}: ${x.content}`).join('\n') || 'No results';
@@ -48,9 +48,9 @@ function buildServerTools(clientData: {
         id: 'list_calendar_events',
         description: 'Lists calendar events for a date range.',
         inputSchema: z.object({ startDate: z.string(), endDate: z.string() }),
-        execute: async ({ context }) => {
-            const start = new Date(context.startDate).getTime();
-            const end = new Date(context.endDate).getTime();
+        execute: async ({ startDate, endDate }) => {
+            const start = new Date(startDate).getTime();
+            const end = new Date(endDate).getTime();
             const filtered = clientData.calendarEvents.filter(
                 (e: any) => e.startDate <= end && e.endDate >= start
             );
@@ -67,9 +67,9 @@ function buildServerTools(clientData: {
             endDate: z.string(),
             description: z.string().optional()
         }),
-        execute: async ({ context }) => {
-            pendingActions.push({ type: 'add_calendar_event', payload: context });
-            return `Event "${context.title}" scheduled`;
+        execute: async ({ title, startDate, endDate, description }) => {
+            pendingActions.push({ type: 'add_calendar_event', payload: { title, startDate, endDate, description } });
+            return `Event "${title}" scheduled`;
         }
     });
 
@@ -77,8 +77,8 @@ function buildServerTools(clientData: {
         id: 'search_workspace',
         description: 'Searches user workspace files, library pages and notes.',
         inputSchema: z.object({ query: z.string() }),
-        execute: async ({ context }) => {
-            const q = context.query.toLowerCase();
+        execute: async ({ query }) => {
+            const q = query.toLowerCase();
             const results: string[] = [];
             for (const f of clientData.workspaceFiles) {
                 if (f.content?.toLowerCase().includes(q)) {
@@ -98,9 +98,9 @@ function buildServerTools(clientData: {
         id: 'save_to_library',
         description: 'Saves content to user library. ONLY when user explicitly says "save this".',
         inputSchema: z.object({ title: z.string(), content: z.string(), action: z.enum(['create', 'update']) }),
-        execute: async ({ context }) => {
-            pendingActions.push({ type: 'save_to_library', payload: context });
-            return `"${context.title}" queued for saving`;
+        execute: async ({ title, content, action }) => {
+            pendingActions.push({ type: 'save_to_library', payload: { title, content, action } });
+            return `"${title}" queued for saving`;
         }
     });
 
