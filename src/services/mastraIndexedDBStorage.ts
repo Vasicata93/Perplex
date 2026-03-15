@@ -1,12 +1,9 @@
 
-import { MemoryStorage } from '@mastra/core/storage';
 import type { MastraDBMessage, StorageThreadType } from '@mastra/core/memory';
 import { db, STORES } from '../../services/db';
 
-export class MastraIndexedDBStorage extends MemoryStorage {
-  constructor() {
-    super();
-  }
+// Nu mai extends MemoryStorage — evită incompatibilitățile de tip din v1.8.x
+export class MastraIndexedDBStorage {
 
   async getThreadById({ threadId }: { threadId: string }): Promise<StorageThreadType | null> {
     const thread = await db.get<StorageThreadType>(STORES.MASTRA_THREADS, threadId);
@@ -43,11 +40,11 @@ export class MastraIndexedDBStorage extends MemoryStorage {
       threads = threads.filter((t: any) => t.resourceId === filter.resourceId);
     }
     if (filter?.metadata) {
-       threads = threads.filter((t: any) => {
-           return Object.entries(filter.metadata!).every(([k, v]) => t.metadata?.[k] === v);
-       });
+      threads = threads.filter((t: any) => {
+        return Object.entries(filter.metadata!).every(([k, v]) => t.metadata?.[k] === v);
+      });
     }
-    return { 
+    return {
       threads,
       total: threads.length,
       page: 0,
@@ -62,7 +59,7 @@ export class MastraIndexedDBStorage extends MemoryStorage {
     const filtered = allMessages
       .filter((m: any) => m.threadId && threadIds.includes(m.threadId))
       .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    return { 
+    return {
       messages: filtered,
       total: filtered.length,
       page: 0,
