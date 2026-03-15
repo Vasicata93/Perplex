@@ -72,6 +72,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [activeMenuNoteId, setActiveMenuNoteId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   
+  // State for Sidebar Resizing
+  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [isResizing, setIsResizing] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
   // State for Mobile Library Full Screen
   const [isMobileLibraryOpen, setIsMobileLibraryOpen] = useState(false);
   const [mobileLibraryFilter, setMobileLibraryFilter] = useState<'all' | 'favorites'>('all');
@@ -109,7 +114,58 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }
   }, [isOpen]); // Update when sidebar opens/closes
 
+  // Initialize mobile check and load saved width
+  useEffect(() => {
+      const checkMobile = () => setIsMobile(window.innerWidth < 768);
+      checkMobile();
+      window.addEventListener('resize', checkMobile);
+      
+      const savedWidth = localStorage.getItem('pplx_sidebar_width');
+      if (savedWidth) {
+          setSidebarWidth(parseInt(savedWidth, 10));
+      }
+      
+      return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Handle resizing logic
+  useEffect(() => {
+      const handleMouseMove = (e: MouseEvent) => {
+          if (!isResizing) return;
+          let newWidth = e.clientX;
+          if (newWidth < 120) newWidth = 64; // Snap to collapsed
+          else if (newWidth < 200) newWidth = 200; // Min expanded width
+          else if (newWidth > 600) newWidth = 600; // Max width
+          setSidebarWidth(newWidth);
+      };
+
+      const handleMouseUp = () => {
+          if (isResizing) {
+              setIsResizing(false);
+              localStorage.setItem('pplx_sidebar_width', sidebarWidth.toString());
+          }
+      };
+
+      if (isResizing) {
+          document.addEventListener('mousemove', handleMouseMove);
+          document.addEventListener('mouseup', handleMouseUp);
+          document.body.style.cursor = 'col-resize';
+          document.body.style.userSelect = 'none';
+      } else {
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+      }
+
+      return () => {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+      };
+  }, [isResizing, sidebarWidth]);
+
   const t = UI_STRINGS[lang] || UI_STRINGS.en;
+
+  const isCollapsed = !isMobile && sidebarWidth < 120;
+  const currentWidth = isMobile ? 280 : sidebarWidth;
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -127,12 +183,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const sidebarClasses = `
-    fixed inset-y-0 left-0 z-[150] bg-pplx-sidebar border-r border-pplx-border transition-all duration-150 ease-out shadow-2xl h-full
+    fixed inset-y-0 left-0 z-[150] bg-pplx-sidebar border-r border-pplx-border shadow-2xl h-full
     md:static md:shadow-none md:translate-x-0
     ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-    ${isOpen ? 'md:w-[280px]' : 'md:w-0 md:border-r-0 md:overflow-hidden'}
-    w-[280px] flex flex-col
+    ${isOpen ? '' : 'md:border-r-0 md:overflow-hidden'}
+    flex flex-col relative
+    ${!isResizing && isMobile ? 'transition-all duration-150 ease-out' : ''}
+    ${!isResizing && !isMobile && !isOpen ? 'transition-all duration-150 ease-out' : ''}
   `;
+
+  const sidebarStyle = isMobile ? {
+      width: '280px',
+      transition: 'transform 150ms ease-out'
+  } : {
+      width: isOpen ? `${currentWidth}px` : '0px',
+      transition: isResizing ? 'none' : 'width 150ms ease-out'
+  };
 
   const handleNavClick = (action?: () => void) => {
     if (action) action();
@@ -183,25 +249,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <div 
         className={sidebarClasses}
+        style={sidebarStyle}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        <div className="w-[280px] h-full flex flex-col">
+        {/* Resize Handle (Desktop only) */}
+        {!isMobile && isOpen && (
+          <div
+            className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-pplx-accent/50 active:bg-pplx-accent z-50 transition-colors"
+            onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); }}
+          />
+        )}
+
+        <div className="w-full h-full flex flex-col overflow-hidden">
           {/* Header - Fixed layout: Logo Left, Close Button Right */}
-          <div className="flex items-center justify-between p-4 mb-2 pt-safe">
+          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} p-4 mb-2 pt-safe`}>
               <div className="flex items-center cursor-pointer opacity-90 hover:opacity-100 transition-opacity" onClick={() => handleNavClick(() => { onChangeView('chat'); onNewThread(); })}>
-                <PerplexityLogo className="w-9 h-9 text-pplx-text" />
-                <span className="ml-2.5 text-xl font-medium tracking-tight text-pplx-text font-serif">perplex</span>
+                <PerplexityLogo className="w-9 h-9 text-pplx-text shrink-0" />
+                {!isCollapsed && <span className="ml-2.5 text-xl font-medium tracking-tight text-pplx-text font-serif">perplex</span>}
               </div>
               
               {/* Close Button - Always visible inside the sidebar, positioned right */}
-              <button 
-                  onClick={toggleSidebar} 
-                  className="text-pplx-muted hover:text-pplx-text p-2 rounded-lg hover:bg-pplx-hover transition-colors"
-                  title="Close Sidebar"
-              >
-                <PanelLeftClose size={24} />
-              </button>
+              {!isCollapsed && (
+                  <button 
+                      onClick={toggleSidebar} 
+                      className="text-pplx-muted hover:text-pplx-text p-2 rounded-lg hover:bg-pplx-hover transition-colors shrink-0"
+                      title="Close Sidebar"
+                  >
+                    <PanelLeftClose size={24} />
+                  </button>
+              )}
           </div>
 
           {/* Main Nav */}
@@ -216,6 +293,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 label={t.home} 
                 active={activeView === 'chat' && !activeThreadId && !activeSpaceId} 
                 onClick={() => handleNavClick(() => { onChangeView('chat'); onSelectSpace(null); })} 
+                isCollapsed={isCollapsed}
               />
               
               {/* Chat (History) */}
@@ -223,13 +301,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <NavItem 
                       icon={<MessageSquareText size={22} />} 
                       label={t.chat}
-                      onClick={() => { toggleSection('chat'); onChangeView('chat'); }}
+                      onClick={() => { 
+                          if (isCollapsed) { setSidebarWidth(280); toggleSection('chat'); onChangeView('chat'); }
+                          else { toggleSection('chat'); onChangeView('chat'); }
+                      }}
                       hasChevron={true}
                       isOpen={expandedSection === 'chat'}
                       active={activeView === 'chat' && (!!activeThreadId || expandedSection === 'chat')}
+                      isCollapsed={isCollapsed}
                   />
 
-                  {expandedSection === 'chat' && (
+                  {!isCollapsed && expandedSection === 'chat' && (
                       <div className="ml-4 pl-3 border-l border-pplx-border space-y-1 mt-1 animate-fadeIn duration-150">
                           {threads.filter(t => !t.spaceId).length === 0 && (
                               <div className="px-3 py-2 text-xs text-pplx-muted">{t.noHistory}</div>
@@ -268,13 +350,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <NavItem 
                       icon={<LayoutGrid size={22} />} 
                       label={t.spaces}
-                      onClick={() => toggleSection('spaces')}
+                      onClick={() => {
+                          if (isCollapsed) { setSidebarWidth(280); toggleSection('spaces'); }
+                          else toggleSection('spaces');
+                      }}
                       hasChevron={true}
                       isOpen={expandedSection === 'spaces'}
                       active={!!activeSpaceId}
+                      isCollapsed={isCollapsed}
                   />
                   
-                  {expandedSection === 'spaces' && (
+                  {!isCollapsed && expandedSection === 'spaces' && (
                       <div className="ml-4 pl-3 border-l border-pplx-border space-y-1 mt-1 animate-fadeIn duration-150">
                           {spaces.map(space => (
                               <button
@@ -312,25 +398,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                   setIsMobileLibraryOpen(true);
                                   setMobileLibraryFilter('all');
                               } else {
-                                  toggleSection('library');
+                                  if (isCollapsed) {
+                                      setSidebarWidth(280);
+                                      toggleSection('library');
+                                  } else {
+                                      toggleSection('library');
+                                  }
                               }
                           }}
                           onChevronClick={() => toggleSection('library')}
                           hasChevron={true}
                           isOpen={expandedSection === 'library'}
                           active={activeView === 'library'}
+                          isCollapsed={isCollapsed}
                       />
                       {/* Inline Plus Button for New Page */}
-                      <button 
-                          onClick={(e) => { e.stopPropagation(); onNewNote(); toggleSection('library'); }}
-                          className="p-2 text-pplx-muted hover:text-pplx-text hover:bg-pplx-hover rounded-md transition-colors opacity-0 group-hover:opacity-100 absolute right-8"
-                          title="New Page"
-                      >
-                          <Plus size={18} />
-                      </button>
+                      {!isCollapsed && (
+                          <button 
+                              onClick={(e) => { e.stopPropagation(); onNewNote(); toggleSection('library'); }}
+                              className="p-2 text-pplx-muted hover:text-pplx-text hover:bg-pplx-hover rounded-md transition-colors opacity-0 group-hover:opacity-100 absolute right-8"
+                              title="New Page"
+                          >
+                              <Plus size={18} />
+                          </button>
+                      )}
                   </div>
                   
-                  {expandedSection === 'library' && (
+                  {!isCollapsed && expandedSection === 'library' && (
                       <div className="ml-2 space-y-0.5 mt-1 animate-fadeIn duration-150 relative">
                           {/* Favorites Section */}
                           {notes.some(n => n.isFavorite) && (
@@ -390,6 +484,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   label="Calendar" 
                   active={activeView === 'calendar'} 
                   onClick={() => { onChangeView('calendar'); if (window.innerWidth < 768) toggleSidebar(); }} 
+                  isCollapsed={isCollapsed}
               />
           </div>
 
@@ -397,9 +492,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="hidden md:block px-2 py-2 mt-2 bg-pplx-sidebar">
               <div 
                 onClick={(e) => { e.stopPropagation(); openSettings(); toggleSidebar(); }} 
-                className="text-sm text-pplx-muted hover:text-pplx-text flex items-center justify-between space-x-2 px-2 py-3 cursor-pointer rounded-lg hover:bg-pplx-hover transition-colors group"
+                className={`text-sm text-pplx-muted hover:text-pplx-text flex items-center ${isCollapsed ? 'justify-center' : 'justify-between space-x-2'} px-2 py-3 cursor-pointer rounded-lg hover:bg-pplx-hover transition-colors group`}
+                title={isCollapsed ? t.settings : undefined}
               >
-                  <div className="flex items-center space-x-3">
+                  <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-3'}`}>
                       <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white text-sm font-bold border border-white/10 overflow-hidden shrink-0">
                           {userProfile.avatar ? (
                             <img src={userProfile.avatar} alt="Avatar" className="w-full h-full object-cover" />
@@ -407,13 +503,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             getUserInitials(userProfile.name)
                           )}
                       </div>
-                      <div className="flex flex-col truncate">
-                          <span className="font-medium text-pplx-text group-hover:text-pplx-text leading-none text-base truncate max-w-[120px]">
-                            {userProfile.name || 'User'}
-                          </span>
-                      </div>
+                      {!isCollapsed && (
+                          <div className="flex flex-col truncate">
+                              <span className="font-medium text-pplx-text group-hover:text-pplx-text leading-none text-base truncate max-w-[120px]">
+                                {userProfile.name || 'User'}
+                              </span>
+                          </div>
+                      )}
                   </div>
-                  <Settings size={22} className="text-pplx-muted hover:text-pplx-text transition-colors shrink-0" />
+                  {!isCollapsed && (
+                      <Settings size={22} className="text-pplx-muted hover:text-pplx-text transition-colors shrink-0" />
+                  )}
               </div>
           </div>
         </div>
@@ -537,7 +637,8 @@ const NavItem = ({
     onClick, 
     onChevronClick,
     hasChevron = false, 
-    isOpen = false
+    isOpen = false,
+    isCollapsed = false
 }: { 
     icon: React.ReactNode, 
     label: string, 
@@ -545,21 +646,24 @@ const NavItem = ({
     onClick?: () => void,
     onChevronClick?: () => void,
     hasChevron?: boolean, 
-    isOpen?: boolean
+    isOpen?: boolean,
+    isCollapsed?: boolean
 }) => (
-  <div className={`w-full flex items-center justify-between px-2 py-1 rounded-lg text-sm transition-colors group relative ${
+  <div className={`w-full flex items-center justify-between ${isCollapsed ? 'px-0 justify-center' : 'px-2'} py-1 rounded-lg text-sm transition-colors group relative ${
       active 
         ? 'bg-pplx-hover' 
         : 'hover:bg-pplx-hover'
-    }`}>
-    <button onClick={onClick} className="flex items-center space-x-3 flex-1 text-left px-1 py-2.5">
+    }`}
+    title={isCollapsed ? label : undefined}
+  >
+    <button onClick={onClick} className={`flex items-center flex-1 text-left py-2.5 ${isCollapsed ? 'justify-center px-0' : 'space-x-3 px-1'}`}>
         <span className={active ? 'text-pplx-accent' : 'text-pplx-muted group-hover:text-pplx-text'}>{icon}</span>
-        <span className={`flex-1 text-base ${active ? 'text-pplx-text font-medium' : 'text-pplx-muted group-hover:text-pplx-text'}`}>{label}</span>
+        {!isCollapsed && <span className={`flex-1 text-base truncate ${active ? 'text-pplx-text font-medium' : 'text-pplx-muted group-hover:text-pplx-text'}`}>{label}</span>}
     </button>
-    {hasChevron && (
+    {!isCollapsed && hasChevron && (
         <button 
             onClick={(e) => { e.stopPropagation(); if(onChevronClick) onChevronClick(); else if(onClick) onClick(); }} 
-            className="text-pplx-muted transition-opacity p-2 hover:bg-pplx-secondary rounded-md"
+            className="text-pplx-muted transition-opacity p-2 hover:bg-pplx-secondary rounded-md shrink-0"
         >
             {isOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
         </button>

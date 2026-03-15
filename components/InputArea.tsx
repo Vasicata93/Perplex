@@ -73,6 +73,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
   const [deepResearchMode, setDeepResearchMode] = useState<'Standard' | 'Advanced'>('Standard');
   const [deepResearchPages, setDeepResearchPages] = useState(5);
   const [thinkingDepth, setThinkingDepth] = useState(4000);
+  const [isAgentMax, setIsAgentMax] = useState(false);
   
   // Library Selection State
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
@@ -536,6 +537,16 @@ export const InputArea: React.FC<InputAreaProps> = ({
                             <X size={8} className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </button>
                     )}
+                    {isAgentMax && (
+                        <button 
+                            onClick={() => setIsAgentMax(false)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-full bg-pplx-accent/10 border border-pplx-accent/20 text-[10px] font-medium text-pplx-accent whitespace-nowrap animate-in fade-in zoom-in duration-200 hover:bg-pplx-accent/20 transition-colors group"
+                        >
+                            <Bot size={10} />
+                            <span>AgentMax</span>
+                            <X size={8} className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
+                    )}
                     {isLongThinking && (
                         <button 
                             onClick={() => setIsLongThinking(false)}
@@ -649,14 +660,36 @@ export const InputArea: React.FC<InputAreaProps> = ({
                         <div className="mb-2">
                             <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1 px-2">Modes</div>
                             <div className="flex flex-col mb-1 bg-pplx-card rounded-lg border border-transparent hover:border-pplx-border transition-colors">
-                                <div className="flex items-center justify-between p-2 cursor-pointer rounded-lg hover:bg-pplx-hover" onClick={() => setIsAgentMode(!isAgentMode)}>
+                                <div className="flex items-center justify-between p-2 cursor-pointer rounded-lg hover:bg-pplx-hover" onClick={() => {
+                                    const next = !isAgentMode;
+                                    setIsAgentMode(next);
+                                    if (next) setIsAgentMax(false);
+                                }}>
                                     <div className="flex items-center space-x-3">
                                         <Bot size={16} className={isAgentMode ? 'text-pplx-accent' : 'text-gray-400'} />
-                                        <span className={`text-sm ${isAgentMode ? 'text-pplx-accent font-medium' : 'text-gray-200 font-medium'}`}>Agent Mode</span>
+                                        <span className={`text-sm ${isAgentMode ? 'text-pplx-accent font-medium' : 'text-gray-200 font-medium'}`}>Agent</span>
                                     </div>
                                     {/* Toggle Switch */}
                                     <div className={`w-10 h-6 rounded-full transition-colors relative ${isAgentMode ? 'bg-pplx-accent' : 'bg-gray-600'}`}>
                                         <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${isAgentMode ? 'left-5' : 'left-1'}`} />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* AgentMax Mode */}
+                            <div className="flex flex-col mb-1 bg-pplx-card rounded-lg border border-transparent hover:border-pplx-border transition-colors">
+                                <div className="flex items-center justify-between p-2 cursor-pointer rounded-lg hover:bg-pplx-hover" onClick={() => {
+                                    const next = !isAgentMax;
+                                    setIsAgentMax(next);
+                                    if (next) setIsAgentMode(false);
+                                }}>
+                                    <div className="flex items-center space-x-3">
+                                        <Bot size={16} className={isAgentMax ? 'text-pplx-accent' : 'text-gray-400'} />
+                                        <span className={`text-sm ${isAgentMax ? 'text-pplx-accent font-medium' : 'text-gray-200 font-medium'}`}>AgentMax</span>
+                                    </div>
+                                    {/* Toggle Switch */}
+                                    <div className={`w-10 h-6 rounded-full transition-colors relative ${isAgentMax ? 'bg-pplx-accent' : 'bg-gray-600'}`}>
+                                        <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${isAgentMax ? 'left-5' : 'left-1'}`} />
                                     </div>
                                 </div>
                             </div>
