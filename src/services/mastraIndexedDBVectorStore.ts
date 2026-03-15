@@ -5,7 +5,7 @@ import { db, STORES } from '../../services/db';
  * Clasă standalone, fără extends, evită incompatibilitățile de tip cu @mastra/core v1.8.x
  */
 export class MastraIndexedDBVectorStore {
-  constructor(private config: { id: string }) { }
+  constructor(_config: { id: string }) { }
 
   async upsert(params: { vectors: number[][], metadata?: any[], ids?: string[] }): Promise<string[]> {
     const allChunks = await db.get<any[]>(STORES.EMBEDDINGS, 'all_chunks') || [];
