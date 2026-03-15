@@ -22,11 +22,18 @@ const agentMaxServer = new Agent({
     Always lead with the most relevant information and use your tools to provide accurate, real-time data.`,
     model: {
         id: 'google/gemini-1.5-pro-latest',
-        apiKey: process.env.API_KEY
+        apiKey: process.env.API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
     } as any
 });
 
 export const handleAgentMax = async (req: Request, res: Response) => {
+    console.log(`[Agent Max] Initializing request for thread: ${req.body.threadId}`);
+    
+    if (!process.env.API_KEY && !process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+        console.error('[Agent Max] ERROR: API_KEY is missing in server environment');
+        return res.status(500).json({ error: 'Server configuration error: API_KEY is missing' });
+    }
+
     try {
         const { prompt, threadId } = req.body;
         const dynamicInstructions = getDynamicInstructions(prompt);
