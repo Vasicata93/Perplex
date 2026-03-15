@@ -159,6 +159,7 @@ export class E2BService {
      */
     static async verifyConnection(apiKey: string): Promise<boolean> {
         try {
+            console.log("[E2B] Testing connection...");
             const response = await fetch('/api/execute', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -172,10 +173,13 @@ export class E2BService {
 
             if (response.ok) {
                 const data = await response.json();
+                console.log("[E2B] Connection test result:", data);
                 return data.success;
             }
+            console.error("[E2B] Connection test failed with status:", response.status);
             return false;
-        } catch {
+        } catch (error) {
+            console.error("[E2B] Connection test network error:", error);
             return false;
         }
     }

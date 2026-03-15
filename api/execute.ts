@@ -5,32 +5,32 @@ export default async function handler(req: any, res: any) {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    const { code, language, timeout = 30, packages = [], session_id, apiKey } = req.body;
+    const { code, language, timeout = 30, packages = [], session_id, apiKey: rawApiKey } = req.body;
+    const apiKey = rawApiKey?.trim();
 
     if (!apiKey) {
         return res.status(200).json({ error_type: 'api_key_missing', success: false, sandbox_mode: 'e2b_cloud' });
     }
 
+    console.log(`[E2B] Attempting execution. Key: ${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)}`);
+
     try {
         const startTime = Date.now();
+
         // Determine sandbox creation options
-        const opts: any = { apiKey };
 
         let sandbox;
         if (session_id) {
-            // Note: Since E2B Sandbox can use session_id to reconnect or create a persistent sandbox
-            // we create it with id or reconnect if active. For simplicity, we create a new one or use the existing
             try {
-                sandbox = await Sandbox.connect(session_id, opts);
+                // e2b SDK allows Sandbox.connect for existing sessions
+                sandbox = await Sandbox.connect(session_id, { apiKey });
             } catch (e) {
-                // Not found, create a new one with this ID
-                // e2b SDK allows specifying an ID? The official docs say .create() doesn't take session_id directly as an argument, 
-                // but let's just create a new sandbox. 
-                sandbox = await Sandbox.create(opts);
+                sandbox = await Sandbox.create({ apiKey });
             }
         } else {
-            sandbox = await Sandbox.create(opts);
+            sandbox = await Sandbox.create({ apiKey });
         }
+
 
         // Install packages if any
         if (packages.length > 0) {
@@ -72,7 +72,9 @@ export default async function handler(req: any, res: any) {
         });
 
     } catch (error: any) {
+        console.error(`[E2B] Error: ${error.message}`, error);
         const isTimeout = error.message?.toLowerCase().includes('timeout');
+        const isAuthError = error.message?.toLowerCase().includes('unauthorized') || error.message?.toLowerCase().includes('apiKey');
         
         return res.status(200).json({
             success: false,
@@ -81,7 +83,7 @@ export default async function handler(req: any, res: any) {
             exit_code: 1,
             execution_time: 0,
             sandbox_mode: 'e2b_cloud',
-            error_type: isTimeout ? 'timeout' : 'execution_error'
+            error_type: isTimeout ? 'timeout' : isAuthError ? 'execution_error' : 'execution_error'
         });
     }
 }
