@@ -14,32 +14,40 @@ function getDynamicInstructions(intent: string) {
     return `\n\nRELEVANT SKILLS ACTIVATED:\n${relevantSkills.map(s => `--- ${s.name} ---\n${s.instructions}`).join('\n\n')}`;
 }
 
-const agentMaxServer = new Agent({
-    id: 'agent-max-server',
-    name: 'Agent Max',
-    instructions: `You are Agent Max, a high-performance Mastra-powered assistant. 
-    You have advanced memory capabilities and access to professional skills.
-    Always lead with the most relevant information and use your tools to provide accurate, real-time data.`,
-    model: {
-        id: 'google/gemini-1.5-pro-latest',
-        apiKey: process.env.API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
-    } as any
-});
-
 export const handleAgentMax = async (req: Request, res: Response) => {
-    console.log(`[Agent Max] Initializing request for thread: ${req.body.threadId}`);
+    const { prompt, threadId, provider, apiKey, modelId } = req.body;
     
-    if (!process.env.API_KEY && !process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-        console.error('[Agent Max] ERROR: API_KEY is missing in server environment');
-        return res.status(500).json({ error: 'Server configuration error: API_KEY is missing' });
+    console.log(`[Agent Max] Request for thread: ${threadId} | Provider: ${provider} | Model: ${modelId}`);
+    
+    // Resolve credentials: use provided ones or fallback to server env
+    const effectiveApiKey = apiKey || (provider === 'openrouter' ? process.env.OPENROUTER_API_KEY : (process.env.API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY));
+    const effectiveModelId = modelId || 'google/gemini-1.5-pro-latest';
+    
+    if (!effectiveApiKey) {
+        console.error('[Agent Max] ERROR: API_KEY is missing for provider:', provider);
+        return res.status(400).json({ error: `API_KEY is missing for provider: ${provider}. Please check your settings.` });
     }
 
     try {
-        const { prompt, threadId } = req.body;
+        // Create a dynamic agent for this request
+        const dynamicAgent = new Agent({
+            id: `agent-max-${threadId || 'default'}`,
+            name: 'Agent Max',
+            instructions: `You are Agent Max, a high-performance assistant. 
+            You have access to professional skills.
+            Always lead with the most relevant information and use your tools to provide accurate data.`,
+            model: {
+                id: effectiveModelId,
+                apiKey: effectiveApiKey,
+                // Mastra handles different providers; for OpenRouter we might need specific logic if standard OpenAI/Gemini doesn't work.
+                // But generally Mastra maps model IDs to providers.
+            } as any
+        });
+
         const dynamicInstructions = getDynamicInstructions(prompt);
         const fullPrompt = `${prompt}${dynamicInstructions}`;
         
-        const result = await agentMaxServer.generate(fullPrompt, {
+        const result = await dynamicAgent.generate(fullPrompt, {
             memory: {
                 thread: threadId || 'backend-default',
                 resource: 'server-root'

@@ -1353,7 +1353,25 @@ function App() {
 
     try {
       if (isAgentMax) {
-          const res = await askAgentMax(modifiedPrompt, threadId);
+          let agentMaxProvider = settings.modelProvider;
+          let agentMaxApiKey = settings.geminiApiKey;
+          let agentMaxModelId = settings.openRouterModelId; // Default/Previous logic or dynamic
+
+          if (agentMaxProvider === ModelProvider.GEMINI) {
+              agentMaxApiKey = settings.geminiApiKey;
+              agentMaxModelId = 'google/gemini-1.5-pro-latest';
+          } else if (agentMaxProvider === ModelProvider.OPENROUTER) {
+              agentMaxApiKey = settings.openRouterApiKey;
+              agentMaxModelId = settings.openRouterModelId || 'google/gemini-pro';
+          }
+
+          const res = await askAgentMax(
+              modifiedPrompt, 
+              threadId, 
+              agentMaxProvider, 
+              agentMaxApiKey, 
+              agentMaxModelId
+          );
           
           setThreads(prev => prev.map(t => t.id === threadId ? { 
             ...t, 

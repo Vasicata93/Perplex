@@ -1,12 +1,24 @@
 // Client proxy for Agent Max. Calls the server route to avoid bundling heavy Node.js-based Mastra core in the browser.
-export async function askAgentMax(prompt: string, threadId: string = 'default-max-thread') {
+export async function askAgentMax(
+    prompt: string, 
+    threadId: string = 'default-max-thread',
+    provider?: string,
+    apiKey?: string,
+    modelId?: string
+) {
     try {
         const response = await fetch('/api/agent-max', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ prompt, threadId }),
+            body: JSON.stringify({ 
+                prompt, 
+                threadId,
+                provider,
+                apiKey,
+                modelId
+            }),
         });
 
         const contentType = response.headers.get('content-type');
