@@ -1396,7 +1396,7 @@ function App() {
                             const newNote: Note = {
                                 id: generateId(), title: action.payload.title,
                                 content: action.payload.content,
-                                createdAt: Date.now(), updatedAt: Date.now(),
+                                updatedAt: Date.now(),
                                 status: 'Idea', tags: ['ai-generated']
                             };
                             const updatedNotes = [...notes, newNote];
@@ -2079,8 +2079,8 @@ function App() {
                                                             </div>
                                                         ) : (
                                                             <div className={`font-normal text-[16px] leading-7 transition-all relative ${msg.role === Role.USER
-                                                                    ? 'bg-pplx-card border border-pplx-border/60 px-4 py-3 rounded-3xl rounded-tr-sm text-pplx-text text-right whitespace-pre-wrap shadow-md backdrop-blur-md'
-                                                                    : 'w-full text-pplx-text'
+                                                                ? 'bg-pplx-card border border-pplx-border/60 px-4 py-3 rounded-3xl rounded-tr-sm text-pplx-text text-right whitespace-pre-wrap shadow-md backdrop-blur-md'
+                                                                : 'w-full text-pplx-text'
                                                                 }`}>
                                                                 {msg.role === Role.USER ? (
                                                                     msg.content

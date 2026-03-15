@@ -4,7 +4,6 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { ALL_AGENT_SKILLS } from '../src/agent/skills';
 import { buildAgentSystemPrompt } from '../src/agent/AgentOrchestrator';
 import { DEFAULT_AGENT_CONFIG } from '../src/agent/types';
 
@@ -22,7 +21,7 @@ function buildServerTools(clientData: {
         id: 'web_search',
         description: 'Searches the web for real-time information. Use for current events, news, prices, weather.',
         inputSchema: z.object({ query: z.string() }),
-        execute: async ({ context }) => {
+        execute: async (context) => {
             const useBrave = clientData.searchProvider === 'brave' && clientData.braveApiKey;
             if (useBrave) {
                 const url = new URL('https://api.search.brave.com/res/v1/web/search');
@@ -49,7 +48,7 @@ function buildServerTools(clientData: {
         id: 'list_calendar_events',
         description: 'Lists calendar events for a date range.',
         inputSchema: z.object({ startDate: z.string(), endDate: z.string() }),
-        execute: async ({ context }) => {
+        execute: async (context) => {
             const start = new Date(context.startDate).getTime();
             const end = new Date(context.endDate).getTime();
             const filtered = clientData.calendarEvents.filter(
@@ -68,7 +67,7 @@ function buildServerTools(clientData: {
             endDate: z.string(),
             description: z.string().optional()
         }),
-        execute: async ({ context }) => {
+        execute: async (context) => {
             pendingActions.push({ type: 'add_calendar_event', payload: context });
             return `Event "${context.title}" scheduled`;
         }
@@ -78,7 +77,7 @@ function buildServerTools(clientData: {
         id: 'search_workspace',
         description: 'Searches user workspace files, library pages and notes.',
         inputSchema: z.object({ query: z.string() }),
-        execute: async ({ context }) => {
+        execute: async (context) => {
             const q = context.query.toLowerCase();
             const results: string[] = [];
             for (const f of clientData.workspaceFiles) {
@@ -99,7 +98,7 @@ function buildServerTools(clientData: {
         id: 'save_to_library',
         description: 'Saves content to user library. ONLY when user explicitly says "save this".',
         inputSchema: z.object({ title: z.string(), content: z.string(), action: z.enum(['create', 'update']) }),
-        execute: async ({ context }) => {
+        execute: async (context) => {
             pendingActions.push({ type: 'save_to_library', payload: context });
             return `"${context.title}" queued for saving`;
         }
