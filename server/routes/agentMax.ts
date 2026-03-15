@@ -42,13 +42,15 @@ export const handleAgentMax = async (req: Request, res: Response) => {
             name: 'Agent Max',
             instructions: `You are Agent Max, a high-performance assistant. 
             You have access to professional skills.
-            Always lead with the most relevant information and use your tools to provide accurate data.`,
+            Always lead with the most relevant information.`,
             model: {
+                provider: provider, // CRITICAL: Specify the provider (e.g., 'google', 'openrouter')
                 id: effectiveModelId,
                 apiKey: effectiveApiKey,
-                // Mastra handles different providers; for OpenRouter we might need specific logic if standard OpenAI/Gemini doesn't work.
-                // But generally Mastra maps model IDs to providers.
-            } as any
+                // Add baseURL for OpenRouter as it's a non-standard endpoint
+                ...(provider === 'openrouter' && { baseURL: 'https://openrouter.ai/api/v1' }),
+            },
+            // Agent Max currently does not use tools as per this simplified implementation.
         });
 
         const dynamicInstructions = getDynamicInstructions(prompt);
