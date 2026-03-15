@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { handleExecute } from './routes/execute';
+import { handleAgentMax } from './routes/agentMax';
 
 async function startServer() {
     const app = express();
@@ -10,6 +11,9 @@ async function startServer() {
 
     app.use(cors());
     app.use(express.json({ limit: '1mb' }));
+
+    // Agent Max Route
+    app.post('/api/agent-max', handleAgentMax);
 
     // E2B Execution Route
     app.post('/api/execute', handleExecute);

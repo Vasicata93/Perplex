@@ -9,7 +9,7 @@ import { User, BookOpen, Globe, Copy, Check, RefreshCw, Share2, Volume2, FileTex
 interface ChatInterfaceProps {
   messages: Message[];
   isThinking: boolean;
-  onSendMessage: (text: string, focusModes: FocusMode[], attachments: Attachment[]) => void;
+  onSendMessage: (text: string, focusModes: FocusMode[], attachments: Attachment[], isAgentMax?: boolean) => void;
   onStopGeneration: () => void;
   onRegenerate: (messageId: string) => void;
   onEditMessage: (messageId: string, newContent: string) => void;
@@ -20,6 +20,8 @@ interface ChatInterfaceProps {
   copiedId: string | null;
   isSidePanel?: boolean;
   activeNote?: Note;
+  isAgentMax?: boolean;
+  setIsAgentMax?: (val: boolean) => void;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -35,7 +37,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   isPlayingAudio,
   copiedId,
   isSidePanel = false,
-  activeNote
+  activeNote,
+  isAgentMax,
+  setIsAgentMax
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -221,13 +225,15 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         {/* Bottom Gradient Fade - Perfectly glued to input box */}
         <div className="absolute bottom-[calc(100%-16px)] left-0 right-0 h-12 bg-gradient-to-t from-pplx-card via-pplx-card/50 to-transparent z-10 pointer-events-none" />
         <InputArea 
-          onSendMessage={(text, focusModes, _proMode, atts) => onSendMessage(text, focusModes, atts)}
+          onSendMessage={(text, focusModes, _proMode, atts, _modelId, _isAgent, _threadId, iam) => onSendMessage(text, focusModes, atts, iam)}
           isThinking={isThinking}
           onStop={onStopGeneration}
           placeholder="Ask about this page..."
           compact={true}
           activeNote={activeNote}
           mobileSidePanel={isSidePanel}
+          isAgentMax={isAgentMax}
+          setIsAgentMax={setIsAgentMax}
         />
       </div>
     </div>

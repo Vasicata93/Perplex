@@ -7,7 +7,7 @@ import { FocusMode, Attachment, AppSettings, ModelProvider, ProMode, Note, Space
 import { FOCUS_MODES, PRO_MODES } from '../constants';
 
 interface InputAreaProps {
-  onSendMessage: (text: string, focusModes: FocusMode[], proMode: ProMode, attachments: Attachment[], modelId?: string, isAgentMode?: boolean) => void;
+  onSendMessage: (text: string, focusModes: FocusMode[], proMode: ProMode, attachments: Attachment[], modelId?: string, isAgentMode?: boolean, threadIdOverride?: string, isAgentMax?: boolean) => void;
   onStop?: () => void;
   isThinking: boolean;
   centered?: boolean;
@@ -26,6 +26,8 @@ interface InputAreaProps {
   setProMode?: (mode: ProMode) => void;
   isAgentMode?: boolean;
   setIsAgentMode?: (isAgent: boolean) => void;
+  isAgentMax?: boolean;
+  setIsAgentMax?: (val: boolean) => void;
   isLongThinking?: boolean;
   setIsLongThinking?: (isThinking: boolean) => void;
 }
@@ -49,6 +51,8 @@ export const InputArea: React.FC<InputAreaProps> = ({
     setProMode: propSetProMode,
     isAgentMode: propIsAgentMode,
     setIsAgentMode: propSetIsAgentMode,
+    isAgentMax: propIsAgentMax,
+    setIsAgentMax: propSetIsAgentMax,
     isLongThinking: propIsLongThinking,
     setIsLongThinking: propSetIsLongThinking,
 }) => {
@@ -58,6 +62,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
   // Local State Fallbacks
   const [localProMode, setLocalProMode] = useState<ProMode>(ProMode.STANDARD);
   const [localIsAgentMode, setLocalIsAgentMode] = useState(false);
+  const [localIsAgentMax, setLocalIsAgentMax] = useState(false);
   const [localIsLongThinking, setLocalIsLongThinking] = useState(false);
 
   // Use props if available, otherwise local state
@@ -66,6 +71,9 @@ export const InputArea: React.FC<InputAreaProps> = ({
 
   const isAgentMode = propIsAgentMode !== undefined ? propIsAgentMode : localIsAgentMode;
   const setIsAgentMode = propSetIsAgentMode || setLocalIsAgentMode;
+
+  const isAgentMax = propIsAgentMax !== undefined ? propIsAgentMax : localIsAgentMax;
+  const setIsAgentMax = propSetIsAgentMax || setLocalIsAgentMax;
 
   const isLongThinking = propIsLongThinking !== undefined ? propIsLongThinking : localIsLongThinking;
   const setIsLongThinking = propSetIsLongThinking || setLocalIsLongThinking;
@@ -390,7 +398,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
           });
       }
 
-      onSendMessage(input, focusModes, proMode, finalAttachments, selectedModelId || undefined, isAgentMode);
+      onSendMessage(input, focusModes, proMode, finalAttachments, selectedModelId || undefined, isAgentMode, undefined, isAgentMax);
       setInput('');
       setAttachments([]);
       if (textareaRef.current) {
@@ -527,6 +535,16 @@ export const InputArea: React.FC<InputAreaProps> = ({
 
                  {/* Active Mode Badges (Minimalist) */}
                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-[200px] md:max-w-none mask-linear-fade">
+                    {isAgentMax && (
+                        <button 
+                            onClick={() => setIsAgentMax(false)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-medium text-amber-400 whitespace-nowrap animate-in fade-in zoom-in duration-200 hover:bg-amber-500/20 transition-colors group"
+                        >
+                            <Zap size={10} />
+                            <span>Agent Max</span>
+                            <X size={8} className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
+                    )}
                     {isAgentMode && (
                         <button 
                             onClick={() => setIsAgentMode(false)}
@@ -672,6 +690,20 @@ export const InputArea: React.FC<InputAreaProps> = ({
                                     {/* Toggle Switch */}
                                     <div className={`w-10 h-6 rounded-full transition-colors relative ${isAgentMode ? 'bg-pplx-accent' : 'bg-gray-600'}`}>
                                         <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${isAgentMode ? 'left-5' : 'left-1'}`} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Agent Max Toggle */}
+                            <div className="flex flex-col mb-1 bg-pplx-card rounded-lg border border-transparent hover:border-pplx-border transition-colors">
+                                <div className="flex items-center justify-between p-2 cursor-pointer rounded-lg hover:bg-pplx-hover" onClick={() => setIsAgentMax(!isAgentMax)}>
+                                    <div className="flex items-center space-x-3">
+                                        <Zap size={16} className={isAgentMax ? 'text-amber-400' : 'text-gray-400'} />
+                                        <span className={`text-sm ${isAgentMax ? 'text-amber-400 font-medium' : 'text-gray-200 font-medium'}`}>Agent Max</span>
+                                    </div>
+                                    {/* Toggle Switch */}
+                                    <div className={`w-10 h-6 rounded-full transition-colors relative ${isAgentMax ? 'bg-amber-400' : 'bg-gray-600'}`}>
+                                        <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${isAgentMax ? 'left-5' : 'left-1'}`} />
                                     </div>
                                 </div>
                             </div>

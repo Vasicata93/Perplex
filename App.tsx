@@ -18,6 +18,7 @@ import { PerplexityLogo } from './constants';
 import { Role, Message, Thread, AppSettings, DEFAULT_SETTINGS, ModelProvider, FocusMode, Attachment, Space, Note, ProMode, PendingAction, CalendarEvent } from './types';
 import { RAGService } from './services/ragService';
 import { LLMService } from './services/geminiService';
+import { askAgentMax } from './src/services/agentMaxService';
 import { BlockService } from './services/blockService';
 import { Block } from './types/blockStructure';
 import { 
@@ -77,6 +78,9 @@ function App() {
   const [inputIsLongThinking, setInputIsLongThinking] = useState(() => 
       sessionStorage.getItem('pplx_inputIsLongThinking') === 'true'
   );
+  const [inputIsAgentMax, setInputIsAgentMax] = useState(() => 
+      sessionStorage.getItem('pplx_inputIsAgentMax') === 'true'
+  );
 
   // Persist Input State
   useEffect(() => {
@@ -90,6 +94,10 @@ function App() {
   useEffect(() => {
       sessionStorage.setItem('pplx_inputIsLongThinking', String(inputIsLongThinking));
   }, [inputIsLongThinking]);
+
+  useEffect(() => {
+      sessionStorage.setItem('pplx_inputIsAgentMax', String(inputIsAgentMax));
+  }, [inputIsAgentMax]);
   
   // Scroll State
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -1253,7 +1261,7 @@ function App() {
       }
   };
 
-  const handleSendMessage = async (text: string, focusModes: FocusMode[], proMode: ProMode, attachments: Attachment[], modelId?: string, isAgentMode: boolean = false, threadIdOverride?: string) => {
+  const handleSendMessage = async (text: string, focusModes: FocusMode[], proMode: ProMode, attachments: Attachment[], modelId?: string, isAgentMode: boolean = false, threadIdOverride?: string, isAgentMax: boolean = false) => {
     isStoppedRef.current = false;
     setIsThinking(true);
     
@@ -1344,6 +1352,22 @@ function App() {
     }
 
     try {
+      if (isAgentMax) {
+          const res = await askAgentMax(modifiedPrompt, threadId);
+          
+          setThreads(prev => prev.map(t => t.id === threadId ? { 
+            ...t, 
+            messages: t.messages.map(m => m.id === tempBotId ? { 
+                ...m, 
+                content: res.text,
+                isThinking: false
+            } : m), 
+            updatedAt: Date.now() 
+          } : t));
+          setIsThinking(false);
+          return;
+      }
+
       let provider = settings.modelProvider;
       let activeLocalModel = settings.localModels.find(m => m.id === settings.activeLocalModelId);
       if (modelId) {
@@ -2179,6 +2203,8 @@ function App() {
                             setProMode={setInputProMode}
                             isAgentMode={inputIsAgentMode}
                             setIsAgentMode={setInputIsAgentMode}
+                            isAgentMax={inputIsAgentMax}
+                            setIsAgentMax={setInputIsAgentMax}
                             isLongThinking={inputIsLongThinking}
                             setIsLongThinking={setInputIsLongThinking}
                           />
@@ -2195,7 +2221,7 @@ function App() {
         onClose={() => setIsSideChatOpen(false)}
         messages={threads.find(t => t.id === sideChatThreadId)?.messages || []}
         isThinking={isThinking}
-        onSendMessage={(text, focusModes, atts) => handleSendMessage(text, focusModes, ProMode.STANDARD, atts, undefined, false, sideChatThreadId!)}
+        onSendMessage={(text, focusModes, atts, iam) => handleSendMessage(text, focusModes, ProMode.STANDARD, atts, undefined, false, sideChatThreadId!, iam)}
         onStopGeneration={handleStopGeneration}
         onRegenerate={(msgId) => handleRegenerate(msgId, sideChatThreadId!)}
         onEditMessage={(msgId, newContent) => handleEditUserMessage(msgId, newContent, sideChatThreadId!)}
@@ -2208,6 +2234,8 @@ function App() {
         onNewChat={handleClearSideChat}
         mode={chatMode}
         onModeChange={setChatMode}
+        isAgentMax={inputIsAgentMax}
+        setIsAgentMax={setInputIsAgentMax}
       />
 
       {/* Floating Action Button for Side Chat (Only in Library Mode) */}
