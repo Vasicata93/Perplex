@@ -3,20 +3,20 @@ import { GoogleGenAI } from '@google/genai';
 
 export class MastraGeminiEmbedder {
   private ai: GoogleGenAI;
-  private model: any;
 
   constructor() {
     this.ai = new GoogleGenAI({ apiKey: (process as any).env.API_KEY || '' });
-    this.model = this.ai.getGenerativeModel({ model: "text-embedding-004" });
   }
 
   async embed(text: string): Promise<number[]> {
     try {
-      const result = await this.model.embedContent(text);
-      return result.embedding.values;
+      const result = await (this.ai.models as any).embedContent({
+        model: "text-embedding-004",
+        contents: [text]
+      });
+      return result.embeddings?.[0]?.values || [];
     } catch (error) {
       console.error('[Gemini Embedder Error]:', error);
-      // Fallback or rethrow
       throw error;
     }
   }

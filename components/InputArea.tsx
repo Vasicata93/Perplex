@@ -81,7 +81,6 @@ export const InputArea: React.FC<InputAreaProps> = ({
   const [deepResearchMode, setDeepResearchMode] = useState<'Standard' | 'Advanced'>('Standard');
   const [deepResearchPages, setDeepResearchPages] = useState(5);
   const [thinkingDepth, setThinkingDepth] = useState(4000);
-  const [isAgentMax, setIsAgentMax] = useState(false);
   
   // Library Selection State
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);

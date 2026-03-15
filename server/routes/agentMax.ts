@@ -1,25 +1,42 @@
-
 import { Request, Response } from 'express';
-import { Mastra } from '@mastra/core';
 import { Agent } from '@mastra/core/agent';
+import { ALL_AGENT_SKILLS } from '../../src/agent/skills';
 
-// For the server-side, we'll use a stateless version or simpler storage for now.
-// Real persistent memory for Agent Max is on the client via IndexedDB.
+// Skills injection logic (reused from previous client implementation)
+function getDynamicInstructions(intent: string) {
+    const relevantSkills = ALL_AGENT_SKILLS.filter(skill => 
+        intent.toLowerCase().includes(skill.name.toLowerCase()) || 
+        intent.toLowerCase().includes(skill.id.split('_')[1])
+    );
+    
+    if (relevantSkills.length === 0) return '';
+    
+    return `\n\nRELEVANT SKILLS ACTIVATED:\n${relevantSkills.map(s => `--- ${s.name} ---\n${s.instructions}`).join('\n\n')}`;
+}
+
 const agentMaxServer = new Agent({
-    name: 'Agent Max Server',
-    instructions: 'You are the backend component of Agent Max. You handle server-side tasks or proxy requests when needed.',
+    id: 'agent-max-server',
+    name: 'Agent Max',
+    instructions: `You are Agent Max, a high-performance Mastra-powered assistant. 
+    You have advanced memory capabilities and access to professional skills.
+    Always lead with the most relevant information and use your tools to provide accurate, real-time data.`,
     model: {
         id: 'google/gemini-1.5-pro-latest',
         apiKey: process.env.API_KEY
-    }
+    } as any
 });
 
 export const handleAgentMax = async (req: Request, res: Response) => {
     try {
         const { prompt, threadId } = req.body;
+        const dynamicInstructions = getDynamicInstructions(prompt);
+        const fullPrompt = `${prompt}${dynamicInstructions}`;
         
-        const result = await agentMaxServer.generate(prompt, {
-            threadId: threadId || 'backend-default'
+        const result = await agentMaxServer.generate(fullPrompt, {
+            memory: {
+                thread: threadId || 'backend-default',
+                resource: 'server-root'
+            } as any
         });
         
         res.json({
