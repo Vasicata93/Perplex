@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Sandbox } from '@e2b/code-interpreter';
+import { Sandbox } from '@e2b/sdk';
 import { sessionManager } from '../sessions';
 
 export const handleExecute = async (req: Request, res: Response) => {
@@ -7,13 +7,13 @@ export const handleExecute = async (req: Request, res: Response) => {
     const apiKey = rawApiKey?.trim();
 
     if (!apiKey) {
-        return res.status(200).json({ 
-            success: false, 
-            stdout: "", 
-            stderr: "E2B API key is missing", 
-            exit_code: 1, 
-            sandbox_mode: "e2b_cloud", 
-            error_type: "api_key_missing" 
+        return res.status(200).json({
+            success: false,
+            stdout: "",
+            stderr: "E2B API key is missing",
+            exit_code: 1,
+            sandbox_mode: "e2b_cloud",
+            error_type: "api_key_missing"
         });
     }
 
@@ -24,6 +24,7 @@ export const handleExecute = async (req: Request, res: Response) => {
         if (session_id) {
             sandbox = await sessionManager.getOrCreateSandbox(session_id, apiKey);
         } else {
+            // Create a standard sandbox (default template supports Python & Node)
             sandbox = await Sandbox.create({ apiKey });
         }
 
@@ -39,10 +40,10 @@ export const handleExecute = async (req: Request, res: Response) => {
 
         // Determine execution command based on language
         let fileExt = language === 'python' ? 'py' : language === 'typescript' ? 'ts' : 'js';
-        let command = language === 'python' 
-            ? `python3 /tmp/script.${fileExt}` 
+        let command = language === 'python'
+            ? `python3 /tmp/script.${fileExt}`
             : (language === 'typescript' ? `npx tsx /tmp/script.${fileExt}` : `node /tmp/script.${fileExt}`);
-        
+
         // Write script to sandbox
         await sandbox.files.write(`/tmp/script.${fileExt}`, code);
 
@@ -68,9 +69,9 @@ export const handleExecute = async (req: Request, res: Response) => {
 
     } catch (error: any) {
         console.error(`[E2B Error]`, error);
-        
+
         const isTimeout = error.message?.toLowerCase().includes('timeout');
-        
+
         return res.status(200).json({
             success: false,
             stdout: '',

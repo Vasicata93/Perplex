@@ -20,36 +20,42 @@ export interface ExecuteCodeResult {
 
 export class E2BService {
     /**
+     * Internal helper to call the backend API.
+     * Centralizes URL, request structure, and basic error handling.
+     */
+    private static async _callApi(body: any): Promise<any> {
+        const response = await fetch('/api/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[E2BService] Backend API call failed with status ${response.status}:`, errorText);
+            throw new Error(`Backend Error: ${response.status}`);
+        }
+
+        return response.json();
+    }
+
+    /**
      * Executes code using E2B Cloud Sandbox or falls back to local Web Worker execution.
      */
     static async executeCode(params: ExecuteCodeParams, settings: AppSettings): Promise<ExecuteCodeResult> {
         const hasInternet = navigator.onLine;
 
-        // Condition for Local Fallback
         if (!settings.e2bApiKey || !hasInternet) {
             return this.executeLocalFallback(params);
         }
 
         try {
-            const response = await fetch('/api/execute', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ...params,
-                    apiKey: settings.e2bApiKey
-                })
+            return await this._callApi({
+                ...params,
+                apiKey: settings.e2bApiKey,
             });
-
-            if (!response.ok) {
-                // If the E2B service returns an error, fallback to local
-                return this.executeLocalFallback(params);
-            }
-
-            const data: ExecuteCodeResult = await response.json();
-            return data;
-
         } catch (error) {
-            // Network error to the serverless function -> fallback
+            console.error("[E2B] Execution failed, falling back to local:", error);
             return this.executeLocalFallback(params);
         }
     }
@@ -158,28 +164,21 @@ export class E2BService {
      * Checks if the E2B API key is valid by sending a test execution.
      */
     static async verifyConnection(apiKey: string): Promise<boolean> {
+        if (!apiKey?.trim()) return false;
+
         try {
             console.log("[E2B] Testing connection...");
-            const response = await fetch('/api/execute', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    apiKey,
-                    code: 'print("success")',
-                    language: 'python',
-                    timeout: 5
-                })
+            const data = await this._callApi({
+                apiKey,
+                code: 'print("success")',
+                language: 'python',
+                timeout: 10 // Slightly longer for potential cold starts
             });
 
-            if (response.ok) {
-                const data = await response.json();
-                console.log("[E2B] Connection test result:", data);
-                return data.success;
-            }
-            console.error("[E2B] Connection test failed with status:", response.status);
-            return false;
+            console.log("[E2B] Connection test result:", data);
+            return data?.success === true;
         } catch (error) {
-            console.error("[E2B] Connection test network error:", error);
+            console.error("[E2B] Connection test failed (Network/Server Error):", error);
             return false;
         }
     }
