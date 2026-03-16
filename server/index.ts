@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { handleExecute } from './routes/execute';
+import { handleLangflow } from './routes/langflow';
 
 async function startServer() {
     const app = express();
@@ -13,6 +14,7 @@ async function startServer() {
 
     // E2B Execution Route
     app.post('/api/execute', handleExecute);
+    app.post('/api/langflow', handleLangflow);
 
     // Basic health check
     app.get('/api/health', (_req, res) => {

@@ -20,6 +20,7 @@ import { RAGService } from './services/ragService';
 import { LLMService } from './services/geminiService';
 import { BlockService } from './services/blockService';
 import { Block } from './types/blockStructure';
+import { askLangflow } from './src/services/langflowService';
 import { 
     User, BookOpen, FileText, Globe, Copy, ChevronLeft, ChevronRight, X,
     Star, MoreHorizontal, Download, Upload, Trash2, Wifi, Lock, FileEdit, ClipboardCopy,
@@ -1348,6 +1349,27 @@ function App() {
       let activeLocalModel = settings.localModels.find(m => m.id === settings.activeLocalModelId);
       if (modelId) {
          if (modelId.startsWith('gemini')) { provider = ModelProvider.GEMINI; } else if (modelId === 'openrouter') { provider = ModelProvider.OPENROUTER; } else if (modelId === 'openai') { provider = ModelProvider.OPENAI; } else { const found = settings.localModels.find(m => m.id === modelId); if (found) { activeLocalModel = found; provider = ModelProvider.LOCAL; } }
+      }
+
+      if (modelId === 'langflow') {
+        const langflowResponse = await askLangflow(
+          text,
+          threadId,
+          settings
+        );
+
+        setThreads(prev => prev.map(t => t.id === threadId ? {
+          ...t,
+          messages: t.messages.map(m => m.id === tempBotId ? {
+            ...m,
+            content: langflowResponse.text,
+            isThinking: false
+          } : m),
+          updatedAt: Date.now()
+        } : t));
+
+        setIsThinking(false);
+        return;
       }
       
       const onChunk = (textChunk: string, reasoningChunk?: string) => {

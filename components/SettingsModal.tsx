@@ -808,6 +808,107 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                         </div>
                                     )}
                                 </div>
+
+                                {/* ─── Langflow Card ─── */}
+                                <div className={`group rounded-3xl p-6 transition-all duration-300 cursor-pointer select-none
+                                  ${formData.langflowEnabled
+                                    ? 'bg-pplx-card shadow-lg ring-1 ring-black/5 dark:ring-white/10'
+                                    : 'bg-pplx-card/50 hover:bg-pplx-card'}`}
+                                >
+                                  <div
+                                    className="flex items-center justify-between"
+                                    onClick={() => updateFormData({ langflowEnabled: !formData.langflowEnabled })}
+                                  >
+                                    <div className="flex items-center gap-4">
+                                      <div className={`p-3 rounded-2xl ${formData.langflowEnabled
+                                        ? 'bg-pplx-text text-pplx-primary'
+                                        : 'bg-pplx-secondary text-pplx-muted'}`}
+                                      >
+                                        <Zap size={20} />
+                                      </div>
+                                      <div>
+                                        <h4 className="text-base font-semibold text-pplx-text">Langflow Agent</h4>
+                                        <p className="text-xs text-pplx-muted mt-0.5">Agent local cu tool-uri</p>
+                                      </div>
+                                    </div>
+                                    {formData.langflowEnabled && (
+                                      <div className="w-6 h-6 rounded-full bg-pplx-text flex items-center justify-center">
+                                        <Check size={14} className="text-pplx-primary" strokeWidth={3} />
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {formData.langflowEnabled && (
+                                    <div className="mt-5 pt-5 border-t border-pplx-border/50 space-y-3 animate-fadeIn">
+
+                                      {/* URL */}
+                                      <div className="relative">
+                                        <Globe className="absolute left-4 top-4 text-pplx-muted opacity-50" size={16} />
+                                        <input
+                                          type="text"
+                                          value={formData.langflowUrl || 'http://localhost:7860'}
+                                          onChange={e => updateFormData({ langflowUrl: e.target.value })}
+                                          placeholder="http://localhost:7860"
+                                          className="w-full bg-pplx-input rounded-2xl pl-11 pr-4 py-3.5 text-sm text-pplx-text outline-none font-mono"
+                                        />
+                                      </div>
+
+                                      {/* Flow ID */}
+                                      <div className="relative">
+                                        <Activity className="absolute left-4 top-4 text-pplx-muted opacity-50" size={16} />
+                                        <input
+                                          type="text"
+                                          value={formData.langflowFlowId || ''}
+                                          onChange={e => updateFormData({ langflowFlowId: e.target.value })}
+                                          placeholder="Flow ID (ex: 276d06b9-...)"
+                                          className="w-full bg-pplx-input rounded-2xl pl-11 pr-4 py-3.5 text-sm text-pplx-text outline-none font-mono"
+                                        />
+                                      </div>
+
+                                      {/* API Key (opțional) */}
+                                      <div className="relative">
+                                        <Key className="absolute left-4 top-4 text-pplx-muted opacity-50" size={16} />
+                                        <input
+                                          type="password"
+                                          value={formData.langflowApiKey || ''}
+                                          onChange={e => updateFormData({ langflowApiKey: e.target.value })}
+                                          placeholder="API Key Langflow (opțional)"
+                                          className="w-full bg-pplx-input rounded-2xl pl-11 pr-4 py-3.5 text-sm text-pplx-text outline-none font-mono"
+                                        />
+                                      </div>
+
+                                      {/* Toggle sync OpenRouter */}
+                                      <div className="flex items-center justify-between px-1 py-2">
+                                        <div>
+                                          <p className="text-sm font-medium text-pplx-text">Sync OpenRouter</p>
+                                          <p className="text-xs text-pplx-muted mt-0.5">
+                                            Folosește același model selectat în Perplex
+                                          </p>
+                                        </div>
+                                        <button
+                                          onClick={() => updateFormData({ langflowSyncOpenRouter: !formData.langflowSyncOpenRouter })}
+                                          className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
+                                            formData.langflowSyncOpenRouter ? 'bg-pplx-accent' : 'bg-pplx-border'
+                                          }`}
+                                        >
+                                          <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                                            formData.langflowSyncOpenRouter ? 'translate-x-5' : 'translate-x-0'
+                                          }`} />
+                                        </button>
+                                      </div>
+
+                                      {/* Info model curent dacă sync e activ */}
+                                      {formData.langflowSyncOpenRouter && formData.openRouterModelId && (
+                                        <div className="px-3 py-2 bg-pplx-secondary/50 rounded-xl">
+                                          <p className="text-xs text-pplx-muted">
+                                            Model activ:{' '}
+                                            <span className="font-mono text-pplx-accent">{formData.openRouterModelId}</span>
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                             </div>
                         )}
 

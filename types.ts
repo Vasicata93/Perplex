@@ -114,7 +114,8 @@ export enum ModelProvider {
   GEMINI = 'gemini',
   LOCAL = 'local', // Renamed from OLLAMA/LMSTUDIO to generic LOCAL
   OPENROUTER = 'openrouter', // Cloud generic
-  OPENAI = 'openai' // Cloud
+  OPENAI = 'openai', // Cloud
+  LANGFLOW = 'langflow'
 }
 
 export enum FocusMode {
@@ -175,6 +176,13 @@ export interface AppSettings {
   activeLocalModelId: string;
   e2bApiKey: string; // E2B API Key for code execution
 
+  // Langflow Configuration
+  langflowEnabled: boolean;       // toggle on/off
+  langflowUrl: string;            // default: http://localhost:7860
+  langflowFlowId: string;         // ID-ul flow-ului
+  langflowApiKey: string;         // API key Langflow (dacă e setat)
+  langflowSyncOpenRouter: boolean; // trimite automat OR key+model din Settings
+
   useSearch: boolean;
   defaultProMode: ProMode; // Default mode for the left button
   enableMemory: boolean; // Toggle for memory system
@@ -209,6 +217,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   localModels: [], // Starts empty, populated by downloads
   activeLocalModelId: '',
   e2bApiKey: '',
+
+  langflowEnabled: false,
+  langflowUrl: 'http://localhost:7860',
+  langflowFlowId: '276d06b9-d6f8-4ecd-832e-3a7cbeb12a62',
+  langflowApiKey: '',
+  langflowSyncOpenRouter: true,
+
   useSearch: true,
   defaultProMode: ProMode.STANDARD,
   enableMemory: true,

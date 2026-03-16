@@ -1086,6 +1086,24 @@ export const InputArea: React.FC<InputAreaProps> = ({
                                     ))}
                                 </>
                             )}
+
+                            {settings.langflowEnabled && (
+                              <button
+                                onClick={() => {
+                                  setSelectedModelId('langflow');
+                                  setShowModelMenu(false);
+                                }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-pplx-hover hover:text-pplx-text rounded-lg flex justify-between items-center group"
+                              >
+                                <span className="flex items-center gap-2">
+                                  <Zap size={12} className="text-pplx-accent" />
+                                  Langflow Agent
+                                </span>
+                                {selectedModelId === 'langflow' && (
+                                  <div className="w-2 h-2 rounded-full bg-pplx-accent" />
+                                )}
+                                </button>
+                            )}
                         </motion.div>
                     )}
                     </AnimatePresence>
