@@ -12,9 +12,7 @@ export const STORES = {
   BUFFER: 'memory_buffer', // New Short-Term RAM
   PROJECTS: 'projects',     // New Project State
   CALENDAR: 'calendar',     // New Calendar Store
-  EMBEDDINGS: 'embeddings',  // New Vector Store for RAG
-  MASTRA_THREADS: 'mastra_threads',
-  MASTRA_MESSAGES: 'mastra_messages'
+  EMBEDDINGS: 'embeddings'  // New Vector Store for RAG
 };
 
 export class DB {
@@ -68,39 +66,6 @@ export class DB {
       const tx = this.db!.transaction(storeName, 'readwrite');
       const store = tx.objectStore(storeName);
       const request = store.put(value, key);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  async getAll<T>(storeName: string): Promise<T[]> {
-    await this.init();
-    return new Promise((resolve, reject) => {
-      const tx = this.db!.transaction(storeName, 'readonly');
-      const store = tx.objectStore(storeName);
-      const request = store.getAll();
-      request.onsuccess = () => resolve(request.result || []);
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  async delete(storeName: string, key: string): Promise<void> {
-    await this.init();
-    return new Promise((resolve, reject) => {
-      const tx = this.db!.transaction(storeName, 'readwrite');
-      const store = tx.objectStore(storeName);
-      const request = store.delete(key);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  async clear(storeName: string): Promise<void> {
-    await this.init();
-    return new Promise((resolve, reject) => {
-      const tx = this.db!.transaction(storeName, 'readwrite');
-      const store = tx.objectStore(storeName);
-      const request = store.clear();
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });

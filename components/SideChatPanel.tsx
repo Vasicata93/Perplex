@@ -14,7 +14,7 @@ interface SideChatPanelProps {
   onClose: () => void;
   messages: Message[];
   isThinking: boolean;
-  onSendMessage: (text: string, focusModes: FocusMode[], attachments: Attachment[], isAgentMax?: boolean) => void;
+  onSendMessage: (text: string, focusModes: FocusMode[], attachments: Attachment[]) => void;
   onStopGeneration: () => void;
   onRegenerate: (messageId: string) => void;
   onEditMessage: (messageId: string, newContent: string) => void;
@@ -27,8 +27,6 @@ interface SideChatPanelProps {
   onNewChat?: () => void;
   mode?: 'sidebar' | 'floating';
   onModeChange?: (mode: 'sidebar' | 'floating') => void;
-  isAgentMax?: boolean;
-  setIsAgentMax?: (val: boolean) => void;
 }
 
 export const SideChatPanel: React.FC<SideChatPanelProps> = ({
@@ -48,9 +46,7 @@ export const SideChatPanel: React.FC<SideChatPanelProps> = ({
   activeNote,
   onNewChat,
   mode: propMode,
-  onModeChange,
-  isAgentMax,
-  setIsAgentMax
+  onModeChange
 }) => {
   const [width, setWidth] = useState(320);
   const [mobileHeight, setMobileHeight] = useState(50); // in vh
@@ -187,8 +183,6 @@ export const SideChatPanel: React.FC<SideChatPanelProps> = ({
         copiedId={copiedId}
         isSidePanel={true}
         activeNote={activeNote}
-        isAgentMax={isAgentMax}
-        setIsAgentMax={setIsAgentMax}
     />
   );
 

@@ -1,10 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import 'dotenv/config';
 import { createServer as createViteServer } from 'vite';
 import { handleExecute } from './routes/execute';
-import { handleAgentMax } from './routes/agentMax';
 
 async function startServer() {
     const app = express();
@@ -13,23 +11,12 @@ async function startServer() {
     app.use(cors());
     app.use(express.json({ limit: '1mb' }));
 
-    // Agent Max Route
-    app.post('/api/agent-max', handleAgentMax);
-
     // E2B Execution Route
     app.post('/api/execute', handleExecute);
 
     // Basic health check
     app.get('/api/health', (_req, res) => {
         res.json({ status: 'ok' });
-    });
-
-    // Diagnostic route to check if API_KEY is loaded
-    app.get('/api/test-env', (_req, res) => {
-        res.json({ 
-            hasApiKey: !!(process.env.API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY),
-            nodeEnv: process.env.NODE_ENV || 'development'
-        });
     });
 
     // Vite middleware for development
