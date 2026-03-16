@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Sandbox } from '@e2b/sdk';
+import { Sandbox } from '@e2b/code-interpreter';
 import { sessionManager } from '../sessions';
 
 export const handleExecute = async (req: Request, res: Response) => {
@@ -24,7 +24,7 @@ export const handleExecute = async (req: Request, res: Response) => {
         if (session_id) {
             sandbox = await sessionManager.getOrCreateSandbox(session_id, apiKey);
         } else {
-            // Create a standard sandbox (default template supports Python & Node)
+            // Create a standard sandbox
             sandbox = await Sandbox.create({ apiKey });
         }
 
@@ -71,6 +71,7 @@ export const handleExecute = async (req: Request, res: Response) => {
         console.error(`[E2B Error]`, error);
 
         const isTimeout = error.message?.toLowerCase().includes('timeout');
+        const isAuthError = error.message?.toLowerCase().includes('api key') || error.message?.toLowerCase().includes('unauthorized');
 
         return res.status(200).json({
             success: false,
@@ -79,7 +80,7 @@ export const handleExecute = async (req: Request, res: Response) => {
             exit_code: 1,
             execution_time: 0,
             sandbox_mode: 'e2b_cloud',
-            error_type: isTimeout ? 'timeout' : 'execution_error'
+            error_type: isAuthError ? 'api_key_invalid' : (isTimeout ? 'timeout' : 'execution_error')
         });
     }
 };

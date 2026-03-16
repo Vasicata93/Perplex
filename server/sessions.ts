@@ -1,4 +1,4 @@
-import { Sandbox } from '@e2b/sdk';
+import { Sandbox } from '@e2b/code-interpreter';
 
 class SessionManager {
     private sessions: Map<string, { sandbox: Sandbox, lastActive: number }> = new Map();

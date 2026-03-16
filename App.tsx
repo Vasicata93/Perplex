@@ -685,7 +685,7 @@ function App() {
       if (!text) return "";
       const prompt = `You are an AI editor. Task: ${instruction}\nOriginal Text: "${text}"\nReturn ONLY the modified text. Do not add quotes, explanations, or markdown fences unless requested.`;
       try {
-          const response = await llmService.generateResponse([], prompt, [], settings.modelProvider, settings.openRouterApiKey, settings.openRouterModelId, settings.openAiApiKey, settings.openAiModelId, settings.localModels.find(m => m.id === settings.activeLocalModelId), false, ProMode.STANDARD, false, settings.userProfile, settings.aiProfile, undefined, settings.tavilyApiKey, settings.geminiApiKey, settings.searchProvider, settings.braveApiKey);
+          const response = await llmService.generateResponse([], prompt, [], settings.modelProvider, settings.openRouterApiKey, settings.openRouterModelId, settings.openAiApiKey, settings.openAiModelId, settings.localModels.find(m => m.id === settings.activeLocalModelId), false, ProMode.STANDARD, false, settings.userProfile, settings.aiProfile, undefined, settings.tavilyApiKey, settings.geminiApiKey, settings.searchProvider, settings.braveApiKey, undefined, false, undefined);
           return response.text.trim();
       } catch (e) { console.error("AI Edit Failed", e); return text; }
   };
@@ -1184,7 +1184,9 @@ function App() {
             settings.aiProfile, customSystemInstructions, 
             settings.tavilyApiKey, settings.geminiApiKey, 
             settings.searchProvider, settings.braveApiKey,
-            onChunk
+            onChunk,
+            false,
+            threadId
         );
 
         if (response.pendingAction) {
@@ -1402,7 +1404,8 @@ function App() {
           settings.tavilyApiKey, settings.geminiApiKey, 
           settings.searchProvider, settings.braveApiKey,
           onChunk, // Pass the streaming callback
-          isAgentMode
+          isAgentMode,
+          threadId
       );
 
       if (isStoppedRef.current) return;

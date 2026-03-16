@@ -177,8 +177,11 @@ export class E2BService {
 
             console.log("[E2B] Connection test result:", data);
             return data?.success === true;
-        } catch (error) {
+        } catch (error: any) {
             console.error("[E2B] Connection test failed (Network/Server Error):", error);
+            if (error.message?.includes('Backend Error')) {
+                throw new Error("Backend server is not responding correctly. Check if Perplex server is running.");
+            }
             return false;
         }
     }

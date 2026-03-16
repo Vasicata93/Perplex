@@ -755,7 +755,8 @@ export class LLMService {
       searchProvider: 'tavily' | 'brave' = 'tavily',
       braveApiKey?: string,
       onChunk?: (text: string, reasoning?: string) => void,
-      useAgenticResearch: boolean = false
+      useAgenticResearch: boolean = false,
+      threadId?: string
   ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
       
       this.abortController = new AbortController();
@@ -774,7 +775,7 @@ export class LLMService {
       // If Agentic Research is disabled, bypass the planner and execute directly
       if (!useAgenticResearch) {
           if (onChunk) customOnChunk("", "⚡ Mod Chat Simplu (Fără etape)...\n");
-          const result = await this.runCoreGeneration(shortTermHistory, prompt, attachments, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel, useSearch, proMode, enableMemory, userProfile, aiProfile, spaceSystemInstruction, tavilyApiKey, geminiApiKey, searchProvider, braveApiKey, customOnChunk);
+          const result = await this.runCoreGeneration(shortTermHistory, prompt, attachments, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel, useSearch, proMode, enableMemory, userProfile, aiProfile, spaceSystemInstruction, tavilyApiKey, geminiApiKey, searchProvider, braveApiKey, customOnChunk, undefined, threadId);
           this.triggerMemoryConsolidation(prompt, result.text, enableMemory, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
           result.reasoning = accumulatedReasoning + (result.reasoning || "");
           return result;
@@ -833,7 +834,8 @@ export class LLMService {
           searchProvider, 
           braveApiKey, 
           customOnChunk, 
-          agentSystemPrompt
+          agentSystemPrompt,
+          threadId
       );
 
       this.triggerMemoryConsolidation(prompt, result.text, enableMemory, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
@@ -866,7 +868,8 @@ export class LLMService {
     searchProvider: 'tavily' | 'brave' = 'tavily',
     braveApiKey?: string,
     onChunk?: (text: string, reasoning?: string) => void,
-    systemInstructionOverride?: string
+    systemInstructionOverride?: string,
+    threadId?: string
   ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
     
     // Reset AbortController
@@ -969,7 +972,8 @@ export class LLMService {
             systemInstruction,
             geminiApiKey,
             onChunk,
-            virtualFiles.length > 0 // Enable readFiles tool
+            virtualFiles.length > 0, // Enable readFiles tool
+            threadId
         );
     } else {
         // Generic Providers (OpenAI, OpenRouter, Local)
@@ -1010,7 +1014,8 @@ export class LLMService {
             activeSearchKey,
             onChunk,
             virtualFiles.length > 0, // Enable readFiles tool
-            proMode
+            proMode,
+            threadId
         );
     }
 
@@ -1249,7 +1254,8 @@ export class LLMService {
     systemInstruction: string,
     customApiKey?: string,
     onChunk?: (text: string, reasoning?: string) => void,
-    useReadFiles: boolean = false
+    useReadFiles: boolean = false,
+    threadId?: string
   ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
     
     let clientToUse = this.ai;
@@ -1674,12 +1680,18 @@ export class LLMService {
                         const appSettings = await db.get<AppSettings>(STORES.SETTINGS, 'app_settings');
                         
                         try {
+                            if (!appSettings?.e2bApiKey) {
+                                toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Error: E2B API Key is not configured in Settings." } } });
+                                continue;
+                            }
+
                             const execResult = await E2BService.executeCode({
                                 code: code as string,
                                 language: language as 'python' | 'typescript',
                                 timeout: (timeout as number) || 30,
-                                packages: (packages as string[]) || []
-                            }, appSettings as AppSettings);
+                                packages: (packages as string[]) || [],
+                                session_id: threadId
+                            }, appSettings);
                             
                             const content = `Execution finished (Mode: ${execResult.sandbox_mode}).
 Success: ${execResult.success}
@@ -1742,7 +1754,8 @@ Error Type: ${execResult.error_type || 'None'}`;
     searchApiKey?: string,
     onChunk?: (text: string, reasoning?: string) => void,
     useReadFiles: boolean = false,
-    _proMode: ProMode = ProMode.STANDARD
+    _proMode: ProMode = ProMode.STANDARD,
+    threadId?: string
   ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
     
     // 1. Prepare Messages
@@ -2238,12 +2251,18 @@ Error Type: ${execResult.error_type || 'None'}`;
                         const appSettings = await db.get<AppSettings>(STORES.SETTINGS, 'app_settings');
                         
                         try {
+                            if (!appSettings?.e2bApiKey) {
+                                toolResultContent = "Error: E2B API Key is not configured in Settings.";
+                                continue;
+                            }
+
                             const execResult = await E2BService.executeCode({
                                 code: code,
                                 language: language,
                                 timeout: timeout || 30,
-                                packages: packages || []
-                            }, appSettings as AppSettings);
+                                packages: packages || [],
+                                session_id: threadId
+                            }, appSettings);
                             
                             toolResultContent = `Execution finished (Mode: ${execResult.sandbox_mode}).
 Success: ${execResult.success}
