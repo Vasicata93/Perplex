@@ -78,6 +78,7 @@ export interface Note {
   updatedAt: number;
 }
 
+
 // ENUM for Memory Categories
 export type MemoryCategory = 
   | 'AboutUser'
@@ -98,38 +99,6 @@ export type MemoryCategory =
   | 'Events'
   | 'Notes'
   | 'Another';
-
-export type MemoryType = 'fact' | 'goal' | 'skill' | 'project' | 'preference';
-
-export interface MemoryItem {
-  id: string;
-  content: string; // The fact/preference
-  category: MemoryCategory;
-  type: MemoryType;
-  confidence: number; // 0 to 1
-  tags: string[];
-  createdAt: number;
-  updatedAt: number;
-  
-  // New Metadata for Scoring
-  lastAccessedAt?: number;
-  usageCount?: number;
-  importance?: 1 | 2 | 3 | 4 | 5; 
-}
-
-// Structured Object for Memory Retrieval
-export interface MemoryContext {
-  core: MemoryItem[];      // Identity, Style, Preferences
-  working: string[];       // Active Projects, Buffer Summary
-  relevant: MemoryItem[];  // Facts filtered by Intent
-  intent: string;          // Detected Intent (e.g. "Coding", "Health")
-}
-
-export interface MemoryBufferItem {
-  role: 'user' | 'model' | 'tool';
-  content: string;
-  timestamp: number;
-}
 
 export interface Project {
   id: string;

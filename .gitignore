@@ -1,0 +1,35 @@
+# dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# production
+/dist
+/dev-dist
+/build
+
+# misc
+.DS_Store
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Capacitor/Cordova tags
+/platforms/
+/plugins/
+/www/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo

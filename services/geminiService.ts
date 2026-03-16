@@ -1174,7 +1174,6 @@ export class LLMService {
         if (jsonText) {
             try {
                 const updates = this.extractJson(jsonText);
-                // memoryManager.memoryConsolidation.runConsolidation(); // Not exactly the same, but we can skip this or implement a custom update logic if needed. For now, let's just use the new manager.
                 // The new memory system handles consolidation automatically based on message count.
                 // If we need to explicitly save new facts from the LLM response:
                 if (updates.new_facts && Array.isArray(updates.new_facts)) {
