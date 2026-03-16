@@ -485,7 +485,7 @@ export const WidgetBlock: React.FC<{
     content: string;
     metadata?: { title?: string };
     readOnly?: boolean;
-}> = ({ content, metadata, readOnly = false }) => {
+}> = ({ content, metadata }) => {
     const [height, setHeight] = React.useState(300);
     const containerRef = React.useRef<HTMLDivElement>(null);
 
