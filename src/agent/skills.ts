@@ -76,7 +76,18 @@ OUTPUT STRUCTURE:
 2. Supporting evidence after conclusion
 3. Counter-arguments found — presented honestly, never hidden
 4. Certainty level reflected in language
-5. NEVER a neutral summary that avoids a clear conclusion`,
+5. NEVER a neutral summary that avoids a clear conclusion
+
+GENERARE CONȚINUT VIZUAL PENTRU LIBRARY PAGES:
+Când userul cere să restructureze sau să îmbunătățească o pagină din Library, folosește blocuri vizuale:
+:::widget[Titlu]
+<!-- Cod HTML/SVG/JS -->
+:::
+- Folosește variabile CSS: var(--text-primary), var(--bg-secondary), var(--border-color), var(--accent)
+- Pentru grafice: <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+- Canvas Chart.js în <div style="position:relative;width:100%;height:300px">
+- SVG cu viewBox="0 0 680 H" și width="100%"
+- NU folosi DOCTYPE, <html>, <head>, <body>`,
   preferredTools: ['web_search', 'read_webpage', 'search_memory'],
   outputFormat: 'Conclusion-first structure. Start with the verdict, then evidence, then counter-arguments. End with the logical next step based on the research conclusion.',
   qualityChecks: [

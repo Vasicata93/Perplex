@@ -13,6 +13,20 @@ import { E2BService } from "./e2bService";
 import { AppSettings } from "../types";
 
 
+// --- Helper Functions ---
+function sanitizeContentForAgent(content: string): string {
+    return content.replace(
+        /\[WIDGET_START\]([\s\S]*?)\[WIDGET_END\]/g,
+        '[WIDGET: vizualizare interactivă]'
+    ).replace(
+        /:::widget(?:\[[^\]]*\])?\s*\n([\s\S]*?):::/g,
+        (_, code) => {
+            const titleMatch = code.match(/label['":\s]+['"]([^'"]+)['"]/);
+            return `[WIDGET: ${titleMatch ? 'grafic ' + titleMatch[1] : 'vizualizare interactivă'}]`;
+        }
+    );
+}
+
 // --- Tool Definitions ---
 
 const searchToolGeneric = {
@@ -1551,7 +1565,7 @@ export class LLMService {
                         let responseContent = "";
                         if (requestedFiles.length > 0) {
                             requestedFiles.forEach(f => {
-                                responseContent += `\n[File: ${f.name}]\n${f.content}\n`;
+                                responseContent += `\n[File: ${f.name}]\n${sanitizeContentForAgent(f.content || "")}\n`;
                             });
                         } else {
                             responseContent = "Error: Requested files not found in workspace.";
@@ -1572,7 +1586,7 @@ export class LLMService {
                                         foundCount += results.length;
                                         responseContent += `\n--- Results for "${query}" ---\n`;
                                         results.forEach((res, idx) => {
-                                            responseContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${res.chunk.content}\n`;
+                                            responseContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${sanitizeContentForAgent(res.chunk.content)}\n`;
                                         });
                                     }
                                 } catch (e) {
@@ -1604,6 +1618,7 @@ export class LLMService {
                                 });
                             });
                             foundCount += fallbackFound;
+                            responseContent = sanitizeContentForAgent(responseContent);
                         }
 
                         if (foundCount === 0) responseContent = `No matches found for any of the queries in workspace files.`;
@@ -1614,7 +1629,7 @@ export class LLMService {
                         
                         this.workspaceFiles.forEach(f => {
                             // Extract a semantic snippet (first 500 chars) and key terms
-                            const snippet = (f.content || "").substring(0, 500).replace(/\n/g, ' ');
+                            const snippet = sanitizeContentForAgent((f.content || "")).substring(0, 500).replace(/\n/g, ' ');
                             const sizeKb = Math.round((f.content?.length || 0) / 1024);
                             
                             // Simple heuristic for "topics" - could be improved with another LLM call but let's keep it local for now
@@ -1639,7 +1654,7 @@ export class LLMService {
                                 
                                 if (results.length > 0) {
                                     results.forEach((res, idx) => {
-                                        responseContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${res.chunk.content}\n`;
+                                        responseContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${sanitizeContentForAgent(res.chunk.content)}\n`;
                                     });
                                 } else {
                                     responseContent = "No semantically relevant information found.";
@@ -2127,7 +2142,7 @@ Error Type: ${execResult.error_type || 'None'}`;
                         
                         if (requestedFiles.length > 0) {
                             requestedFiles.forEach(f => {
-                                toolResultContent += `\n[File: ${f.name}]\n${f.content}\n`;
+                                toolResultContent += `\n[File: ${f.name}]\n${sanitizeContentForAgent(f.content || "")}\n`;
                             });
                         } else {
                             toolResultContent = "Error: Requested files not found in workspace.";
@@ -2148,7 +2163,7 @@ Error Type: ${execResult.error_type || 'None'}`;
                                         foundCount += results.length;
                                         toolResultContent += `\n--- Results for "${query}" ---\n`;
                                         results.forEach((res, idx) => {
-                                            toolResultContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${res.chunk.content}\n`;
+                                            toolResultContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${sanitizeContentForAgent(res.chunk.content)}\n`;
                                         });
                                     }
                                 } catch (e) {
@@ -2177,6 +2192,7 @@ Error Type: ${execResult.error_type || 'None'}`;
                                 });
                             });
                             foundCount += fallbackFound;
+                            toolResultContent = sanitizeContentForAgent(toolResultContent);
                         }
 
                         if (foundCount === 0) toolResultContent = `No matches found for any of the queries in workspace files.`;
@@ -2184,7 +2200,7 @@ Error Type: ${execResult.error_type || 'None'}`;
                     } else if (toolCall.function.name === 'get_workspace_map') {
                         toolResultContent = "WORKSPACE KNOWLEDGE BASE MAP:\n";
                         this.workspaceFiles.forEach(f => {
-                            const snippet = (f.content || "").substring(0, 500).replace(/\n/g, ' ');
+                            const snippet = sanitizeContentForAgent((f.content || "")).substring(0, 500).replace(/\n/g, ' ');
                             const sizeKb = Math.round((f.content?.length || 0) / 1024);
                             toolResultContent += `\n- FILE: ${f.name} (${sizeKb} KB)\n`;
                             toolResultContent += `  PREVIEW: ${snippet}...\n`;
@@ -2204,7 +2220,7 @@ Error Type: ${execResult.error_type || 'None'}`;
                                 const results = await RAGService.search(query, undefined, apiKeyToUse, 5, filenames);
                                 if (results.length > 0) {
                                     results.forEach((res, idx) => {
-                                        toolResultContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${res.chunk.content}\n`;
+                                        toolResultContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${sanitizeContentForAgent(res.chunk.content)}\n`;
                                     });
                                 } else {
                                     toolResultContent = "No semantically relevant information found.";
@@ -2478,7 +2494,17 @@ Error Type: ${execResult.error_type || 'None'}`;
 2. **EXECUTE:** Call necessary tools.
 3. **ANALYZE:** Critically evaluate the tool results. Are they relevant? Are they sufficient? If not, search again with a better query.
 4. **SYNTHESIZE:** Formulate a clear, comprehensive answer based *only* on the verified information.
-5. **CITE:** Support your claims with [1], [2] citations from the search results.`);
+5. **CITE:** Support your claims with [1], [2] citations from the search results.
+
+**LIBRARY CONTENT FORMAT:**
+Când generezi conținut pentru Library (save_to_library sau restructurare pagini), poți și TREBUIE să incluzi blocuri vizuale folosind sintaxa:
+:::widget[Titlu]
+<!-- HTML/SVG/JS pentru vizualizare -->
+:::
+Aceste blocuri sunt randate ca widget-uri interactive în Library.
+Folosește variabile CSS: var(--text-primary), var(--bg-secondary), var(--border-color), var(--accent).
+Nu folosi culori hardcodate. Nu folosi DOCTYPE/html/head/body în cod.
+`);
 
       // Explicit Citation Instruction for Generic Models
       parts.push("\nCITATION RULES: If you use the 'perform_search' tool, you must cite the results in your final answer. Use the format [1], [2], etc., corresponding to the order of the sources provided by the tool. Do NOT invent sources.");

@@ -36,7 +36,7 @@ import { EMOJI_LIST } from '../constants';
 import { 
     Block, BlockType, AutoResizeTextarea, 
     TableBlock, CalendarBlock, ChartBlock, TOCBlock, ButtonBlock, SyncedBlock, EquationBlock,
-    MentionPageBlock, MentionPersonBlock, NewPageBlock 
+    MentionPageBlock, MentionPersonBlock, NewPageBlock, WidgetBlock
 } from './BlockRenderers';
 
 interface NotesViewProps {
@@ -187,6 +187,7 @@ const AddBlockMenu = ({
                         <MobileBlockRow icon={BarChart} label="Chart" onClick={() => onSelectType('chart_bar_v')} />
                         <MobileBlockRow icon={ListOrdered} label="TOC" onClick={() => onSelectType('toc')} />
                         <MobileBlockRow icon={Layers} label="Synced Block" onClick={() => onSelectType('block_synced')} />
+                        <MobileBlockRow icon={Code} label="Widget" onClick={() => onSelectType('widget')} />
                         {onAddTag && <MobileBlockRow icon={Tag} label="Add Tag" onClick={onAddTag} />}
                         {onDeleteBlock && <MobileBlockRow icon={Trash2} label="Delete Block" onClick={onDeleteBlock} isDestructive />}
                     </div>
@@ -228,6 +229,7 @@ const AddBlockMenu = ({
             <button onClick={() => onSelectType('chart_line')} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-pplx-text hover:bg-pplx-hover rounded-lg text-left"><TrendingUp size={16} /> Line Chart</button>
             <button onClick={() => onSelectType('chart_donut')} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-pplx-text hover:bg-pplx-hover rounded-lg text-left"><PieChart size={16} /> Donut Chart</button>
             <button onClick={() => onSelectType('toc')} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-pplx-text hover:bg-pplx-hover rounded-lg text-left"><ListOrdered size={16} /> Table of Contents</button>
+            <button onClick={() => onSelectType('widget')} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-pplx-text hover:bg-pplx-hover rounded-lg text-left"><Code size={16} /> Widget / Diagramă</button>
             <button onClick={() => onSelectType('button')} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-pplx-text hover:bg-pplx-hover rounded-lg text-left"><MousePointerClick size={16} /> Button</button>
             <button onClick={() => onSelectType('block_synced')} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-pplx-text hover:bg-pplx-hover rounded-lg text-left"><Layers size={16} /> Blocks</button>
             <button onClick={() => onSelectType('equation')} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-pplx-text hover:bg-pplx-hover rounded-lg text-left"><Sigma size={16} /> Equation</button>
@@ -313,6 +315,7 @@ const renderBlockContent = (
         case 'mention_person': return <MentionPersonBlock content={block.content} onChange={onChange} readOnly={readOnly} />;
         case 'mention_page': return <MentionPageBlock content={block.content} metadata={block.metadata} notes={allNotes || []} onUpdate={updateBlockMetadata || (() => {})} onNavigate={onNavigatePage} readOnly={readOnly} />;
         case 'block_synced': return <SyncedBlock content={block.content} onChange={onChange} readOnly={readOnly} />;
+        case 'widget': return <WidgetBlock content={block.content} metadata={block.metadata} readOnly={readOnly} />;
         default: return <div className="my-1"><AutoResizeTextarea {...textProps} className="text-base text-pplx-text leading-relaxed" placeholder={(isFocused && !isPreviewMode) ? "Type '/' for commands" : ""} /></div>;
     }
 };
@@ -456,7 +459,40 @@ export const NotesView: React.FC<NotesViewProps> = ({ activeNoteId, notes, onSav
             if (activeNote.id !== lastNoteIdRef.current || activeNote.content !== lastSavedContentRef.current) {
                 
                 const lines = activeNote.content ? activeNote.content.split('\n') : [''];
-                const parsedBlocks: Block[] = lines.map(line => {
+                const parsedBlocks: Block[] = [];
+                for (let i = 0; i < lines.length; i++) {
+                    let line = lines[i];
+                    if (line.startsWith('[WIDGET_START]')) {
+                        let widgetContent = '';
+                        i++;
+                        while (i < lines.length && lines[i] !== '[WIDGET_END]') {
+                            widgetContent += lines[i] + '\n';
+                            i++;
+                        }
+                        parsedBlocks.push({
+                            id: uid(),
+                            type: 'widget',
+                            content: widgetContent.trim()
+                        });
+                        continue;
+                    }
+                    if (line.startsWith(':::widget')) {
+                        const titleMatch = line.match(/:::widget(?:\[([^\]]*)\])?/);
+                        const title = titleMatch?.[1] || '';
+                        let widgetContent = '';
+                        i++;
+                        while (i < lines.length && !lines[i].startsWith(':::')) {
+                            widgetContent += lines[i] + '\n';
+                            i++;
+                        }
+                        parsedBlocks.push({
+                            id: uid(),
+                            type: 'widget',
+                            content: widgetContent.trim(),
+                            metadata: { title }
+                        });
+                        continue;
+                    }
                     let type: BlockType = 'text';
                     let content = line;
                     let checked = false;
@@ -487,8 +523,8 @@ export const NotesView: React.FC<NotesViewProps> = ({ activeNoteId, notes, onSav
                     else if (line.startsWith('[MENTION_P]')) { type = 'mention_person'; content = line.replace('[MENTION_P]', ''); }
                     else if (line.startsWith('[MENTION_D]')) { type = 'mention_page'; const complexMatch = line.match(/\[MENTION_D:(.*?)\](.*)/); if (complexMatch) { metadata = { pageId: complexMatch[1] }; content = complexMatch[2]; } else { content = line.replace('[MENTION_D]', ''); } }
                     
-                    return { id: uid(), type, content, checked, metadata };
-                });
+                    parsedBlocks.push({ id: uid(), type, content, checked, metadata });
+                }
                 
                 if (parsedBlocks.length === 0) parsedBlocks.push({ id: uid(), type: 'text', content: '' });
                 
@@ -529,6 +565,7 @@ export const NotesView: React.FC<NotesViewProps> = ({ activeNoteId, notes, onSav
                 case 'equation': return `[EQUATION]${b.content}`;
                 case 'block_synced': return `[SYNC]${b.content}`;
                 case 'mention_person': return `[MENTION_P]${b.content}`;
+                case 'widget': return `[WIDGET_START]\n${b.content}\n[WIDGET_END]`;
                 case 'mention_page': if (b.metadata?.pageId) return `[MENTION_D:${b.metadata.pageId}]${b.content}`; return `[MENTION_D]${b.content}`;
                 default: return b.content;
             }

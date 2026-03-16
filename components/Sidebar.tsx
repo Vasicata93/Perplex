@@ -187,7 +187,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     md:static md:shadow-none md:translate-x-0
     ${isOpen ? 'translate-x-0' : '-translate-x-full'}
     ${isOpen ? '' : 'md:border-r-0 md:overflow-hidden'}
-    flex flex-col relative
+    flex flex-col md:relative
     ${!isResizing && isMobile ? 'transition-all duration-150 ease-out' : ''}
     ${!isResizing && !isMobile && !isOpen ? 'transition-all duration-150 ease-out' : ''}
   `;
