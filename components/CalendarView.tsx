@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  ChevronLeft, ChevronRight, Calendar as CalendarIcon, 
+import {
+  ChevronLeft, ChevronRight, Calendar as CalendarIcon,
   Clock, MapPin, Plus, X, Trash2, Search, ChevronDown, PanelLeft,
   Sun, CloudRain, CloudSnow, CloudLightning, CloudSun, CloudFog, Info,
   Wind, Navigation
@@ -55,7 +55,7 @@ const WeatherWidget = ({ selectedDate }: { selectedDate: Date }) => {
     try {
       const isTargetToday = isSameDay(targetDate || new Date(), new Date());
       let url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`;
-      
+
       if (!isTargetToday && targetDate) {
         const dateStr = targetDate.toISOString().split('T')[0];
         url += `&daily=weathercode,temperature_2m_max&start_date=${dateStr}&end_date=${dateStr}&timezone=auto`;
@@ -65,7 +65,7 @@ const WeatherWidget = ({ selectedDate }: { selectedDate: Date }) => {
 
       const res = await fetch(url);
       const data = await res.json();
-      
+
       if (!isTargetToday && data.daily) {
         setWeather({
           temp: Math.round(data.daily.temperature_2m_max[0]),
@@ -120,11 +120,11 @@ const WeatherWidget = ({ selectedDate }: { selectedDate: Date }) => {
   }, [location.lat, location.lon, selectedDate]);
 
   const getWeatherIcon = (code: number, size = 20) => {
-    const iconProps = { 
-      size, 
-      className: "transition-all duration-700" 
+    const iconProps = {
+      size,
+      className: "transition-all duration-700"
     };
-    
+
     if (code === 0) return <Sun {...iconProps} className="text-yellow-600 dark:text-yellow-400" />;
     if (code <= 3) return (
       <div className="relative">
@@ -144,17 +144,17 @@ const WeatherWidget = ({ selectedDate }: { selectedDate: Date }) => {
 
   if (!weather) return (
     <div className="flex items-center gap-6 px-4 py-2 animate-pulse opacity-50">
-        <div className="flex flex-col gap-1">
-            <div className="w-12 h-8 bg-white/10 rounded" />
-            <div className="w-10 h-2 bg-white/10 rounded" />
-        </div>
-        <div className="ml-auto w-10 h-10 bg-white/10 rounded-full" />
+      <div className="flex flex-col gap-1">
+        <div className="w-12 h-8 bg-white/10 rounded" />
+        <div className="w-10 h-2 bg-white/10 rounded" />
+      </div>
+      <div className="ml-auto w-10 h-10 bg-white/10 rounded-full" />
     </div>
   );
 
   return (
     <div className="relative">
-      <div 
+      <div
         onClick={() => setIsMenuOpen(!isMenuOpen)}
         className="flex items-center gap-4 px-2 py-0.5 transition-all cursor-pointer group"
       >
@@ -190,9 +190,9 @@ const WeatherWidget = ({ selectedDate }: { selectedDate: Date }) => {
           <div className="absolute top-full left-0 mt-3 w-60 bg-pplx-card border border-pplx-border rounded-[20px] shadow-2xl z-[121] overflow-hidden animate-in fade-in zoom-in-95 duration-300">
             <div className="p-3 border-b border-pplx-border bg-pplx-primary/50 space-y-3">
               <div className="text-[9px] font-black text-pplx-muted uppercase tracking-[0.2em]">Locație</div>
-              
+
               <form onSubmit={handleManualSearch} className="relative">
-                <input 
+                <input
                   type="text"
                   value={searchCity}
                   onChange={(e) => setSearchCity(e.target.value)}
@@ -228,7 +228,7 @@ const WeatherWidget = ({ selectedDate }: { selectedDate: Date }) => {
                 </div>
               )}
 
-              <button 
+              <button
                 onClick={() => {
                   navigator.geolocation.getCurrentPosition((pos) => {
                     fetchWeather(pos.coords.latitude, pos.coords.longitude, 'Locația Ta', selectedDate);
@@ -294,7 +294,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   useEffect(() => {
     setHolidays(getHolidays(currentDate.getFullYear()));
   }, [currentDate.getFullYear()]);
-  
+
   // New Event State
   const [newEventData, setNewEventData] = useState<Partial<CalendarEvent>>({
     title: '',
@@ -350,7 +350,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     const start = initialDate ? new Date(initialDate) : new Date();
     if (!initialDate) start.setHours(9, 0, 0, 0);
     else start.setHours(9, 0, 0, 0); // Ensure consistent start time if just a date is passed
-    
+
     const end = new Date(start);
     end.setHours(start.getHours() + 1);
 
@@ -396,111 +396,111 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   // --- Filtering ---
   const filteredEvents = useMemo(() => {
-      if (!searchQuery) return events;
-      return events.filter(e => 
-          e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          e.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          e.location?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+    if (!searchQuery) return events;
+    return events.filter(e =>
+      e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      e.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      e.location?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
   }, [events, searchQuery]);
 
   // --- Renderers ---
 
   const renderMiniCalendar = () => {
-      const { days, firstDay } = getDaysInMonth(currentDate);
-      const blanks = Array(firstDay).fill(null);
-      const dayNumbers = Array.from({ length: days }, (_, i) => i + 1);
+    const { days, firstDay } = getDaysInMonth(currentDate);
+    const blanks = Array(firstDay).fill(null);
+    const dayNumbers = Array.from({ length: days }, (_, i) => i + 1);
 
-      return (
-          <div className="p-4 bg-pplx-card border border-pplx-border rounded-2xl shadow-xl">
-              <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm font-bold text-pplx-text">
-                      {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
-                  </span>
-                  <div className="flex gap-1">
-                      <button onClick={() => {
-                          const d = new Date(currentDate);
-                          d.setMonth(d.getMonth() - 1);
-                          setCurrentDate(d);
-                      }} className="p-1.5 hover:bg-pplx-hover rounded-lg text-pplx-muted hover:text-pplx-text transition-all">
-                          <ChevronLeft size={14} />
-                      </button>
-                      <button onClick={() => {
-                          const d = new Date(currentDate);
-                          d.setMonth(d.getMonth() + 1);
-                          setCurrentDate(d);
-                      }} className="p-1.5 hover:bg-pplx-hover rounded-lg text-pplx-muted hover:text-pplx-text transition-all">
-                          <ChevronRight size={14} />
-                      </button>
-                  </div>
-              </div>
-              <div className="grid grid-cols-7 gap-1 text-center mb-2">
-                  {DAYS.map(d => <div key={d} className="text-[10px] text-pplx-muted font-bold uppercase tracking-tighter">{d.charAt(0)}</div>)}
-              </div>
-              <div className="grid grid-cols-7 gap-1 text-center">
-                  {[...blanks, ...dayNumbers].map((day, idx) => {
-                      if (!day) return <div key={`mini-blank-${idx}`} />;
-                      const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-                      const isToday = isSameDay(date, new Date());
-                      const isSelected = isSameDay(date, currentDate);
-                      const hasEvents = events.some(e => isSameDay(new Date(e.startDate), date));
-                      
-                      return (
-                          <button 
-                              key={day}
-                              onClick={() => setCurrentDate(date)}
-                              className={`
+    return (
+      <div className="p-4 bg-pplx-card border border-pplx-border rounded-2xl shadow-xl">
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-sm font-bold text-pplx-text">
+            {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
+          </span>
+          <div className="flex gap-1">
+            <button onClick={() => {
+              const d = new Date(currentDate);
+              d.setMonth(d.getMonth() - 1);
+              setCurrentDate(d);
+            }} className="p-1.5 hover:bg-pplx-hover rounded-lg text-pplx-muted hover:text-pplx-text transition-all">
+              <ChevronLeft size={14} />
+            </button>
+            <button onClick={() => {
+              const d = new Date(currentDate);
+              d.setMonth(d.getMonth() + 1);
+              setCurrentDate(d);
+            }} className="p-1.5 hover:bg-pplx-hover rounded-lg text-pplx-muted hover:text-pplx-text transition-all">
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center mb-2">
+          {DAYS.map(d => <div key={d} className="text-[10px] text-pplx-muted font-bold uppercase tracking-tighter">{d.charAt(0)}</div>)}
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center">
+          {[...blanks, ...dayNumbers].map((day, idx) => {
+            if (!day) return <div key={`mini-blank-${idx}`} />;
+            const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+            const isToday = isSameDay(date, new Date());
+            const isSelected = isSameDay(date, currentDate);
+            const hasEvents = events.some(e => isSameDay(new Date(e.startDate), date));
+
+            return (
+              <button
+                key={day}
+                onClick={() => setCurrentDate(date)}
+                className={`
                                   w-7 h-7 mx-auto flex items-center justify-center rounded-full text-[11px] transition-all
                                   ${isSelected ? 'bg-pplx-accent text-white font-bold shadow-lg shadow-pplx-accent/20' : isToday ? 'bg-pplx-accent/10 text-pplx-accent font-bold' : 'text-pplx-muted hover:bg-pplx-hover'}
                               `}
-                          >
-                              {day}
-                              {hasEvents && !isSelected && <div className="absolute bottom-1 w-1 h-1 bg-blue-500 rounded-full" />}
-                          </button>
-                      );
-                  })}
-              </div>
-          </div>
-      );
+              >
+                {day}
+                {hasEvents && !isSelected && <div className="absolute bottom-1 w-1 h-1 bg-blue-500 rounded-full" />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   const renderUpcomingEvents = () => {
-      const upcoming = events
-          .filter(e => new Date(e.startDate) >= new Date())
-          .sort((a, b) => a.startDate - b.startDate)
-          .slice(0, 5);
+    const upcoming = events
+      .filter(e => new Date(e.startDate) >= new Date())
+      .sort((a, b) => a.startDate - b.startDate)
+      .slice(0, 5);
 
-      return (
-          <div className="flex flex-col gap-4 mt-2">
-              <h3 className="text-[10px] font-bold text-pplx-muted uppercase tracking-[0.2em] px-2">Upcoming</h3>
-              {upcoming.length === 0 ? (
-                  <div className="text-xs text-pplx-muted italic px-2">No events scheduled</div>
-              ) : (
-                  upcoming.map(event => (
-                      <div 
-                          key={event.id}
-                          onClick={() => handleEventClick(event)}
-                          className="flex gap-4 items-center p-3 hover:bg-pplx-hover rounded-2xl cursor-pointer transition-all group border border-transparent hover:border-pplx-border"
-                      >
-                          <div className={`w-1 h-10 rounded-full shrink-0 ${event.color || 'bg-blue-600'} shadow-[0_0_10px_rgba(59,130,246,0.2)]`} />
-                          <div className="flex-1 min-w-0">
-                              <div className="text-sm font-bold text-pplx-text truncate group-hover:text-pplx-accent transition-colors">{event.title}</div>
-                              <div className="text-[11px] text-pplx-muted font-medium mt-0.5">
-                                  {new Date(event.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} • {new Date(event.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </div>
-                          </div>
-                      </div>
-                  ))
-              )}
-          </div>
-      );
+    return (
+      <div className="flex flex-col gap-4 mt-2">
+        <h3 className="text-[10px] font-bold text-pplx-muted uppercase tracking-[0.2em] px-2">Upcoming</h3>
+        {upcoming.length === 0 ? (
+          <div className="text-xs text-pplx-muted italic px-2">No events scheduled</div>
+        ) : (
+          upcoming.map(event => (
+            <div
+              key={event.id}
+              onClick={() => handleEventClick(event)}
+              className="flex gap-4 items-center p-3 hover:bg-pplx-hover rounded-2xl cursor-pointer transition-all group border border-transparent hover:border-pplx-border"
+            >
+              <div className={`w-1 h-10 rounded-full shrink-0 ${event.color || 'bg-blue-600'} shadow-[0_0_10px_rgba(59,130,246,0.2)]`} />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold text-pplx-text truncate group-hover:text-pplx-accent transition-colors">{event.title}</div>
+                <div className="text-[11px] text-pplx-muted font-medium mt-0.5">
+                  {new Date(event.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} • {new Date(event.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    );
   };
 
   const renderMonthView = () => {
     const { days, firstDay } = getDaysInMonth(currentDate);
     const blanks = Array(firstDay).fill(null);
     const dayNumbers = Array.from({ length: days }, (_, i) => i + 1);
-    
+
     return (
       <div className="grid grid-cols-7 gap-px bg-pplx-border h-full border-x border-b border-pplx-border rounded-b-3xl md:rounded-2xl overflow-hidden shadow-2xl md:bg-pplx-border md:border">
         {/* Headers */}
@@ -509,11 +509,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             {day}
           </div>
         ))}
-        
+
         {/* Days */}
         {[...blanks, ...dayNumbers].map((day, idx) => {
           if (!day) return <div key={`blank-${idx}`} className="bg-pplx-primary min-h-[40px] md:min-h-[80px]" />;
-          
+
           const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
           const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
           const isToday = isSameDay(date, new Date());
@@ -522,8 +522,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           const hasPublicHoliday = dayHolidays.some(h => h.isPublic);
 
           return (
-            <div 
-              key={day} 
+            <div
+              key={day}
               className={`bg-pplx-primary p-1.5 min-h-[40px] md:min-h-[80px] hover:bg-pplx-hover transition-colors cursor-pointer group relative flex flex-col gap-1 border-r border-b border-pplx-border last:border-r-0 ${hasPublicHoliday ? 'bg-red-500/5' : ''}`}
               onClick={() => {
                 setCurrentDate(date);
@@ -545,9 +545,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     {day}
                   </span>
                   {dayHolidays.slice(0, 2).map((h, hIdx) => (
-                    <span 
+                    <span
                       key={hIdx}
-                      className={`text-[8px] font-bold mt-0.5 text-center leading-tight truncate cursor-help hover:scale-110 transition-transform ${h.isPublic ? 'text-red-500' : 'text-emerald-500'}`} 
+                      className={`text-[8px] font-bold mt-0.5 text-center leading-tight truncate cursor-help hover:scale-110 transition-transform ${h.isPublic ? 'text-red-500' : 'text-emerald-500'}`}
                       title={`${h.name} (${h.country})`}
                       onClick={(e) => { e.stopPropagation(); handleHolidayClick(h); }}
                     >
@@ -555,7 +555,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     </span>
                   ))}
                 </div>
-                <button 
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleCreateClick(date);
@@ -565,11 +565,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   <Plus size={16} />
                 </button>
               </div>
-              
+
               {/* Events List */}
               <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-0.5">
                 {dayEvents.map(event => (
-                  <div 
+                  <div
                     key={event.id}
                     onClick={(e) => { e.stopPropagation(); handleEventClick(event); }}
                     className={`text-[8px] md:text-[9px] px-1 md:px-1 py-0.5 rounded-md truncate font-bold ${event.color || 'bg-blue-600'} text-white shadow-sm hover:brightness-110 hover:shadow-md transition-all border border-white/5`}
@@ -596,18 +596,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         <div className="grid grid-cols-8 border-b border-pplx-border">
           <div className="p-2 border-r border-pplx-border bg-pplx-secondary"></div>
           {weekDays.map((day, i) => {
-             const isToday = isSameDay(day, new Date());
-             const dateStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
-             const dayHolidays = holidays.filter(h => h.date === dateStr);
-             const hasPublicHoliday = dayHolidays.some(h => h.isPublic);
-             return (
+            const isToday = isSameDay(day, new Date());
+            const dateStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+            const dayHolidays = holidays.filter(h => h.date === dateStr);
+            const hasPublicHoliday = dayHolidays.some(h => h.isPublic);
+            return (
               <div key={i} className={`p-3 text-center border-r border-pplx-border last:border-r-0 ${isToday ? 'bg-pplx-accent/10' : hasPublicHoliday ? 'bg-red-500/5' : ''}`}>
                 <div className={`text-[10px] uppercase font-bold tracking-wider mb-1 ${hasPublicHoliday ? 'text-red-400' : 'text-pplx-muted'}`}>{DAYS[day.getDay()]}</div>
                 <div className={`text-lg font-light ${isToday ? 'text-pplx-accent font-bold' : hasPublicHoliday ? 'text-red-400' : 'text-pplx-text'}`}>{day.getDate()}</div>
                 {dayHolidays.map((h, hIdx) => (
-                  <div 
+                  <div
                     key={hIdx}
-                    className={`text-[8px] font-bold truncate mt-1 cursor-help hover:text-pplx-text transition-colors ${h.isPublic ? 'text-red-500' : 'text-emerald-500'}`} 
+                    className={`text-[8px] font-bold truncate mt-1 cursor-help hover:text-pplx-text transition-colors ${h.isPublic ? 'text-red-500' : 'text-emerald-500'}`}
                     title={h.name}
                     onClick={(e) => { e.stopPropagation(); handleHolidayClick(h); }}
                   >
@@ -615,10 +615,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   </div>
                 ))}
               </div>
-             );
+            );
           })}
         </div>
-        
+
         {/* Grid */}
         <div className="flex-1 overflow-y-auto no-scrollbar relative">
           <div className="grid grid-cols-8 min-h-[1000px] bg-pplx-primary">
@@ -630,23 +630,23 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 </div>
               ))}
             </div>
-            
+
             {/* Days Columns */}
             {weekDays.map((day, dayIdx) => (
               <div key={dayIdx} className="border-r border-pplx-border last:border-r-0 relative group">
                 {/* Grid Lines */}
                 {hours.map(hour => (
-                   <div 
-                      key={hour} 
-                      className="h-14 border-b border-pplx-border hover:bg-pplx-hover transition-colors cursor-pointer"
-                      onClick={() => {
-                          const newDate = new Date(day);
-                          newDate.setHours(hour, 0, 0, 0);
-                          handleCreateClick(newDate);
-                      }}
-                   />
+                  <div
+                    key={hour}
+                    className="h-14 border-b border-pplx-border hover:bg-pplx-hover transition-colors cursor-pointer"
+                    onClick={() => {
+                      const newDate = new Date(day);
+                      newDate.setHours(hour, 0, 0, 0);
+                      handleCreateClick(newDate);
+                    }}
+                  />
                 ))}
-                
+
                 {/* Events */}
                 {filteredEvents
                   .filter(e => isSameDay(new Date(e.startDate), day))
@@ -655,7 +655,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     const end = new Date(event.endDate);
                     const startHour = start.getHours() + start.getMinutes() / 60;
                     const duration = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-                    
+
                     return (
                       <div
                         key={event.id}
@@ -668,7 +668,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       >
                         <div className="font-bold truncate leading-tight">{event.title}</div>
                         <div className="text-[9px] opacity-80 truncate mt-0.5">
-                            {start.toLocaleTimeString([], {hour: 'numeric', minute:'2-digit'})} - {end.toLocaleTimeString([], {hour: 'numeric', minute:'2-digit'})}
+                          {start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - {end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                         </div>
                       </div>
                     );
@@ -696,9 +696,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           <div className={`text-xs uppercase font-bold tracking-widest mb-1 ${hasPublicHoliday ? 'text-red-400' : 'text-pplx-muted'}`}>{DAYS[day.getDay()]}</div>
           <div className={`text-3xl font-light ${isToday ? 'text-pplx-accent font-bold' : hasPublicHoliday ? 'text-red-400' : 'text-pplx-text'}`}>{day.getDate()} {MONTHS[day.getMonth()]}</div>
           {dayHolidays.map((h, hIdx) => (
-            <div 
+            <div
               key={hIdx}
-              className={`text-xs font-bold mt-2 cursor-help hover:text-pplx-text transition-colors ${h.isPublic ? 'text-red-500' : 'text-emerald-500'}`} 
+              className={`text-xs font-bold mt-2 cursor-help hover:text-pplx-text transition-colors ${h.isPublic ? 'text-red-500' : 'text-emerald-500'}`}
               title={h.name}
               onClick={(e) => { e.stopPropagation(); handleHolidayClick(h); }}
             >
@@ -706,7 +706,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             </div>
           ))}
         </div>
-        
+
         {/* Grid */}
         <div className="flex-1 overflow-y-auto no-scrollbar relative">
           <div className="grid grid-cols-[80px_1fr] min-h-[1000px] bg-pplx-primary">
@@ -718,22 +718,22 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 </div>
               ))}
             </div>
-            
+
             {/* Day Column */}
             <div className="relative group">
               {/* Grid Lines */}
               {hours.map(hour => (
-                 <div 
-                    key={hour} 
-                    className="h-20 border-b border-pplx-border hover:bg-pplx-hover transition-colors cursor-pointer"
-                    onClick={() => {
-                        const newDate = new Date(day);
-                        newDate.setHours(hour, 0, 0, 0);
-                        handleCreateClick(newDate);
-                    }}
-                 />
+                <div
+                  key={hour}
+                  className="h-20 border-b border-pplx-border hover:bg-pplx-hover transition-colors cursor-pointer"
+                  onClick={() => {
+                    const newDate = new Date(day);
+                    newDate.setHours(hour, 0, 0, 0);
+                    handleCreateClick(newDate);
+                  }}
+                />
               ))}
-              
+
               {/* Events */}
               {filteredEvents
                 .filter(e => isSameDay(new Date(e.startDate), day))
@@ -742,7 +742,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   const end = new Date(event.endDate);
                   const startHour = start.getHours() + start.getMinutes() / 60;
                   const duration = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-                  
+
                   return (
                     <div
                       key={event.id}
@@ -755,7 +755,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     >
                       <div className="font-bold truncate text-base">{event.title}</div>
                       <div className="text-xs opacity-80 truncate">
-                          {start.toLocaleTimeString([], {hour: 'numeric', minute:'2-digit'})} - {end.toLocaleTimeString([], {hour: 'numeric', minute:'2-digit'})}
+                        {start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - {end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                       </div>
                       {event.location && (
                         <div className="text-[10px] flex items-center gap-1 opacity-70">
@@ -773,96 +773,96 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   };
 
   const renderAgendaView = () => {
-      const sortedEvents = [...filteredEvents].sort((a, b) => a.startDate - b.startDate);
-      const upcomingEvents = sortedEvents.filter(e => new Date(e.startDate) >= new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate()));
-      
-      // Combine events and holidays for agenda
-      const agendaItems = [
-        ...upcomingEvents.map(e => ({ type: 'event' as const, date: e.startDate, data: e })),
-        ...holidays
-          .filter(h => new Date(h.date) >= new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate()))
-          .map(h => ({ type: 'holiday' as const, date: h.date, data: h }))
-      ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sortedEvents = [...filteredEvents].sort((a, b) => a.startDate - b.startDate);
+    const upcomingEvents = sortedEvents.filter(e => new Date(e.startDate) >= new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate()));
 
-      return (
-          <div className="h-full overflow-y-auto no-scrollbar bg-pplx-card border border-pplx-border rounded-2xl p-4 md:p-6 space-y-4 shadow-2xl">
-              {agendaItems.length === 0 && (
-                  <div className="text-center text-pplx-muted py-20 flex flex-col items-center">
-                      <CalendarIcon size={48} className="mb-4 opacity-10" />
-                      <p className="text-sm font-medium">No upcoming events or holidays found</p>
-                  </div>
-              )}
-              {agendaItems.map((item) => {
-                  const date = new Date(item.date);
-                  
-                  if (item.type === 'event') {
-                    const event = item.data as CalendarEvent;
-                    return (
-                      <div 
-                        key={`event-${event.id}`} 
-                        onClick={() => handleEventClick(event)}
-                        className="flex items-start gap-4 md:gap-6 p-4 md:p-5 rounded-2xl border border-pplx-border hover:bg-pplx-hover hover:border-pplx-accent/30 hover:shadow-xl transition-all cursor-pointer group bg-pplx-primary/50"
-                      >
-                          <div className="flex flex-col items-center min-w-[60px] md:min-w-[70px] bg-pplx-card border border-pplx-border rounded-xl p-2 shadow-lg">
-                              <span className="text-[10px] font-bold text-pplx-muted uppercase tracking-wider">{date.toLocaleDateString('en-US', { month: 'short' })}</span>
-                              <span className="text-2xl md:text-3xl font-light text-pplx-text my-1">{date.getDate()}</span>
-                              <span className="text-[10px] text-pplx-muted font-medium">{date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
-                          </div>
-                          <div className={`w-1 self-stretch rounded-full ${event.color || 'bg-pplx-accent'} opacity-80 group-hover:opacity-100 transition-opacity shadow-[0_0_10px_rgba(59,130,246,0.2)]`} />
-                          <div className="flex-1 pt-1">
-                              <h3 className="font-serif text-lg md:text-xl font-bold text-pplx-text group-hover:text-pplx-accent transition-colors">{event.title}</h3>
-                              <div className="flex flex-wrap items-center gap-3 mt-2 text-[11px] md:text-xs text-pplx-muted">
-                                  <span className="flex items-center gap-1.5 bg-pplx-secondary px-2 py-1 rounded-lg">
-                                      <Clock size={12} />
-                                      {event.allDay ? 'All Day' : `${new Date(event.startDate).toLocaleTimeString([], {hour: 'numeric', minute:'2-digit'})} - ${new Date(event.endDate).toLocaleTimeString([], {hour: 'numeric', minute:'2-digit'})}`}
-                                  </span>
-                                  {event.location && (
-                                      <span className="flex items-center gap-1.5 bg-pplx-secondary px-2 py-1 rounded-lg">
-                                          <MapPin size={12} /> {event.location}
-                                      </span>
-                                  )}
-                              </div>
-                              {event.description && (
-                                  <p className="mt-3 text-xs md:text-sm text-pplx-muted leading-relaxed line-clamp-2">{event.description}</p>
-                              )}
-                          </div>
-                      </div>
-                    );
-                  } else {
-                    const holiday = item.data as Holiday;
-                    return (
-                      <div 
-                        key={`holiday-${holiday.date}-${holiday.name}`}
-                        onClick={() => handleHolidayClick(holiday)}
-                        className={`flex items-start gap-4 md:gap-6 p-4 md:p-5 rounded-2xl border transition-all group cursor-pointer hover:bg-pplx-hover ${holiday.isPublic ? 'bg-red-500/5 border-red-500/10' : 'bg-emerald-500/5 border-emerald-500/10'}`}
-                      >
-                          <div className={`flex flex-col items-center min-w-[60px] md:min-w-[70px] border rounded-xl p-2 shadow-lg ${holiday.isPublic ? 'bg-red-500/10 border-red-500/20' : 'bg-emerald-500/10 border-emerald-500/20'}`}>
-                              <span className={`text-[10px] font-bold uppercase tracking-wider ${holiday.isPublic ? 'text-red-400' : 'text-emerald-400'}`}>{date.toLocaleDateString('en-US', { month: 'short' })}</span>
-                              <span className={`text-2xl md:text-3xl font-light my-1 ${holiday.isPublic ? 'text-red-200' : 'text-emerald-200'}`}>{date.getDate()}</span>
-                              <span className={`text-[10px] font-medium ${holiday.isPublic ? 'text-red-400' : 'text-emerald-400'}`}>{date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
-                          </div>
-                          <div className={`w-1 self-stretch rounded-full ${holiday.isPublic ? 'bg-red-500' : 'bg-emerald-500'} opacity-80 shadow-[0_0_10px_rgba(239,68,68,0.2)]`} />
-                          <div className="flex-1 pt-1">
-                              <div className="flex items-center gap-2">
-                                <h3 className={`font-serif text-lg md:text-xl font-bold ${holiday.isPublic ? 'text-red-400' : 'text-emerald-400'}`}>{holiday.name}</h3>
-                                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-pplx-secondary text-pplx-muted uppercase tracking-tighter">
-                                  {holiday.country === 'BOTH' ? 'RO & DE' : holiday.country}
-                                </span>
-                              </div>
-                              <div className="flex flex-wrap items-center gap-3 mt-2 text-[11px] md:text-xs text-pplx-muted">
-                                  <span className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${holiday.isPublic ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
-                                      <CalendarIcon size={12} />
-                                      {holiday.isPublic ? 'Zi Nelucrătoare' : 'Sărbătoare'}
-                                  </span>
-                                  <span className="text-pplx-muted italic">System Event</span>
-                              </div>
-                          </div>
-                      </div>
-                    );
-                  }
-              })}
+    // Combine events and holidays for agenda
+    const agendaItems = [
+      ...upcomingEvents.map(e => ({ type: 'event' as const, date: e.startDate, data: e })),
+      ...holidays
+        .filter(h => new Date(h.date) >= new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate()))
+        .map(h => ({ type: 'holiday' as const, date: h.date, data: h }))
+    ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    return (
+      <div className="h-full overflow-y-auto no-scrollbar bg-pplx-card border border-pplx-border rounded-2xl p-4 md:p-6 space-y-4 shadow-2xl">
+        {agendaItems.length === 0 && (
+          <div className="text-center text-pplx-muted py-20 flex flex-col items-center">
+            <CalendarIcon size={48} className="mb-4 opacity-10" />
+            <p className="text-sm font-medium">No upcoming events or holidays found</p>
           </div>
-      );
+        )}
+        {agendaItems.map((item) => {
+          const date = new Date(item.date);
+
+          if (item.type === 'event') {
+            const event = item.data as CalendarEvent;
+            return (
+              <div
+                key={`event-${event.id}`}
+                onClick={() => handleEventClick(event)}
+                className="flex items-start gap-4 md:gap-6 p-4 md:p-5 rounded-2xl border border-pplx-border hover:bg-pplx-hover hover:border-pplx-accent/30 hover:shadow-xl transition-all cursor-pointer group bg-pplx-primary/50"
+              >
+                <div className="flex flex-col items-center min-w-[60px] md:min-w-[70px] bg-pplx-card border border-pplx-border rounded-xl p-2 shadow-lg">
+                  <span className="text-[10px] font-bold text-pplx-muted uppercase tracking-wider">{date.toLocaleDateString('en-US', { month: 'short' })}</span>
+                  <span className="text-2xl md:text-3xl font-light text-pplx-text my-1">{date.getDate()}</span>
+                  <span className="text-[10px] text-pplx-muted font-medium">{date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                </div>
+                <div className={`w-1 self-stretch rounded-full ${event.color || 'bg-pplx-accent'} opacity-80 group-hover:opacity-100 transition-opacity shadow-[0_0_10px_rgba(59,130,246,0.2)]`} />
+                <div className="flex-1 pt-1">
+                  <h3 className="font-serif text-lg md:text-xl font-bold text-pplx-text group-hover:text-pplx-accent transition-colors">{event.title}</h3>
+                  <div className="flex flex-wrap items-center gap-3 mt-2 text-[11px] md:text-xs text-pplx-muted">
+                    <span className="flex items-center gap-1.5 bg-pplx-secondary px-2 py-1 rounded-lg">
+                      <Clock size={12} />
+                      {event.allDay ? 'All Day' : `${new Date(event.startDate).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${new Date(event.endDate).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+                    </span>
+                    {event.location && (
+                      <span className="flex items-center gap-1.5 bg-pplx-secondary px-2 py-1 rounded-lg">
+                        <MapPin size={12} /> {event.location}
+                      </span>
+                    )}
+                  </div>
+                  {event.description && (
+                    <p className="mt-3 text-xs md:text-sm text-pplx-muted leading-relaxed line-clamp-2">{event.description}</p>
+                  )}
+                </div>
+              </div>
+            );
+          } else {
+            const holiday = item.data as Holiday;
+            return (
+              <div
+                key={`holiday-${holiday.date}-${holiday.name}`}
+                onClick={() => handleHolidayClick(holiday)}
+                className={`flex items-start gap-4 md:gap-6 p-4 md:p-5 rounded-2xl border transition-all group cursor-pointer hover:bg-pplx-hover ${holiday.isPublic ? 'bg-red-500/5 border-red-500/10' : 'bg-emerald-500/5 border-emerald-500/10'}`}
+              >
+                <div className={`flex flex-col items-center min-w-[60px] md:min-w-[70px] border rounded-xl p-2 shadow-lg ${holiday.isPublic ? 'bg-red-500/10 border-red-500/20' : 'bg-emerald-500/10 border-emerald-500/20'}`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${holiday.isPublic ? 'text-red-400' : 'text-emerald-400'}`}>{date.toLocaleDateString('en-US', { month: 'short' })}</span>
+                  <span className={`text-2xl md:text-3xl font-light my-1 ${holiday.isPublic ? 'text-red-200' : 'text-emerald-200'}`}>{date.getDate()}</span>
+                  <span className={`text-[10px] font-medium ${holiday.isPublic ? 'text-red-400' : 'text-emerald-400'}`}>{date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                </div>
+                <div className={`w-1 self-stretch rounded-full ${holiday.isPublic ? 'bg-red-500' : 'bg-emerald-500'} opacity-80 shadow-[0_0_10px_rgba(239,68,68,0.2)]`} />
+                <div className="flex-1 pt-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className={`font-serif text-lg md:text-xl font-bold ${holiday.isPublic ? 'text-red-400' : 'text-emerald-400'}`}>{holiday.name}</h3>
+                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-pplx-secondary text-pplx-muted uppercase tracking-tighter">
+                      {holiday.country === 'BOTH' ? 'RO & DE' : holiday.country}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 mt-2 text-[11px] md:text-xs text-pplx-muted">
+                    <span className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${holiday.isPublic ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                      <CalendarIcon size={12} />
+                      {holiday.isPublic ? 'Zi Nelucrătoare' : 'Sărbătoare'}
+                    </span>
+                    <span className="text-pplx-muted italic">System Event</span>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+        })}
+      </div>
+    );
   };
 
   const renderYearView = () => {
@@ -918,7 +918,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     <div className="flex flex-col h-full w-full bg-pplx-primary p-0 md:p-2 gap-0 overflow-hidden">
       {/* Holiday Banner */}
       {todayHoliday && (
-        <div 
+        <div
           onClick={() => handleHolidayClick(todayHoliday)}
           className={`px-4 py-2 flex items-center justify-between text-[11px] font-bold animate-in slide-in-from-top duration-300 cursor-pointer hover:brightness-125 transition-all ${todayHoliday.isPublic ? 'bg-red-600/20 text-red-400 border-b border-red-600/30' : 'bg-emerald-600/20 text-emerald-400 border-b border-emerald-600/30'}`}
         >
@@ -936,255 +936,252 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       <div className="sticky top-0 z-20 flex flex-col md:flex-row items-center justify-between gap-3 md:gap-4 shrink-0 bg-pplx-primary/80 backdrop-blur-md px-4 py-2 md:py-1 supports-[backdrop-filter]:bg-pplx-primary/50 border-b border-pplx-border md:border-none">
         {/* Top Row (Desktop: Sidebar Toggle, Icon, Title | Mobile: Weather & Date) */}
         <div className="flex flex-col md:flex-row items-center gap-2 w-full md:w-auto justify-between md:justify-start">
-            {/* Desktop: Weather Widget (Replacing Title) */}
-            <div className="hidden md:flex items-center gap-2 shrink-0">
-                {onToggleSidebar && !isSidebarOpen && (
-                    <button 
-                        onClick={onToggleSidebar}
-                        className="p-2 text-gray-400 hover:text-white rounded-full transition-all duration-300 hover:bg-white/5 active:scale-95 shrink-0"
-                        title="Open Sidebar"
-                    >
-                        <PanelLeft size={20} className="stroke-[2.2]" />
-                    </button>
-                )}
-                <WeatherWidget selectedDate={currentDate} />
-            </div>
+          {/* Desktop: Weather Widget (Replacing Title) */}
+          <div className="hidden md:flex items-center gap-2 shrink-0">
+            {onToggleSidebar && !isSidebarOpen && (
+              <button
+                onClick={onToggleSidebar}
+                className="p-2 text-gray-400 hover:text-white rounded-full transition-all duration-300 hover:bg-white/5 active:scale-95 shrink-0"
+                title="Open Sidebar"
+              >
+                <PanelLeft size={20} className="stroke-[2.2]" />
+              </button>
+            )}
+            <WeatherWidget selectedDate={currentDate} />
+          </div>
 
-            {/* Mobile: Weather Widget & Month/Year Navigation */}
-            <div className="flex md:hidden items-center justify-between w-full py-2">
-                {/* Weather Widget */}
-                <WeatherWidget selectedDate={currentDate} />
+          {/* Mobile: Weather Widget & Month/Year Navigation */}
+          <div className="flex md:hidden items-center justify-between w-full py-2">
+            {/* Weather Widget */}
+            <WeatherWidget selectedDate={currentDate} />
 
-                {/* Month/Year & Navigation */}
-                <div className="flex flex-col items-end">
-                    <div className="flex items-center gap-2">
-                        <button onClick={handlePrev} className="p-1.5 hover:bg-pplx-hover rounded-full text-pplx-muted active:scale-90 transition-transform">
-                            <ChevronLeft size={24} />
-                        </button>
-                        <span className="text-2xl font-black text-pplx-muted tracking-tighter">
-                            {MONTHS[currentDate.getMonth()].substring(0, 3)} {currentDate.getFullYear()}
-                        </span>
-                        <button onClick={handleNext} className="p-1.5 hover:bg-pplx-hover rounded-full text-pplx-muted active:scale-90 transition-transform">
-                            <ChevronRight size={24} />
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Mobile: Control Bar (Now at top, under Title/Search) */}
-            <div className="flex md:hidden items-center justify-end w-full bg-pplx-secondary px-4 py-2 rounded-t-3xl border-x border-t border-pplx-border shrink-0">
-                {/* Middle: Switcher & View Selector */}
-                <div className="flex items-center gap-2">
-                    {/* Agenda/Calendar Switcher */}
-                    <div className="flex bg-pplx-card border border-pplx-border rounded-xl p-0.5 shrink-0">
-                        <button 
-                            onClick={() => viewMode === 'agenda' && handleToggleAgenda()}
-                            className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${viewMode !== 'agenda' ? 'bg-pplx-primary text-pplx-text shadow-sm' : 'text-pplx-muted hover:text-pplx-text'}`}
-                        >
-                            Calendar
-                        </button>
-                        <button 
-                            onClick={() => viewMode !== 'agenda' && handleToggleAgenda()}
-                            className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${viewMode === 'agenda' ? 'bg-pplx-primary text-pplx-text shadow-sm' : 'text-pplx-muted hover:text-pplx-text'}`}
-                        >
-                            Agendă
-                        </button>
-                    </div>
-
-                    {/* View Selector */}
-                    <div className="relative">
-                        <button 
-                            onClick={() => setIsViewMenuOpen(!isViewMenuOpen)}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-pplx-card border border-pplx-border rounded-xl text-[10px] font-bold text-pplx-text hover:bg-pplx-hover transition-all active:scale-95"
-                        >
-                            <span className="capitalize">{viewMode === 'agenda' ? prevViewMode : viewMode}</span>
-                            <ChevronDown size={10} className="text-pplx-text" />
-                        </button>
-                        {isViewMenuOpen && (
-                            <div className="absolute right-0 top-full mt-1 w-28 bg-pplx-card border border-pplx-border rounded-xl shadow-2xl z-50 overflow-hidden">
-                                {(['year', 'month', 'week', 'day'] as ViewMode[]).map((mode) => (
-                                    <button
-                                        key={mode}
-                                        onClick={() => { setViewMode(mode); setPrevViewMode(mode); setIsViewMenuOpen(false); }}
-                                        className="w-full text-left px-3 py-2 text-[10px] capitalize hover:bg-pplx-hover text-pplx-muted"
-                                    >
-                                        {mode}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Mobile Search Button */}
-                    <button 
-                        onClick={() => setIsMobileSearchOpen(true)}
-                        className="flex items-center justify-center w-8 h-7 bg-pplx-card border border-pplx-border rounded-xl text-pplx-text hover:bg-pplx-hover active:scale-95 transition-all"
-                    >
-                        <Search size={14} />
-                    </button>
-                </div>
-            </div>
-            
-            <div className="h-5 w-px bg-white/10 mx-1 hidden md:block shrink-0" />
-            
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-1 shrink-0">
-                <button onClick={handlePrev} className="p-1.5 bg-pplx-card border border-pplx-border hover:bg-pplx-hover rounded-xl text-pplx-muted hover:text-pplx-text transition-all active:scale-95"><ChevronLeft size={16} /></button>
-                <span className="text-base font-bold text-pplx-text mx-1 min-w-[140px] text-center bg-pplx-card border border-pplx-border rounded-xl px-3 py-1">
-                    {viewMode === 'year' ? currentDate.getFullYear() : `${MONTHS[currentDate.getMonth()]} ${currentDate.getFullYear()}`}
+            {/* Month/Year & Navigation */}
+            <div className="flex flex-col items-end">
+              <div className="flex items-center gap-2">
+                <button onClick={handlePrev} className="p-1.5 hover:bg-pplx-hover rounded-full text-pplx-muted active:scale-90 transition-transform">
+                  <ChevronLeft size={24} />
+                </button>
+                <span className="text-2xl font-black text-pplx-muted tracking-tighter">
+                  {MONTHS[currentDate.getMonth()].substring(0, 3)} {currentDate.getFullYear()}
                 </span>
-                <button onClick={handleNext} className="p-1.5 bg-pplx-card border border-pplx-border hover:bg-pplx-hover rounded-xl text-pplx-muted hover:text-pplx-text transition-all active:scale-95"><ChevronRight size={16} /></button>
+                <button onClick={handleNext} className="p-1.5 hover:bg-pplx-hover rounded-full text-pplx-muted active:scale-90 transition-transform">
+                  <ChevronRight size={24} />
+                </button>
+              </div>
             </div>
+          </div>
+
+          {/* Mobile: Control Bar (Now at top, under Title/Search) */}
+          <div className="flex md:hidden items-center justify-end w-full bg-pplx-secondary px-4 py-2 rounded-t-3xl border-x border-t border-pplx-border shrink-0">
+            {/* Middle: Switcher & View Selector */}
+            <div className="flex items-center gap-2">
+              {/* Agenda/Calendar Switcher */}
+              <div className="flex bg-pplx-card border border-pplx-border rounded-xl p-0.5 shrink-0">
+                <button
+                  onClick={() => viewMode === 'agenda' && handleToggleAgenda()}
+                  className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${viewMode !== 'agenda' ? 'bg-pplx-primary text-pplx-text shadow-sm' : 'text-pplx-muted hover:text-pplx-text'}`}
+                >
+                  Calendar
+                </button>
+                <button
+                  onClick={() => viewMode !== 'agenda' && handleToggleAgenda()}
+                  className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${viewMode === 'agenda' ? 'bg-pplx-primary text-pplx-text shadow-sm' : 'text-pplx-muted hover:text-pplx-text'}`}
+                >
+                  Agendă
+                </button>
+              </div>
+
+              {/* View Selector */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsViewMenuOpen(!isViewMenuOpen)}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-pplx-card border border-pplx-border rounded-xl text-[10px] font-bold text-pplx-text hover:bg-pplx-hover transition-all active:scale-95"
+                >
+                  <span className="capitalize">{viewMode === 'agenda' ? prevViewMode : viewMode}</span>
+                  <ChevronDown size={10} className="text-pplx-text" />
+                </button>
+                {isViewMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-28 bg-pplx-card border border-pplx-border rounded-xl shadow-2xl z-50 overflow-hidden">
+                    {(['year', 'month', 'week', 'day'] as ViewMode[]).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => { setViewMode(mode); setPrevViewMode(mode); setIsViewMenuOpen(false); }}
+                        className="w-full text-left px-3 py-2 text-[10px] capitalize hover:bg-pplx-hover text-pplx-muted"
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Mobile Search Button */}
+              <button
+                onClick={() => setIsMobileSearchOpen(true)}
+                className="flex items-center justify-center w-8 h-7 bg-pplx-card border border-pplx-border rounded-xl text-pplx-text hover:bg-pplx-hover active:scale-95 transition-all"
+              >
+                <Search size={14} />
+              </button>
+            </div>
+          </div>
+
+          <div className="h-5 w-px bg-white/10 mx-1 hidden md:block shrink-0" />
+
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center gap-1 shrink-0">
+            <button onClick={handlePrev} className="p-1.5 bg-pplx-card border border-pplx-border hover:bg-pplx-hover rounded-xl text-pplx-muted hover:text-pplx-text transition-all active:scale-95"><ChevronLeft size={16} /></button>
+            <span className="text-base font-bold text-pplx-text mx-1 min-w-[140px] text-center bg-pplx-card border border-pplx-border rounded-xl px-3 py-1">
+              {viewMode === 'year' ? currentDate.getFullYear() : `${MONTHS[currentDate.getMonth()]} ${currentDate.getFullYear()}`}
+            </span>
+            <button onClick={handleNext} className="p-1.5 bg-pplx-card border border-pplx-border hover:bg-pplx-hover rounded-xl text-pplx-muted hover:text-pplx-text transition-all active:scale-95"><ChevronRight size={16} /></button>
+          </div>
         </div>
 
         {/* Center: Search Bar (Desktop) */}
         <div className="hidden md:block flex-1 max-w-md w-full relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-pplx-muted group-focus-within:text-pplx-accent transition-colors" size={12} />
-            <input 
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search events..."
-                className="w-full bg-pplx-card border border-pplx-border rounded-xl pl-8 pr-4 py-1.5 text-[11px] md:text-xs text-pplx-text focus:border-pplx-accent/50 focus:ring-2 focus:ring-pplx-accent/10 outline-none transition-all shadow-sm placeholder:text-pplx-muted"
-            />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-pplx-muted group-focus-within:text-pplx-accent transition-colors" size={12} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search events..."
+            className="w-full bg-pplx-card border border-pplx-border rounded-xl pl-8 pr-4 py-1.5 text-[11px] md:text-xs text-pplx-text focus:border-pplx-accent/50 focus:ring-2 focus:ring-pplx-accent/10 outline-none transition-all shadow-sm placeholder:text-pplx-muted"
+          />
         </div>
 
         {/* Right: Switcher & View Selector & New Event (Desktop) */}
         <div className="hidden md:flex items-center gap-2 justify-end">
-            {/* Agenda/Calendar Switcher */}
-            <div className="flex bg-white border border-pplx-border rounded-xl p-0.5 shrink-0">
-                <button 
-                    onClick={() => viewMode === 'agenda' && handleToggleAgenda()}
-                    className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${viewMode !== 'agenda' ? 'bg-pplx-primary text-pplx-text-inverse shadow-sm' : 'text-pplx-muted hover:text-pplx-text'}`}
-                >
-                    Calendar
-                </button>
-                <button 
-                    onClick={() => viewMode !== 'agenda' && handleToggleAgenda()}
-                    className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${viewMode === 'agenda' ? 'bg-pplx-primary text-pplx-text-inverse shadow-sm' : 'text-pplx-muted hover:text-pplx-text'}`}
-                >
-                    Agenda
-                </button>
-            </div>
-
-            <div className="relative">
-                <button 
-                    onClick={() => setIsViewMenuOpen(!isViewMenuOpen)}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-pplx-border rounded-xl text-xs font-bold text-pplx-text hover:bg-pplx-hover transition-all min-w-[100px] justify-between active:scale-95"
-                >
-                    <span className="capitalize">{viewMode === 'agenda' ? prevViewMode : viewMode}</span>
-                    <ChevronDown size={12} className={`transition-transform duration-300 ${isViewMenuOpen ? 'rotate-180' : ''}`} />
-                </button>
-                
-                {isViewMenuOpen && (
-                    <div className="absolute right-0 top-full mt-1 w-32 bg-pplx-card border border-pplx-border rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        {(['year', 'month', 'week', 'day'] as ViewMode[]).map((mode) => (
-                            <button
-                                key={mode}
-                                onClick={() => { setViewMode(mode); setPrevViewMode(mode); setIsViewMenuOpen(false); }}
-                                className={`w-full text-left px-4 py-2.5 text-xs capitalize hover:bg-white/5 transition-colors flex items-center justify-between ${viewMode === mode ? 'text-blue-500 font-bold bg-blue-500/5' : 'text-gray-400'}`}
-                            >
-                                {mode}
-                                {viewMode === mode && <div className="w-1 h-1 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />}
-                            </button>
-                        ))}
-                    </div>
-                )}
-            </div>
-            
-            <button 
-                onClick={() => handleCreateClick()}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-600/10 hover:shadow-blue-600/20 active:scale-95"
+          {/* Agenda/Calendar Switcher */}
+          <div className="flex bg-white border border-pplx-border rounded-xl p-0.5 shrink-0">
+            <button
+              onClick={() => viewMode === 'agenda' && handleToggleAgenda()}
+              className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${viewMode !== 'agenda' ? 'bg-pplx-primary text-pplx-text-inverse shadow-sm' : 'text-pplx-muted hover:text-pplx-text'}`}
             >
-                <Plus size={16} /> <span>Create</span>
+              Calendar
             </button>
+            <button
+              onClick={() => viewMode !== 'agenda' && handleToggleAgenda()}
+              className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${viewMode === 'agenda' ? 'bg-pplx-primary text-pplx-text-inverse shadow-sm' : 'text-pplx-muted hover:text-pplx-text'}`}
+            >
+              Agenda
+            </button>
+          </div>
+
+          <div className="relative">
+            <button
+              onClick={() => setIsViewMenuOpen(!isViewMenuOpen)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-white border border-pplx-border rounded-xl text-xs font-bold text-pplx-text hover:bg-pplx-hover transition-all min-w-[100px] justify-between active:scale-95"
+            >
+              <span className="capitalize">{viewMode === 'agenda' ? prevViewMode : viewMode}</span>
+              <ChevronDown size={12} className={`transition-transform duration-300 ${isViewMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isViewMenuOpen && (
+              <div className="absolute right-0 top-full mt-1 w-32 bg-pplx-card border border-pplx-border rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                {(['year', 'month', 'week', 'day'] as ViewMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => { setViewMode(mode); setPrevViewMode(mode); setIsViewMenuOpen(false); }}
+                    className={`w-full text-left px-4 py-2.5 text-xs capitalize hover:bg-white/5 transition-colors flex items-center justify-between ${viewMode === mode ? 'text-blue-500 font-bold bg-blue-500/5' : 'text-gray-400'}`}
+                  >
+                    {mode}
+                    {viewMode === mode && <div className="w-1 h-1 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => handleCreateClick()}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-600/10 hover:shadow-blue-600/20 active:scale-95"
+          >
+            <Plus size={16} /> <span>Create</span>
+          </button>
         </div>
       </div>
 
       {/* Main Content Area */}
       <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-2 md:gap-4 overflow-hidden px-0 md:px-2 pb-2 relative">
-          {/* Calendar Grid - Darker background */}
-          <div className="flex-[0.6] md:flex-1 h-full overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700 px-4 md:px-0">
-            {viewMode === 'year' && renderYearView()}
-            {viewMode === 'month' && renderMonthView()}
-            {viewMode === 'week' && renderWeekView()}
-            {viewMode === 'day' && renderDayView()} 
-            {viewMode === 'agenda' && renderAgendaView()}
-          </div>
+        {/* Calendar Grid - Darker background */}
+        <div className="flex-[0.6] md:flex-1 h-full overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700 px-4 md:px-0">
+          {viewMode === 'year' && renderYearView()}
+          {viewMode === 'month' && renderMonthView()}
+          {viewMode === 'week' && renderWeekView()}
+          {viewMode === 'day' && renderDayView()}
+          {viewMode === 'agenda' && renderAgendaView()}
+        </div>
 
-          {/* Mobile Upcoming List (Bottom 40%) */}
-          <div className="flex-[0.4] md:hidden overflow-y-auto no-scrollbar rounded-3xl p-4 mx-4 mb-2">
-              {renderUpcomingEvents()}
-          </div>
+        {/* Mobile Upcoming List (Bottom 40%) */}
+        <div className="flex-[0.4] md:hidden overflow-y-auto no-scrollbar rounded-3xl p-4 mx-4 mb-2">
+          {renderUpcomingEvents()}
+        </div>
 
-          {/* Mobile Bottom Actions (Search & Plus) - REMOVED */}
-          {/* <div className="md:hidden absolute bottom-6 right-6 flex items-center gap-3 pointer-events-none z-[60]"> ... </div> */}
-
-          {/* Mobile Search Overlay */}
-          {isMobileSearchOpen && (
-            <div 
-                className={`fixed top-0 left-0 right-0 z-[110] bg-pplx-card p-4 flex flex-col animate-in fade-in duration-150`}
-                style={{ 
-                    bottom: document.body.classList.contains('dock-active') && window.innerWidth < 640 
-                        ? 'calc(72px + env(safe-area-inset-bottom))' 
-                        : '0px' 
-                }}
-            >
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="flex-1 relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-                        <input 
-                            ref={mobileSearchInputRef}
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search events..."
-                            className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm text-gray-100 outline-none focus:border-blue-500/50"
-                        />
-                    </div>
-                    <button 
-                        onClick={() => { setIsMobileSearchOpen(false); setSearchQuery(''); }}
-                        className="text-gray-400 hover:text-white p-2"
-                    >
-                        <X size={24} />
-                    </button>
-                </div>
-                <div className="flex-1 overflow-y-auto no-scrollbar">
-                    {filteredEvents.length === 0 ? (
-                        <div className="text-center text-gray-600 py-20">No events found</div>
-                    ) : (
-                        <div className="space-y-3">
-                            {filteredEvents.map(event => (
-                                <div 
-                                    key={event.id}
-                                    onClick={() => { handleEventClick(event); setIsMobileSearchOpen(false); }}
-                                    className="p-4 bg-white/5 rounded-2xl border border-white/5"
-                                >
-                                    <div className="font-bold text-gray-200">{event.title}</div>
-                                    <div className="text-xs text-gray-500 mt-1">
-                                        {new Date(event.startDate).toLocaleDateString()} • {new Date(event.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+        {/* Mobile Search Overlay */}
+        {isMobileSearchOpen && (
+          <div
+            className={`fixed top-0 left-0 right-0 z-[110] bg-pplx-card p-4 flex flex-col animate-in fade-in duration-150`}
+            style={{
+              bottom: document.body.classList.contains('dock-active') && window.innerWidth < 640
+                ? 'calc(72px + env(safe-area-inset-bottom))'
+                : '0px'
+            }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                <input
+                  ref={mobileSearchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search events..."
+                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm text-gray-100 outline-none focus:border-blue-500/50"
+                />
+              </div>
+              <button
+                onClick={() => { setIsMobileSearchOpen(false); setSearchQuery(''); }}
+                className="text-gray-400 hover:text-white p-2"
+              >
+                <X size={24} />
+              </button>
             </div>
-          )}
-
-          {/* Right Sidebar (Desktop Only) - Lighter background */}
-          <div className="hidden lg:flex flex-col w-64 shrink-0 gap-4 animate-in fade-in slide-in-from-right-4 duration-700 delay-200 overflow-hidden">
-              <div className="bg-pplx-card rounded-2xl p-0.5 shrink-0">
-                {renderMiniCalendar()}
-              </div>
-              
-              <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col justify-end pb-2">
-                <div className="mt-auto">
-                  {renderUpcomingEvents()}
+            <div className="flex-1 overflow-y-auto no-scrollbar">
+              {filteredEvents.length === 0 ? (
+                <div className="text-center text-gray-600 py-20">No events found</div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredEvents.map(event => (
+                    <div
+                      key={event.id}
+                      onClick={() => { handleEventClick(event); setIsMobileSearchOpen(false); }}
+                      className="p-4 bg-white/5 rounded-2xl border border-white/5"
+                    >
+                      <div className="font-bold text-gray-200">{event.title}</div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {new Date(event.startDate).toLocaleDateString()} • {new Date(event.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-
-              </div>
+              )}
+            </div>
           </div>
+        )}
+
+        {/* Right Sidebar (Desktop Only) - Lighter background */}
+        <div className="hidden lg:flex flex-col w-64 shrink-0 gap-4 animate-in fade-in slide-in-from-right-4 duration-700 delay-200 overflow-hidden">
+          <div className="bg-pplx-card rounded-2xl p-0.5 shrink-0">
+            {renderMiniCalendar()}
+          </div>
+
+          <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col justify-end pb-2">
+            <div className="mt-auto">
+              {renderUpcomingEvents()}
+            </div>
+
+          </div>
+        </div>
       </div>
 
       {/* Holiday Detail Modal */}
@@ -1192,7 +1189,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-xl flex items-center justify-center p-4">
           <div className="bg-pplx-card border border-pplx-border rounded-[24px] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300">
             <div className={`h-24 relative flex items-end p-6 ${selectedHoliday.isPublic ? 'bg-gradient-to-br from-red-600/30 to-red-900/50' : 'bg-gradient-to-br from-emerald-600/30 to-emerald-900/50'}`}>
-              <button 
+              <button
                 onClick={() => setIsHolidayModalOpen(false)}
                 className="absolute top-4 right-4 p-1.5 bg-black/20 hover:bg-black/40 text-white rounded-full transition-all"
               >
@@ -1209,7 +1206,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 </h2>
               </div>
             </div>
-            
+
             <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto no-scrollbar">
               <div className="flex items-center gap-4">
                 <div className="flex flex-col items-center justify-center w-12 h-12 bg-white/[0.03] border border-white/5 rounded-xl">
@@ -1236,7 +1233,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   <div className={`w-1.5 h-1.5 rounded-full ${selectedHoliday.type === 'religious' ? 'bg-emerald-500' : selectedHoliday.type === 'national' ? 'bg-blue-500' : 'bg-purple-500'}`} />
                   <span className="capitalize">{selectedHoliday.type === 'religious' ? 'Religios' : selectedHoliday.type === 'national' ? 'Național' : 'Cultural'}</span>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsHolidayModalOpen(false)}
                   className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold transition-all"
                 >
@@ -1251,162 +1248,162 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       {/* Event Modal */}
       {isEventModalOpen && (
         <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-center justify-center p-2 md:p-4">
-            <div className="bg-pplx-card border border-pplx-border rounded-3xl shadow-2xl w-full max-w-md max-h-[95vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="p-4 md:p-5 border-b border-white/5 flex justify-between items-center bg-white/[0.02] shrink-0">
-                    <h3 className="font-serif font-bold text-lg md:text-xl text-gray-100">{selectedEventId ? 'Edit Event' : 'New Event'}</h3>
-                    <button onClick={() => setIsEventModalOpen(false)} className="text-gray-500 hover:text-white p-2 hover:bg-white/5 rounded-full transition-all"><X size={20} /></button>
-                </div>
-                <div className="flex-1 overflow-y-auto no-scrollbar p-4 md:p-6 space-y-5 md:space-y-6">
-                    <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-2 tracking-widest">Title</label>
-                        <input 
-                            type="text" 
-                            value={newEventData.title}
-                            onChange={(e) => setNewEventData({...newEventData, title: e.target.value})}
-                            className="w-full bg-[#0f0f0f] border border-white/5 rounded-2xl px-4 py-2.5 md:py-3 text-gray-200 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all shadow-inner placeholder:text-gray-700"
-                            placeholder="What's happening?"
-                            autoFocus
-                        />
-                    </div>
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest">Start Date & Time</label>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="date" 
-                                        value={new Date(newEventData.startDate!).toISOString().split('T')[0]}
-                                        onChange={(e) => {
-                                            const d = new Date(newEventData.startDate!);
-                                            const [y, m, day] = e.target.value.split('-').map(Number);
-                                            d.setFullYear(y, m - 1, day);
-                                            const newStart = d.getTime();
-                                            let newEnd = newEventData.endDate!;
-                                            if (newEnd <= newStart) newEnd = newStart + 3600000;
-                                            setNewEventData({...newEventData, startDate: newStart, endDate: newEnd});
-                                        }}
-                                        className="flex-1 bg-[#0f0f0f] border border-white/5 rounded-xl px-3 py-2.5 text-xs text-gray-200 outline-none focus:border-blue-500/50 transition-all"
-                                    />
-                                    <input 
-                                        type="time" 
-                                        value={new Date(newEventData.startDate!).toTimeString().slice(0, 5)}
-                                        onChange={(e) => {
-                                            const d = new Date(newEventData.startDate!);
-                                            const [h, min] = e.target.value.split(':').map(Number);
-                                            d.setHours(h, min, 0, 0);
-                                            const newStart = d.getTime();
-                                            let newEnd = newEventData.endDate!;
-                                            if (newEnd <= newStart) newEnd = newStart + 3600000;
-                                            setNewEventData({...newEventData, startDate: newStart, endDate: newEnd});
-                                        }}
-                                        className="w-24 bg-pplx-background border border-pplx-border rounded-xl px-2 py-2.5 text-xs text-pplx-text outline-none focus:border-pplx-accent/50 transition-all"
-                                    />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest">End Date & Time</label>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="date" 
-                                        value={new Date(newEventData.endDate!).toISOString().split('T')[0]}
-                                        onChange={(e) => {
-                                            const d = new Date(newEventData.endDate!);
-                                            const [y, m, day] = e.target.value.split('-').map(Number);
-                                            d.setFullYear(y, m - 1, day);
-                                            setNewEventData({...newEventData, endDate: d.getTime()});
-                                        }}
-                                        className="flex-1 bg-pplx-background border border-pplx-border rounded-xl px-3 py-2.5 text-xs text-pplx-text outline-none focus:border-pplx-accent/50 transition-all"
-                                    />
-                                    <input 
-                                        type="time" 
-                                        value={new Date(newEventData.endDate!).toTimeString().slice(0, 5)}
-                                        onChange={(e) => {
-                                            const d = new Date(newEventData.endDate!);
-                                            const [h, min] = e.target.value.split(':').map(Number);
-                                            d.setHours(h, min, 0, 0);
-                                            setNewEventData({...newEventData, endDate: d.getTime()});
-                                        }}
-                                        className="w-24 bg-pplx-background border border-pplx-border rounded-xl px-2 py-2.5 text-xs text-pplx-text outline-none focus:border-pplx-accent/50 transition-all"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3 bg-white/[0.02] p-3 md:p-4 rounded-2xl border border-white/5">
-                        <input 
-                            type="checkbox" 
-                            id="allDay"
-                            checked={newEventData.allDay}
-                            onChange={(e) => setNewEventData({...newEventData, allDay: e.target.checked})}
-                            className="w-4 h-4 rounded border-pplx-border bg-pplx-background text-pplx-accent focus:ring-pplx-accent/20 cursor-pointer"
-                        />
-                        <label htmlFor="allDay" className="text-sm font-bold text-gray-300 cursor-pointer select-none">All Day Event</label>
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-2 tracking-widest">Location</label>
-                        <div className="relative group">
-                            <MapPin size={16} className="absolute left-4 top-3 md:top-3.5 text-gray-600 group-focus-within:text-blue-500 transition-colors" />
-                            <input 
-                                type="text" 
-                                value={newEventData.location || ''}
-                                onChange={(e) => setNewEventData({...newEventData, location: e.target.value})}
-                                className="w-full bg-pplx-background border border-pplx-border rounded-2xl pl-11 pr-4 py-2.5 md:py-3 text-xs text-pplx-text outline-none focus:border-pplx-accent/50 transition-all"
-                                placeholder="Add location"
-                            />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-2 tracking-widest">Description</label>
-                        <textarea 
-                            value={newEventData.description || ''}
-                            onChange={(e) => setNewEventData({...newEventData, description: e.target.value})}
-                            className="w-full bg-pplx-background border border-pplx-border rounded-2xl px-4 py-3 md:py-4 text-xs text-pplx-text outline-none min-h-[80px] md:min-h-[100px] focus:border-pplx-accent/50 transition-all resize-none placeholder:text-pplx-muted"
-                            placeholder="Add details..."
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest">Color</label>
-                        <div className="flex flex-wrap gap-3 justify-center bg-white/[0.02] p-3 md:p-4 rounded-2xl border border-white/5">
-                            {['bg-blue-600', 'bg-red-600', 'bg-emerald-600', 'bg-amber-600', 'bg-purple-600', 'bg-pink-600', 'bg-gray-600'].map(color => (
-                                <button
-                                    key={color}
-                                    onClick={() => setNewEventData({...newEventData, color})}
-                                    className={`w-7 h-7 md:w-8 md:h-8 rounded-full ${color} transition-all hover:scale-110 shadow-lg ${newEventData.color === color ? 'ring-2 ring-offset-4 ring-white ring-offset-[#1a1a1a] scale-110' : 'opacity-40 hover:opacity-100'}`}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                </div>
-                <div className="p-4 md:p-5 border-t border-white/5 bg-white/[0.02] flex justify-between items-center shrink-0">
-                    {selectedEventId ? (
-                        <button 
-                            onClick={handleDeleteClick}
-                            className="text-red-400 hover:text-red-500 text-[10px] md:text-xs font-bold flex items-center gap-2 px-3 md:py-2 hover:bg-red-500/10 rounded-xl transition-all"
-                        >
-                            <Trash2 size={14} /> Delete
-                        </button>
-                    ) : <div />}
-                    
-                    <div className="flex gap-2 md:gap-3">
-                        <button 
-                            onClick={() => setIsEventModalOpen(false)}
-                            className="px-3 md:px-5 py-2 text-[10px] md:text-xs font-bold text-gray-500 hover:text-white hover:bg-white/5 rounded-xl transition-all"
-                        >
-                            Cancel
-                        </button>
-                        <button 
-                            onClick={handleSaveEvent}
-                            className="px-4 md:px-8 py-2 text-[10px] md:text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl transition-all shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40"
-                        >
-                            Save Event
-                        </button>
-                    </div>
-                </div>
+          <div className="bg-pplx-card border border-pplx-border rounded-3xl shadow-2xl w-full max-w-md max-h-[95vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-4 md:p-5 border-b border-white/5 flex justify-between items-center bg-white/[0.02] shrink-0">
+              <h3 className="font-serif font-bold text-lg md:text-xl text-gray-100">{selectedEventId ? 'Edit Event' : 'New Event'}</h3>
+              <button onClick={() => setIsEventModalOpen(false)} className="text-gray-500 hover:text-white p-2 hover:bg-white/5 rounded-full transition-all"><X size={20} /></button>
             </div>
+            <div className="flex-1 overflow-y-auto no-scrollbar p-4 md:p-6 space-y-5 md:space-y-6">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-2 tracking-widest">Title</label>
+                <input
+                  type="text"
+                  value={newEventData.title}
+                  onChange={(e) => setNewEventData({ ...newEventData, title: e.target.value })}
+                  className="w-full bg-[#0f0f0f] border border-white/5 rounded-2xl px-4 py-2.5 md:py-3 text-gray-200 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all shadow-inner placeholder:text-gray-700"
+                  placeholder="What's happening?"
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest">Start Date & Time</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="date"
+                        value={new Date(newEventData.startDate!).toISOString().split('T')[0]}
+                        onChange={(e) => {
+                          const d = new Date(newEventData.startDate!);
+                          const [y, m, day] = e.target.value.split('-').map(Number);
+                          d.setFullYear(y, m - 1, day);
+                          const newStart = d.getTime();
+                          let newEnd = newEventData.endDate!;
+                          if (newEnd <= newStart) newEnd = newStart + 3600000;
+                          setNewEventData({ ...newEventData, startDate: newStart, endDate: newEnd });
+                        }}
+                        className="flex-1 bg-[#0f0f0f] border border-white/5 rounded-xl px-3 py-2.5 text-xs text-gray-200 outline-none focus:border-blue-500/50 transition-all"
+                      />
+                      <input
+                        type="time"
+                        value={new Date(newEventData.startDate!).toTimeString().slice(0, 5)}
+                        onChange={(e) => {
+                          const d = new Date(newEventData.startDate!);
+                          const [h, min] = e.target.value.split(':').map(Number);
+                          d.setHours(h, min, 0, 0);
+                          const newStart = d.getTime();
+                          let newEnd = newEventData.endDate!;
+                          if (newEnd <= newStart) newEnd = newStart + 3600000;
+                          setNewEventData({ ...newEventData, startDate: newStart, endDate: newEnd });
+                        }}
+                        className="w-24 bg-pplx-background border border-pplx-border rounded-xl px-2 py-2.5 text-xs text-pplx-text outline-none focus:border-pplx-accent/50 transition-all"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest">End Date & Time</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="date"
+                        value={new Date(newEventData.endDate!).toISOString().split('T')[0]}
+                        onChange={(e) => {
+                          const d = new Date(newEventData.endDate!);
+                          const [y, m, day] = e.target.value.split('-').map(Number);
+                          d.setFullYear(y, m - 1, day);
+                          setNewEventData({ ...newEventData, endDate: d.getTime() });
+                        }}
+                        className="flex-1 bg-pplx-background border border-pplx-border rounded-xl px-3 py-2.5 text-xs text-pplx-text outline-none focus:border-pplx-accent/50 transition-all"
+                      />
+                      <input
+                        type="time"
+                        value={new Date(newEventData.endDate!).toTimeString().slice(0, 5)}
+                        onChange={(e) => {
+                          const d = new Date(newEventData.endDate!);
+                          const [h, min] = e.target.value.split(':').map(Number);
+                          d.setHours(h, min, 0, 0);
+                          setNewEventData({ ...newEventData, endDate: d.getTime() });
+                        }}
+                        className="w-24 bg-pplx-background border border-pplx-border rounded-xl px-2 py-2.5 text-xs text-pplx-text outline-none focus:border-pplx-accent/50 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 bg-white/[0.02] p-3 md:p-4 rounded-2xl border border-white/5">
+                <input
+                  type="checkbox"
+                  id="allDay"
+                  checked={newEventData.allDay}
+                  onChange={(e) => setNewEventData({ ...newEventData, allDay: e.target.checked })}
+                  className="w-4 h-4 rounded border-pplx-border bg-pplx-background text-pplx-accent focus:ring-pplx-accent/20 cursor-pointer"
+                />
+                <label htmlFor="allDay" className="text-sm font-bold text-gray-300 cursor-pointer select-none">All Day Event</label>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-2 tracking-widest">Location</label>
+                <div className="relative group">
+                  <MapPin size={16} className="absolute left-4 top-3 md:top-3.5 text-gray-600 group-focus-within:text-blue-500 transition-colors" />
+                  <input
+                    type="text"
+                    value={newEventData.location || ''}
+                    onChange={(e) => setNewEventData({ ...newEventData, location: e.target.value })}
+                    className="w-full bg-pplx-background border border-pplx-border rounded-2xl pl-11 pr-4 py-2.5 md:py-3 text-xs text-pplx-text outline-none focus:border-pplx-accent/50 transition-all"
+                    placeholder="Add location"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-2 tracking-widest">Description</label>
+                <textarea
+                  value={newEventData.description || ''}
+                  onChange={(e) => setNewEventData({ ...newEventData, description: e.target.value })}
+                  className="w-full bg-pplx-background border border-pplx-border rounded-2xl px-4 py-3 md:py-4 text-xs text-pplx-text outline-none min-h-[80px] md:min-h-[100px] focus:border-pplx-accent/50 transition-all resize-none placeholder:text-pplx-muted"
+                  placeholder="Add details..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest">Color</label>
+                <div className="flex flex-wrap gap-3 justify-center bg-white/[0.02] p-3 md:p-4 rounded-2xl border border-white/5">
+                  {['bg-blue-600', 'bg-red-600', 'bg-emerald-600', 'bg-amber-600', 'bg-purple-600', 'bg-pink-600', 'bg-gray-600'].map(color => (
+                    <button
+                      key={color}
+                      onClick={() => setNewEventData({ ...newEventData, color })}
+                      className={`w-7 h-7 md:w-8 md:h-8 rounded-full ${color} transition-all hover:scale-110 shadow-lg ${newEventData.color === color ? 'ring-2 ring-offset-4 ring-white ring-offset-[#1a1a1a] scale-110' : 'opacity-40 hover:opacity-100'}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="p-4 md:p-5 border-t border-white/5 bg-white/[0.02] flex justify-between items-center shrink-0">
+              {selectedEventId ? (
+                <button
+                  onClick={handleDeleteClick}
+                  className="text-red-400 hover:text-red-500 text-[10px] md:text-xs font-bold flex items-center gap-2 px-3 md:py-2 hover:bg-red-500/10 rounded-xl transition-all"
+                >
+                  <Trash2 size={14} /> Delete
+                </button>
+              ) : <div />}
+
+              <div className="flex gap-2 md:gap-3">
+                <button
+                  onClick={() => setIsEventModalOpen(false)}
+                  className="px-3 md:px-5 py-2 text-[10px] md:text-xs font-bold text-gray-500 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEvent}
+                  className="px-4 md:px-8 py-2 text-[10px] md:text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl transition-all shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40"
+                >
+                  Save Event
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

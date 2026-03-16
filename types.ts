@@ -279,5 +279,3 @@ export interface CalendarEvent {
   category?: 'work' | 'personal' | 'meeting' | 'task' | 'other';
   attendees?: string[]; // Emails or names
 }
-
-export type PdfTemplate = 'report' | 'cv' | 'simple';

@@ -15,8 +15,7 @@ export type BlockType =
     | 'table' | 'calendar' 
     | 'chart_bar_v' | 'chart_bar_h' | 'chart_line' | 'chart_donut'
     | 'toc' | 'button' | 'block_synced' | 'equation' 
-    | 'mention_person' | 'mention_page'
-    | 'db_list' | 'db_gallery';
+    | 'mention_person' | 'mention_page';
 
 export interface Block {
     id: string;

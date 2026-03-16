@@ -359,7 +359,7 @@ const BlockRow = ({
     showBlockMenu, setShowBlockMenu
 }: any) => {
     const isFocused = activeBlockId === block.id;
-    const isWideBlock = ['table', 'chart_bar_v', 'chart_bar_h', 'chart_line', 'chart_donut', 'calendar', 'db_list', 'db_gallery'].includes(block.type);
+    const isWideBlock = ['table', 'chart_bar_v', 'chart_bar_h', 'chart_line', 'chart_donut', 'calendar'].includes(block.type);
     
     return (
         <div data-block-id={block.id} className={`group relative flex -mx-2 md:mx-0 group/row touch-manipulation min-h-[1.5rem] ${isWideBlock ? 'flex-col items-stretch' : 'items-start'} md:flex-row md:items-start ${isOverlay ? 'bg-pplx-card shadow-2xl border border-pplx-accent/50 rounded-lg opacity-90 scale-105' : ''}`} onMouseEnter={() => !isOverlay && setActiveBlockId(block.id)}>
@@ -409,7 +409,6 @@ export const NotesView: React.FC<NotesViewProps> = ({ activeNoteId, notes, onSav
 
     const coverInputRef = useRef<HTMLInputElement>(null);
     const blockFileInputRef = useRef<HTMLInputElement>(null);
-    // const draggingTouchRef = useRef<string | null>(null); // Removed
 
     const activeNote = notes.find(n => n.id === activeNoteId);
 
