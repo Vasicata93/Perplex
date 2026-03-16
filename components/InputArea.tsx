@@ -138,6 +138,8 @@ export const InputArea: React.FC<InputAreaProps> = ({
             setSelectedModelId('openrouter');
         } else if (settings.modelProvider === ModelProvider.OPENAI) {
             setSelectedModelId('openai');
+        } else if (settings.modelProvider === ModelProvider.LANGFLOW) {
+            setSelectedModelId('langflow');
         } else {
             setSelectedModelId(settings.activeLocalModelId);
         }
@@ -536,6 +538,16 @@ export const InputArea: React.FC<InputAreaProps> = ({
                             <X size={8} className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </button>
                     )}
+                    {selectedModelId === 'langflow' && (
+                        <button 
+                            onClick={() => setSelectedModelId(settings?.modelProvider === ModelProvider.GEMINI ? 'gemini-pro' : settings?.modelProvider || null)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-full bg-pplx-accent/10 border border-pplx-accent/20 text-[10px] font-medium text-pplx-accent whitespace-nowrap animate-in fade-in zoom-in duration-200 hover:bg-pplx-accent/20 transition-colors group"
+                        >
+                            <Zap size={10} />
+                            <span>Langflow</span>
+                            <X size={8} className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
+                    )}
                     {isLongThinking && (
                         <button 
                             onClick={() => setIsLongThinking(false)}
@@ -691,6 +703,34 @@ export const InputArea: React.FC<InputAreaProps> = ({
                                     </div>
                                 )}
                             </div>
+                             {/* Langflow Mode (Dynamic) */}
+                             {settings?.langflowEnabled && (
+                                 <div className="flex flex-col mb-1 bg-pplx-card rounded-lg border border-transparent hover:border-pplx-border transition-colors">
+                                     <div 
+                                         className="flex items-center justify-between p-2 cursor-pointer rounded-lg hover:bg-pplx-hover" 
+                                         onClick={() => {
+                                             if (selectedModelId === 'langflow') {
+                                                 // Reset to default provider
+                                                 setSelectedModelId(settings.modelProvider === ModelProvider.GEMINI ? 'gemini-pro' : settings.modelProvider);
+                                             } else {
+                                                 setSelectedModelId('langflow');
+                                             }
+                                         }}
+                                     >
+                                         <div className="flex items-center space-x-3">
+                                             <Zap size={16} className={selectedModelId === 'langflow' ? 'text-pplx-accent' : 'text-gray-400'} />
+                                             <div className="flex flex-col">
+                                                 <span className={`text-sm ${selectedModelId === 'langflow' ? 'text-pplx-accent font-medium' : 'text-gray-200 font-medium'}`}>Langflow Agent</span>
+                                                 <span className="text-[10px] text-gray-500">Flow local activ</span>
+                                             </div>
+                                         </div>
+                                         {/* Toggle Switch */}
+                                         <div className={`w-10 h-6 rounded-full transition-colors relative ${selectedModelId === 'langflow' ? 'bg-pplx-accent' : 'bg-gray-600'}`}>
+                                             <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${selectedModelId === 'langflow' ? 'left-5' : 'left-1'}`} />
+                                         </div>
+                                     </div>
+                                 </div>
+                             )}
                         </div>
 
                         <div className="h-px bg-pplx-border my-2 mx-1" />
