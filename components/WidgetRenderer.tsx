@@ -27,7 +27,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ code, title }) =
 
   // Construim HTML complet pentru iframe
   const buildHtml = (content: string, dark: boolean): string => {
-    const cssVars = isDark ? `
+    const cssVars = dark ? `
       --bg-primary: #191919;
       --bg-secondary: #262626;
       --bg-hover: #2d2d2d;
@@ -73,7 +73,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ code, title }) =
     `;
 
     return `<!DOCTYPE html>
-<html class="${isDark ? 'dark' : ''}">
+<html class="${dark ? 'dark' : ''}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
