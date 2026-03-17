@@ -9,11 +9,24 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ code, title }) =
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(300);
   const [isInteracting, setIsInteracting] = useState(false);
+  // Detect dark mode changes to force update if theme changes
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'class') {
+          setIsDark(document.documentElement.classList.contains('dark'));
+        }
+      });
+    });
+    observer.observe(document.documentElement, { attributes: true });
+    setIsDark(document.documentElement.classList.contains('dark'));
+    return () => observer.disconnect();
+  }, []);
 
   // Construim HTML complet pentru iframe
-  const buildHtml = (content: string): string => {
-    const isDark = document.documentElement.classList.contains('dark');
-
+  const buildHtml = (content: string, dark: boolean): string => {
     const cssVars = isDark ? `
       --bg-primary: #191919;
       --bg-secondary: #262626;
@@ -172,17 +185,17 @@ ${content}
     const h = document.documentElement.scrollHeight || document.body.scrollHeight;
     window.parent.postMessage({ type: 'PERPLEX_WIDGET_HEIGHT', height: h }, '*');
   }
+  const observer = new ResizeObserver(() => reportHeight());
+  observer.observe(document.body);
   window.addEventListener('load', function() {
     reportHeight();
     setTimeout(reportHeight, 500);
   });
-  window.addEventListener('resize', reportHeight);
 </script>
 </body>
 </html>`;
   };
 
-  // Ascultă mesaje din iframe
   useEffect(() => {
     const handler = (e: MessageEvent) => {
       if (e.data?.type === 'PERPLEX_WIDGET_HEIGHT') {
@@ -207,9 +220,12 @@ ${content}
     return () => window.removeEventListener('message', handler);
   }, []);
 
-  const html = buildHtml(code);
-  const blob = new Blob([html], { type: 'text/html' });
-  const blobUrl = URL.createObjectURL(blob);
+  // Memoize blobUrl to prevent iframe reloading (flashing) on every render
+  const blobUrl = React.useMemo(() => {
+    const html = buildHtml(code, isDark);
+    const blob = new Blob([html], { type: 'text/html' });
+    return URL.createObjectURL(blob);
+  }, [code, isDark]);
 
   useEffect(() => {
     return () => URL.revokeObjectURL(blobUrl);

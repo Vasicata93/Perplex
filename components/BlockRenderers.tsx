@@ -489,11 +489,24 @@ export const WidgetBlock: React.FC<{
     const [height, setHeight] = React.useState(300);
     const containerRef = React.useRef<HTMLDivElement>(null);
     const [isInteracting, setIsInteracting] = React.useState(false);
+    // Detect dark mode for theme sync
+    const [isDark, setIsDark] = useState(false);
 
-    // Detectăm dark mode din clasa pe <html>
-    const isDark = document.documentElement.classList.contains('dark');
+    useEffect(() => {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === 'class') {
+                    setIsDark(document.documentElement.classList.contains('dark'));
+                }
+            });
+        });
+        observer.observe(document.documentElement, { attributes: true });
+        setIsDark(document.documentElement.classList.contains('dark'));
+        return () => observer.disconnect();
+    }, []);
 
-    const cssVars = isDark ? `
+    const buildHtml = (code: string, dark: boolean) => {
+        const cssVars = dark ? `
         --bg-primary:#191919; --bg-secondary:#262626; --bg-hover:#2d2d2d;
         --border-color:#3a3a3a; --text-primary:#e8e6e0; --text-muted:#8a8880;
         --accent:#20B8CD;
@@ -503,8 +516,8 @@ export const WidgetBlock: React.FC<{
         --accent:#20B8CD;
     `;
 
-    const buildHtml = (code: string) => `<!DOCTYPE html>
-<html class="${isDark ? 'dark' : ''}">
+        return `<!DOCTYPE html>
+<html class="${dark ? 'dark' : ''}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -579,14 +592,16 @@ function reportHeight(){
     var h = document.documentElement.scrollHeight || document.body.scrollHeight;
     window.parent.postMessage({type:'PERPLEX_WIDGET_HEIGHT',height:h},'*');
 }
+var observer = new ResizeObserver(() => reportHeight());
+observer.observe(document.body);
 window.addEventListener('load', function() {
     reportHeight();
     setTimeout(reportHeight, 500);
 });
-window.addEventListener('resize', reportHeight);
 </script>
 </body>
 </html>`;
+    };
 
     // Listener pentru înălțime auto
     React.useEffect(() => {
@@ -602,9 +617,11 @@ window.addEventListener('resize', reportHeight);
         return () => window.removeEventListener('message', handler);
     }, []);
 
-    const html = buildHtml(content);
-    const blob = new Blob([html], { type: 'text/html' });
-    const blobUrl = URL.createObjectURL(blob);
+    const blobUrl = React.useMemo(() => {
+        const html = buildHtml(content, isDark);
+        const blob = new Blob([html], { type: 'text/html' });
+        return URL.createObjectURL(blob);
+    }, [content, isDark]);
 
     React.useEffect(() => () => URL.revokeObjectURL(blobUrl), [blobUrl]);
 
