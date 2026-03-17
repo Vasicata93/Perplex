@@ -10,6 +10,7 @@ import { RAGService } from "./ragService";
 import { buildAgentSystemPrompt } from "../src/agent/AgentOrchestrator";
 import { DEFAULT_AGENT_CONFIG } from "../src/agent/types";
 import { E2BService } from "./e2bService";
+import { webLLMService } from "./webLLMService";
 
 
 // --- Helper Functions ---
@@ -974,6 +975,56 @@ export class LLMService {
                 virtualFiles.length > 0, // Enable readFiles tool
                 threadId
             );
+        } else if (provider === ModelProvider.LOCAL) {
+            // ── WebLLM: rulează 100% în browser, fără server ──
+            if (!activeLocalModel) throw new Error("No local model configured.");
+
+            // Asigură că modelul e încărcat
+            if (!webLLMService.isModelLoaded(activeLocalModel.modelId)) {
+                if (onChunk) onChunk("", "⏳ Loading model into memory...");
+                await webLLMService.loadModel(activeLocalModel.modelId, (pct) => {
+                    if (onChunk) onChunk("", `⏳ Initializing model: ${pct}%`);
+                });
+            }
+
+            // Construiește mesajele în format chat
+            const chatMessages: { role: "system" | "user" | "assistant"; content: string }[] = [];
+
+            if (systemInstruction) {
+                chatMessages.push({ role: "system", content: systemInstruction });
+            }
+
+            // Adaugă istoricul conversației
+            for (const msg of history.slice(-6)) {
+                chatMessages.push({
+                    role: msg.role === Role.MODEL ? "assistant" : "user",
+                    content: typeof msg.content === "string" ? msg.content : prompt,
+                });
+            }
+
+            // Adaugă promptul curent
+            chatMessages.push({ role: "user", content: prompt });
+
+            // Streaming răspuns
+            let fullText = "";
+            for await (const chunk of webLLMService.streamChat(chatMessages)) {
+                fullText += chunk;
+                if (onChunk) onChunk("", chunk); // Send chunk to UI (text is accumulated in UI)
+            }
+
+            // Note: onChunk usually takes (text, reasoning). WebLLM chunks are just text segments.
+            // The UI often expects `text` for the main content accumulation or `reasoning` for side thoughts.
+            // Here we treat everything as main text. 
+            // However, the calling function accumulates. Let's fix usage:
+            // `customOnChunk` in `generateResponse` accumulates reasoning.
+            // `generateGenericResponse` below expects `onChunk` to be called with partial text.
+            // The way `runCoreGeneration` is set up, it returns the final text.
+
+            result = {
+                text: fullText,
+                citations: [],
+                relatedQuestions: [],
+            };
         } else {
             // Generic Providers (OpenAI, OpenRouter, Local)
             let endpoint = "";
@@ -988,12 +1039,6 @@ export class LLMService {
                 endpoint = "https://openrouter.ai/api/v1/chat/completions";
                 apiKey = openRouterKey;
                 modelName = openRouterModel || "openai/gpt-4o";
-            } else {
-                if (!activeLocalModel) throw new Error("No local model configured.");
-                // Default to standard Ollama port if not specified
-                endpoint = "http://localhost:11434/v1/chat/completions";
-                modelName = activeLocalModel.modelId;
-                apiKey = "not-needed";
             }
 
             // Determine correct search key

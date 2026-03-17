@@ -11,6 +11,7 @@ import { AppSettings, ModelProvider, LocalModelConfig, MemoryCategory } from '..
 import { SemanticMemoryEntry } from '../memory';
 import { memoryManager } from '../memory';
 import { UI_STRINGS, AVAILABLE_OFFLINE_MODELS } from '../constants';
+import { webLLMService } from '../services/webLLMService';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -330,47 +331,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
     };
 
     // --- Offline Model Logic ---
-    const handleDownloadModel = (model: LocalModelConfig) => {
-        // Simulate download
-        let progress = 0;
+    const handleDownloadModel = async (model: LocalModelConfig) => {
         setDownloadProgress(prev => ({ ...prev, [model.id]: 0 }));
 
-        const interval = setInterval(() => {
-            progress += Math.floor(Math.random() * 15) + 5;
-            if (progress >= 100) {
-                progress = 100;
-                clearInterval(interval);
+        try {
+            await webLLMService.loadModel(model.modelId, (percent, text) => {
+                console.log(`[WebLLM] ${text}`);
+                setDownloadProgress(prev => ({ ...prev, [model.id]: percent }));
+            });
 
-                // Add to "downloaded" list in settings
-                const updatedLocalModels = [...formData.localModels];
-                const existingIdx = updatedLocalModels.findIndex(m => m.id === model.id);
+            // Mark as downloaded in settings
+            const updatedLocalModels = [...formData.localModels];
+            const existingIdx = updatedLocalModels.findIndex(m => m.id === model.id);
+            const completedModel = { ...model, isDownloaded: true };
 
-                const completedModel = { ...model, isDownloaded: true };
-
-                if (existingIdx >= 0) {
-                    updatedLocalModels[existingIdx] = completedModel;
-                } else {
-                    updatedLocalModels.push(completedModel);
-                }
-
-                updateFormData({
-                    localModels: updatedLocalModels,
-                    activeLocalModelId: formData.activeLocalModelId || model.id,
-                    modelProvider: formData.modelProvider === ModelProvider.LOCAL ? formData.modelProvider : ModelProvider.LOCAL
-                });
-
-                // Clear progress after short delay
-                setTimeout(() => {
-                    setDownloadProgress(prev => {
-                        const next = { ...prev };
-                        delete next[model.id];
-                        return next;
-                    });
-                }, 500);
+            if (existingIdx >= 0) {
+                updatedLocalModels[existingIdx] = completedModel;
             } else {
-                setDownloadProgress(prev => ({ ...prev, [model.id]: progress }));
+                updatedLocalModels.push(completedModel);
             }
-        }, 400);
+
+            updateFormData({
+                localModels: updatedLocalModels,
+                activeLocalModelId: formData.activeLocalModelId || model.id,
+                modelProvider: ModelProvider.LOCAL
+            });
+
+        } catch (err) {
+            console.error('[WebLLM] Download/init failed:', err);
+            alert(`Failed to load model: ${model.name}.\nMake sure your browser supports WebGPU (Chrome 113+).`);
+        } finally {
+            setDownloadProgress(prev => {
+                const next = { ...prev };
+                delete next[model.id];
+                return next;
+            });
+        }
     };
 
     const handleDeleteModel = (id: string) => {
@@ -904,6 +900,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                                     Download highly optimized small language models (1B-7B) to run locally on your device without internet.
                                                 </p>
                                             </div>
+
+                                            {/* WebGPU Compatibility Warning */}
+                                            {!navigator.gpu && (
+                                                <div className="mb-4 px-4 py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl">
+                                                    <p className="text-xs text-yellow-400 font-medium">
+                                                        ⚠️ Your browser doesn't support WebGPU. Please use Chrome 113+ or Edge 113+ for offline models.
+                                                    </p>
+                                                </div>
+                                            )}
 
                                             <div className="space-y-4">
                                                 <h4 className="text-xs font-bold text-pplx-muted uppercase tracking-widest opacity-60 ml-1">Available Models</h4>
