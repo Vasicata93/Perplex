@@ -230,16 +230,7 @@ OUTPUT STRUCTURE:
 2. Code in a dedicated block — complete and functional
 3. Brief explanation AFTER code — what it does, why this approach, what edge cases are covered
 4. If sandbox validated → validation result mentioned explicitly (Stdout, time taken)
-5. If there are known limitations → mentioned clearly, not hidden\`,OR:
-- TypeScript by default if language is not specified
-- Cover important edge cases or mention them explicitly if not implementing them
-- Use search_memory for technical context about the user's project before writing code that needs to integrate
-
-OUTPUT STRUCTURE:
-1. Code in a dedicated block — complete and functional
-2. Brief explanation AFTER code — what it does, why this approach, what edge cases are covered
-3. If sandbox validated → validation result mentioned explicitly (Stdout, time taken)
-4. If there are known limitations → mentioned clearly, not hidden`,
+5. If there are known limitations → mentioned clearly, not hidden`,
   preferredTools: ['search_memory', 'web_search', 'execute_code'],
   outputFormat: 'Code block first (complete, functional). Brief explanation after. Validation result if sandbox was used. Known limitations if any. Run command or next steps if relevant.',
   qualityChecks: [
