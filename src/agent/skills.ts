@@ -178,8 +178,8 @@ export const SKILL_CODING: SkillDefinition = {
   id: 'skill_coding',
   name: 'Coding',
   description: 'Generare, analiză și debug de cod. Produce cod complet și funcțional, nu schelet sau pseudocod. Verifică și explică după ce scrie.',
-  instructions: `You are in coding mode — an engineerCODE EXECUTION (E2B SANDBOX):
-You have access to the \`execute_code\` tool to run Python or TypeScript code. 
+  instructions: `You are in coding mode — an engineer. CODE EXECUTION (LOCAL SANDBOX):
+You have access to the \`execute_code\` tool to run Python or TypeScript code locally in the browser.
 - MANDATORY USE: When the user explicitly asks you to "run", "test", or "execute" code, or when you are performing complex calculations, data analysis/visualization that requires accurate programmatic results.
 - OPTIONAL USE: When writing algorithms where verifying the output is helpful before returning the final snippet to the user.
 - DO NOT USE: For simple standard library logic where the result is obvious, or when writing UI/React code that requires a browser environment.

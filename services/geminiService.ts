@@ -30,23 +30,23 @@ function sanitizeContentForAgent(content: string): string {
 // --- Tool Definitions ---
 
 const searchToolGeneric = {
-  type: "function",
-  function: {
-    name: "perform_search",
-    description: "Searches the web for real-time information. REQUIRED for current events, news, weather, or specific facts not in your training data.",
-    parameters: {
-      type: "object",
-      properties: {
-        query: {
-            type: "string",
-            description: "The optimal search query to find the information."
-        }
-      },
-      required: ["query"],
-      additionalProperties: false
-    },
-    strict: true
-  }
+    type: "function",
+    function: {
+        name: "perform_search",
+        description: "Searches the web for real-time information. REQUIRED for current events, news, weather, or specific facts not in your training data.",
+        parameters: {
+            type: "object",
+            properties: {
+                query: {
+                    type: "string",
+                    description: "The optimal search query to find the information."
+                }
+            },
+            required: ["query"],
+            additionalProperties: false
+        },
+        strict: true
+    }
 };
 
 const saveToolGeneric = {
@@ -218,7 +218,7 @@ const semanticSearchToolGemini: FunctionDeclaration = {
 
 const executeCodeToolGemini: FunctionDeclaration = {
     name: "execute_code",
-    description: "Executes Python or TypeScript/JavaScript code in a secure E2B cloud sandbox. Use this to perform complex calculations, data analysis, format conversions, or verify algorithms. Do NOT use for basic logic. The result will contain stdout, stderr, and success status. If fallback is active, only TS/JS is supported.",
+    description: "Executes Python or TypeScript/JavaScript code locally in the browser. Python runs via Pyodide (WebAssembly), TypeScript/JS via Web Workers. No API key required. Always available.",
     parameters: {
         type: Type.OBJECT,
         properties: {
@@ -256,7 +256,7 @@ const executeCodeToolGeneric = {
     type: "function",
     function: {
         name: "execute_code",
-        description: "Executes Python or TypeScript/JavaScript code in a secure E2B cloud sandbox. Use this to perform complex calculations, data analysis, format conversions, or verify algorithms. Do NOT use for basic logic. The result will contain stdout, stderr, and success status. If fallback is active, only TS/JS is supported.",
+        description: "Executes Python or TypeScript/JavaScript code locally in the browser. Python runs via Pyodide (WebAssembly), TypeScript/JS via Web Workers. No API key required. Always available.",
         parameters: {
             type: "object",
             properties: {
@@ -284,10 +284,10 @@ const insertBlockToolGeneric = {
                 pageTitle: { type: "string", description: "The exact title of the page to modify." },
                 targetBlockId: { type: "string", description: "The ID of the block AFTER which to insert the new content. Use 'start' to insert at the top." },
                 content: { type: "string", description: "The text content of the new block." },
-                type: { 
-                    type: "string", 
+                type: {
+                    type: "string",
                     enum: ["paragraph", "heading_1", "heading_2", "heading_3", "bullet_list", "numbered_list", "todo_list", "code", "quote", "callout", "divider"],
-                    description: "The type of block to insert." 
+                    description: "The type of block to insert."
                 }
             },
             required: ["pageTitle", "targetBlockId", "content", "type"],
@@ -306,10 +306,10 @@ const insertBlockToolGemini: FunctionDeclaration = {
             pageTitle: { type: Type.STRING, description: "The exact title of the page to modify." },
             targetBlockId: { type: Type.STRING, description: "The ID of the block AFTER which to insert the new content. Use 'start' to insert at the top." },
             content: { type: Type.STRING, description: "The text content of the new block." },
-            type: { 
-                type: Type.STRING, 
+            type: {
+                type: Type.STRING,
                 enum: ["paragraph", "heading_1", "heading_2", "heading_3", "bullet_list", "numbered_list", "todo_list", "code", "quote", "callout", "divider"],
-                description: "The type of block to insert." 
+                description: "The type of block to insert."
             }
         },
         required: ["pageTitle", "targetBlockId", "content", "type"]
@@ -643,459 +643,459 @@ const getCurrentTimeToolGemini: FunctionDeclaration = {
 import { BlockService } from "./blockService";
 
 export class LLMService {
-  private ai: GoogleGenAI | null = null;
-  private apiKey: string | undefined;
-  
-  // Track listeners for "learning" state (brain pulse in UI)
-  private learningListeners: ((isLearning: boolean) => void)[] = [];
+    private ai: GoogleGenAI | null = null;
+    private apiKey: string | undefined;
 
-  // Virtual Knowledge Base for Tool-based Retrieval
-  private workspaceFiles: Attachment[] = [];
+    // Track listeners for "learning" state (brain pulse in UI)
+    private learningListeners: ((isLearning: boolean) => void)[] = [];
 
-  // Models that support internal reasoning via OpenRouter
-  private static readonly OPENROUTER_REASONING_MODELS = [
-    'deepseek-r1',
-    'deepseek-r1-0528',
-    'deepseek-v3.2',
-    'deepseek-v3.2-exp',
-    'deepseek-v3.2-speciale',
-    'deepseek-v3.1-terminus',
-    'deepseek-v3.1',
-    'qwen/qwq-32b',
-    'qwen/qwen3-235b-a22b',
-    'qwen/qwen3-30b-a3b',
-    'qwen/qwen3-14b',
-    'qwen/qwen3-8b',
-    'qwen/qwen3-max-thinking',
-    'claude-3.7-sonnet:thinking',
-    'gemini-3-pro-preview',
-    'gemini-3-flash-preview',
-    'gemini-2.5-pro-preview',
-    'gemini-2.5-flash',
-    'grok-4-1',
-    'grok-4-1-fast',
-    'minimax-m2.5',
-    'minimax-m1',
-    'glm-4-7',
-    'magistral-medium',
-    'magistral-small'
-  ];
+    // Virtual Knowledge Base for Tool-based Retrieval
+    private workspaceFiles: Attachment[] = [];
 
-  constructor() {
-    this.apiKey = process.env.API_KEY;
-    if (this.apiKey) {
-        try {
-            this.ai = new GoogleGenAI({ apiKey: this.apiKey });
-        } catch (e) {
-            console.error("Failed to initialize GoogleGenAI client:", e);
+    // Models that support internal reasoning via OpenRouter
+    private static readonly OPENROUTER_REASONING_MODELS = [
+        'deepseek-r1',
+        'deepseek-r1-0528',
+        'deepseek-v3.2',
+        'deepseek-v3.2-exp',
+        'deepseek-v3.2-speciale',
+        'deepseek-v3.1-terminus',
+        'deepseek-v3.1',
+        'qwen/qwq-32b',
+        'qwen/qwen3-235b-a22b',
+        'qwen/qwen3-30b-a3b',
+        'qwen/qwen3-14b',
+        'qwen/qwen3-8b',
+        'qwen/qwen3-max-thinking',
+        'claude-3.7-sonnet:thinking',
+        'gemini-3-pro-preview',
+        'gemini-3-flash-preview',
+        'gemini-2.5-pro-preview',
+        'gemini-2.5-flash',
+        'grok-4-1',
+        'grok-4-1-fast',
+        'minimax-m2.5',
+        'minimax-m1',
+        'glm-4-7',
+        'magistral-medium',
+        'magistral-small'
+    ];
+
+    constructor() {
+        this.apiKey = process.env.API_KEY;
+        if (this.apiKey) {
+            try {
+                this.ai = new GoogleGenAI({ apiKey: this.apiKey });
+            } catch (e) {
+                console.error("Failed to initialize GoogleGenAI client:", e);
+            }
         }
     }
-  }
 
-  // --- Observer for UI ---
-  public subscribeToLearningState(callback: (isLearning: boolean) => void) {
-      this.learningListeners.push(callback);
-  }
-
-  private notifyLearningState(isLearning: boolean) {
-      this.learningListeners.forEach(cb => cb(isLearning));
-  }
-
-  private abortController: AbortController | null = null;
-
-  public stopGeneration() {
-      if (this.abortController) {
-          this.abortController.abort();
-          this.abortController = null;
-      }
-  }
-
-  private async triggerMemoryConsolidation(
-      prompt: string, 
-      responseText: string, 
-      enableMemory: boolean, 
-      provider: ModelProvider,
-      openRouterKey: string,
-      openRouterModel: string,
-      openAiKey: string, 
-      openAiModel: string,
-      geminiApiKey?: string
-  ) {
-      if (enableMemory) {
-          await memoryManager.processNewMessage({ id: crypto.randomUUID(), role: Role.MODEL, content: responseText, timestamp: Date.now() }, 'current_session');
-          const buffer = memoryManager.workingMemory.getMessages();
-          const shouldConsolidate = buffer.length >= 5 || prompt.toLowerCase().includes("remember this") || prompt.toLowerCase().includes("salvează");
-          if (shouldConsolidate) {
-              this.runConsolidation(provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
-          }
-      }
-  }
-
-  /**
-   * Orchestrator function that implements the 3-stage agent architecture
-   */
-  async generateResponse(
-      history: Message[],
-      prompt: string,
-      attachments: Attachment[],
-      provider: ModelProvider,
-      openRouterKey: string,
-      openRouterModel: string,
-      openAiKey: string, 
-      openAiModel: string,
-      activeLocalModel: LocalModelConfig | undefined,
-      useSearch: boolean,
-      proMode: ProMode,
-      enableMemory: boolean,
-      userProfile: UserProfile,
-      aiProfile: AiProfile,
-      spaceSystemInstruction?: string,
-      tavilyApiKey?: string, 
-      geminiApiKey?: string,
-      searchProvider: 'tavily' | 'brave' = 'tavily',
-      braveApiKey?: string,
-      onChunk?: (text: string, reasoning?: string) => void,
-      useAgenticResearch: boolean = false,
-      threadId?: string
-  ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
-      
-      this.abortController = new AbortController();
-      const shortTermHistory = history.slice(-5); // 5 messages short-term memory
-
-      if (enableMemory) {
-          await memoryManager.processNewMessage({ id: crypto.randomUUID(), role: Role.USER, content: prompt, timestamp: Date.now() }, 'current_session');
-      }
-
-      let accumulatedReasoning = "";
-      const customOnChunk = (text: string, reasoning?: string) => {
-          if (reasoning) accumulatedReasoning += reasoning;
-          if (onChunk) onChunk(text, reasoning);
-      };
-
-      // If Agentic Research is disabled, bypass the planner and execute directly
-      if (!useAgenticResearch) {
-          if (onChunk) customOnChunk("", "⚡ Mod Chat Simplu (Fără etape)...\n");
-          const result = await this.runCoreGeneration(shortTermHistory, prompt, attachments, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel, useSearch, proMode, enableMemory, userProfile, aiProfile, spaceSystemInstruction, tavilyApiKey, geminiApiKey, searchProvider, braveApiKey, customOnChunk, undefined, threadId);
-          this.triggerMemoryConsolidation(prompt, result.text, enableMemory, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
-          result.reasoning = accumulatedReasoning + (result.reasoning || "");
-          return result;
-      }
-
-          // ─── Build the 5-Step Agent System Prompt ───────────────────────
-      const now = new Date();
-      const timeStr = now.toLocaleString('en-US', { 
-          weekday: 'long', 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric', 
-          hour: '2-digit', 
-          minute: '2-digit',
-          timeZoneName: 'short'
-      });
-
-      // Get memory context for the orchestrator
-      let memoryContextStr = '';
-      if (enableMemory) {
-          memoryContextStr = await memoryManager.formatContextString(prompt);
-      }
-
-      // Build the base system context (identity, profiles, protocols)
-      const baseSystemContext = await this.buildSystemContext(
-          prompt, '', enableMemory, userProfile, aiProfile, spaceSystemInstruction, false, false
-      );
-
-      // Build the full 5-step agent system prompt via the orchestrator
-      const { systemPrompt: agentSystemPrompt } = buildAgentSystemPrompt({
-          userMessage: prompt,
-          baseSystemContext,
-          memoryContext: memoryContextStr,
-          currentDateTime: timeStr,
-          config: DEFAULT_AGENT_CONFIG
-      });
-
-      const result = await this.runCoreGeneration(
-          shortTermHistory, 
-          prompt, 
-          attachments, 
-          provider, 
-          openRouterKey, 
-          openRouterModel, 
-          openAiKey, 
-          openAiModel, 
-          activeLocalModel, 
-          true, // useSearch
-          proMode, 
-          enableMemory, 
-          userProfile, 
-          aiProfile, 
-          spaceSystemInstruction, 
-          tavilyApiKey, 
-          geminiApiKey, 
-          searchProvider, 
-          braveApiKey, 
-          customOnChunk, 
-          agentSystemPrompt,
-          threadId
-      );
-
-      this.triggerMemoryConsolidation(prompt, result.text, enableMemory, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
-      result.reasoning = accumulatedReasoning + (result.reasoning || "");
-      
-      return result;
-  }
-
-  /**
-   * Internal generation function that routes to the correct provider
-   */
-  async runCoreGeneration(
-    history: Message[],
-    prompt: string,
-    attachments: Attachment[],
-    provider: ModelProvider,
-    openRouterKey: string,
-    openRouterModel: string,
-    openAiKey: string, 
-    openAiModel: string,
-    activeLocalModel: LocalModelConfig | undefined,
-    useSearch: boolean,
-    proMode: ProMode,
-    enableMemory: boolean,
-    userProfile: UserProfile,
-    aiProfile: AiProfile,
-    spaceSystemInstruction?: string,
-    tavilyApiKey?: string, 
-    geminiApiKey?: string,
-    searchProvider: 'tavily' | 'brave' = 'tavily',
-    braveApiKey?: string,
-    onChunk?: (text: string, reasoning?: string) => void,
-    systemInstructionOverride?: string,
-    threadId?: string
-  ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
-    
-    // Reset AbortController
-    this.abortController = new AbortController();
-
-    // 1. Add User Observation to Buffer
-    if (enableMemory) {
-        await memoryManager.processNewMessage({ id: crypto.randomUUID(), role: Role.USER, content: prompt, timestamp: Date.now() }, 'current_session');
+    // --- Observer for UI ---
+    public subscribeToLearningState(callback: (isLearning: boolean) => void) {
+        this.learningListeners.push(callback);
     }
 
-    // 2. Determine System Logic based on ProMode
-    let modeInstruction = "";
-    let forceReasoning = false;
-    let forceSearch = useSearch;
-
-    switch (proMode) {
-        case ProMode.STANDARD:
-            break;
-        case ProMode.REASONING:
-            forceReasoning = true;
-            modeInstruction = "You are in DEEP REASONING mode. Think deeply, analyze the problem step-by-step before answering.";
-            break;
-        case ProMode.THINKING:
-            forceReasoning = true; 
-            modeInstruction = "You are in THINKING mode. Break down the user's query into logical components.";
-            break;
-        case ProMode.RESEARCH:
-            forceSearch = true;
-            modeInstruction = "You are in RESEARCH mode. Provide a highly detailed report with extensive citations.";
-            break;
-        case ProMode.LEARNING:
-            modeInstruction = "You are in LEARNING mode. Act as a Socratic tutor. Guide the user.";
-            break;
-        case ProMode.SHOPPING:
-            forceSearch = true;
-            modeInstruction = "You are in SHOPPING RESEARCH mode. Find products, compare prices, and look for reviews.";
-            break;
+    private notifyLearningState(isLearning: boolean) {
+        this.learningListeners.forEach(cb => cb(isLearning));
     }
 
-    // 3. Build the System Context (Used by all providers)
-    // We pass the provider type so we can inject specific instructions (like <thinking> tags for Generic models)
-    
-    // --- SMART CONTEXT RETRIEVAL: Handle large workspace files ---
-    const MAX_DIRECT_FILES = 3;
-    const MAX_DIRECT_SIZE = 15000; // characters
-    
-    let directAttachments = [...attachments];
-    let virtualFiles: Attachment[] = [];
-    let kbSummary = "";
+    private abortController: AbortController | null = null;
 
-    // Identify text files that are part of the workspace
-    const textFiles = attachments.filter(a => a.type === 'text');
-    
-    // Always populate workspaceFiles for tool usage, even if they are also in direct context
-    this.workspaceFiles = textFiles;
+    public stopGeneration() {
+        if (this.abortController) {
+            this.abortController.abort();
+            this.abortController = null;
+        }
+    }
 
-    const totalSize = textFiles.reduce((sum, a) => sum + (a.content?.length || 0), 0);
+    private async triggerMemoryConsolidation(
+        prompt: string,
+        responseText: string,
+        enableMemory: boolean,
+        provider: ModelProvider,
+        openRouterKey: string,
+        openRouterModel: string,
+        openAiKey: string,
+        openAiModel: string,
+        geminiApiKey?: string
+    ) {
+        if (enableMemory) {
+            await memoryManager.processNewMessage({ id: crypto.randomUUID(), role: Role.MODEL, content: responseText, timestamp: Date.now() }, 'current_session');
+            const buffer = memoryManager.workingMemory.getMessages();
+            const shouldConsolidate = buffer.length >= 5 || prompt.toLowerCase().includes("remember this") || prompt.toLowerCase().includes("salvează");
+            if (shouldConsolidate) {
+                this.runConsolidation(provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
+            }
+        }
+    }
 
-    if (textFiles.length > MAX_DIRECT_FILES || totalSize > MAX_DIRECT_SIZE) {
-        // Move large/many files to virtual storage
-        virtualFiles = textFiles;
-        
-        // Keep only images and non-text attachments in direct
-        directAttachments = attachments.filter(a => a.type !== 'text');
-        
-        // Build a summary for the model
-        kbSummary = "\n\n**AVAILABLE WORKSPACE FILES (Knowledge Base):**\n";
-        virtualFiles.forEach(f => {
-            const sizeKb = Math.round((f.content?.length || 0) / 1024);
-            kbSummary += `- ${f.name} (${sizeKb} KB)\n`;
+    /**
+     * Orchestrator function that implements the 3-stage agent architecture
+     */
+    async generateResponse(
+        history: Message[],
+        prompt: string,
+        attachments: Attachment[],
+        provider: ModelProvider,
+        openRouterKey: string,
+        openRouterModel: string,
+        openAiKey: string,
+        openAiModel: string,
+        activeLocalModel: LocalModelConfig | undefined,
+        useSearch: boolean,
+        proMode: ProMode,
+        enableMemory: boolean,
+        userProfile: UserProfile,
+        aiProfile: AiProfile,
+        spaceSystemInstruction?: string,
+        tavilyApiKey?: string,
+        geminiApiKey?: string,
+        searchProvider: 'tavily' | 'brave' = 'tavily',
+        braveApiKey?: string,
+        onChunk?: (text: string, reasoning?: string) => void,
+        useAgenticResearch: boolean = false,
+        threadId?: string
+    ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
+
+        this.abortController = new AbortController();
+        const shortTermHistory = history.slice(-5); // 5 messages short-term memory
+
+        if (enableMemory) {
+            await memoryManager.processNewMessage({ id: crypto.randomUUID(), role: Role.USER, content: prompt, timestamp: Date.now() }, 'current_session');
+        }
+
+        let accumulatedReasoning = "";
+        const customOnChunk = (text: string, reasoning?: string) => {
+            if (reasoning) accumulatedReasoning += reasoning;
+            if (onChunk) onChunk(text, reasoning);
+        };
+
+        // If Agentic Research is disabled, bypass the planner and execute directly
+        if (!useAgenticResearch) {
+            if (onChunk) customOnChunk("", "⚡ Mod Chat Simplu (Fără etape)...\n");
+            const result = await this.runCoreGeneration(shortTermHistory, prompt, attachments, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel, useSearch, proMode, enableMemory, userProfile, aiProfile, spaceSystemInstruction, tavilyApiKey, geminiApiKey, searchProvider, braveApiKey, customOnChunk, undefined, threadId);
+            this.triggerMemoryConsolidation(prompt, result.text, enableMemory, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
+            result.reasoning = accumulatedReasoning + (result.reasoning || "");
+            return result;
+        }
+
+        // ─── Build the 5-Step Agent System Prompt ───────────────────────
+        const now = new Date();
+        const timeStr = now.toLocaleString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZoneName: 'short'
         });
-        kbSummary += "\n**IMPORTANT:** The full content of these files is NOT currently in your context to save tokens. If you need to read a specific file to answer the user's question accurately, you **MUST** use the `read_workspace_files` tool. Do not guess the content.";
-    } else {
-        // Keep files in direct context, but also available in workspaceFiles for tools
-    }
 
-    const systemInstruction = await this.buildSystemContext(
-        prompt, 
-        (systemInstructionOverride ? systemInstructionOverride + "\n\n" : "") + modeInstruction + kbSummary,
-        enableMemory, 
-        userProfile, 
-        aiProfile, 
-        spaceSystemInstruction,
-        provider === ModelProvider.GEMINI ? false : forceReasoning, // Only force XML thinking for non-Gemini
-        provider !== ModelProvider.GEMINI && (forceSearch || virtualFiles.length > 0) // Force explicit tool instruction for generics
-    );
-
-    let result: { text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string } = { text: "", citations: [] as Citation[], relatedQuestions: [] as string[] };
-
-    // 4. Route to Provider
-    if (provider === ModelProvider.GEMINI) {
-        result = await this.generateGeminiResponse(
-            history,
-            prompt, 
-            directAttachments, 
-            forceSearch, 
-            forceReasoning, 
-            proMode,
-            enableMemory, 
-            systemInstruction,
-            geminiApiKey,
-            onChunk,
-            virtualFiles.length > 0, // Enable readFiles tool
-            threadId
-        );
-    } else {
-        // Generic Providers (OpenAI, OpenRouter, Local)
-        let endpoint = "";
-        let apiKey = "";
-        let modelName = "";
-
-        if (provider === ModelProvider.OPENAI) {
-            endpoint = "https://api.openai.com/v1/chat/completions";
-            apiKey = openAiKey;
-            modelName = openAiModel || "gpt-4o"; 
-        } else if (provider === ModelProvider.OPENROUTER) {
-            endpoint = "https://openrouter.ai/api/v1/chat/completions";
-            apiKey = openRouterKey;
-            modelName = openRouterModel || "openai/gpt-4o"; 
-        } else {
-            if (!activeLocalModel) throw new Error("No local model configured.");
-            // Default to standard Ollama port if not specified
-            endpoint = "http://localhost:11434/v1/chat/completions";
-            modelName = activeLocalModel.modelId;
-            apiKey = "not-needed"; 
+        // Get memory context for the orchestrator
+        let memoryContextStr = '';
+        if (enableMemory) {
+            memoryContextStr = await memoryManager.formatContextString(prompt);
         }
 
-        // Determine correct search key
-        const activeSearchKey = searchProvider === 'brave' ? braveApiKey : tavilyApiKey;
+        // Build the base system context (identity, profiles, protocols)
+        const baseSystemContext = await this.buildSystemContext(
+            prompt, '', enableMemory, userProfile, aiProfile, spaceSystemInstruction, false, false
+        );
 
-        result = await this.generateGenericResponse(
-            history,
+        // Build the full 5-step agent system prompt via the orchestrator
+        const { systemPrompt: agentSystemPrompt } = buildAgentSystemPrompt({
+            userMessage: prompt,
+            baseSystemContext,
+            memoryContext: memoryContextStr,
+            currentDateTime: timeStr,
+            config: DEFAULT_AGENT_CONFIG
+        });
+
+        const result = await this.runCoreGeneration(
+            shortTermHistory,
             prompt,
-            directAttachments,
-            endpoint,
-            apiKey,
-            modelName,
-            systemInstruction,
-            enableMemory,
-            forceSearch,
-            searchProvider,
-            activeSearchKey,
-            onChunk,
-            virtualFiles.length > 0, // Enable readFiles tool
+            attachments,
+            provider,
+            openRouterKey,
+            openRouterModel,
+            openAiKey,
+            openAiModel,
+            activeLocalModel,
+            true, // useSearch
             proMode,
+            enableMemory,
+            userProfile,
+            aiProfile,
+            spaceSystemInstruction,
+            tavilyApiKey,
+            geminiApiKey,
+            searchProvider,
+            braveApiKey,
+            customOnChunk,
+            agentSystemPrompt,
             threadId
         );
+
+        this.triggerMemoryConsolidation(prompt, result.text, enableMemory, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
+        result.reasoning = accumulatedReasoning + (result.reasoning || "");
+
+        return result;
     }
 
-    return result;
-  }
+    /**
+     * Internal generation function that routes to the correct provider
+     */
+    async runCoreGeneration(
+        history: Message[],
+        prompt: string,
+        attachments: Attachment[],
+        provider: ModelProvider,
+        openRouterKey: string,
+        openRouterModel: string,
+        openAiKey: string,
+        openAiModel: string,
+        activeLocalModel: LocalModelConfig | undefined,
+        useSearch: boolean,
+        proMode: ProMode,
+        enableMemory: boolean,
+        userProfile: UserProfile,
+        aiProfile: AiProfile,
+        spaceSystemInstruction?: string,
+        tavilyApiKey?: string,
+        geminiApiKey?: string,
+        searchProvider: 'tavily' | 'brave' = 'tavily',
+        braveApiKey?: string,
+        onChunk?: (text: string, reasoning?: string) => void,
+        systemInstructionOverride?: string,
+        threadId?: string
+    ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
 
-  // --- Helper: Extract JSON content ---
-  private extractJson(text: string): any {
-    try {
-        return JSON.parse(text);
-    } catch (e) {
-        let clean = text.trim();
-        clean = clean.replace(/^```[a-z]*\s*/i, '');
-        clean = clean.replace(/\s*```$/, '');
-        try { 
-          return JSON.parse(clean); 
-        } catch (e2) {
-           const firstOpen = text.indexOf('{');
-           const lastClose = text.lastIndexOf('}');
-           if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
-               const candidate = text.substring(firstOpen, lastClose + 1);
-               try { return JSON.parse(candidate); } catch (e3) {}
-           }
-           throw e;
+        // Reset AbortController
+        this.abortController = new AbortController();
+
+        // 1. Add User Observation to Buffer
+        if (enableMemory) {
+            await memoryManager.processNewMessage({ id: crypto.randomUUID(), role: Role.USER, content: prompt, timestamp: Date.now() }, 'current_session');
+        }
+
+        // 2. Determine System Logic based on ProMode
+        let modeInstruction = "";
+        let forceReasoning = false;
+        let forceSearch = useSearch;
+
+        switch (proMode) {
+            case ProMode.STANDARD:
+                break;
+            case ProMode.REASONING:
+                forceReasoning = true;
+                modeInstruction = "You are in DEEP REASONING mode. Think deeply, analyze the problem step-by-step before answering.";
+                break;
+            case ProMode.THINKING:
+                forceReasoning = true;
+                modeInstruction = "You are in THINKING mode. Break down the user's query into logical components.";
+                break;
+            case ProMode.RESEARCH:
+                forceSearch = true;
+                modeInstruction = "You are in RESEARCH mode. Provide a highly detailed report with extensive citations.";
+                break;
+            case ProMode.LEARNING:
+                modeInstruction = "You are in LEARNING mode. Act as a Socratic tutor. Guide the user.";
+                break;
+            case ProMode.SHOPPING:
+                forceSearch = true;
+                modeInstruction = "You are in SHOPPING RESEARCH mode. Find products, compare prices, and look for reviews.";
+                break;
+        }
+
+        // 3. Build the System Context (Used by all providers)
+        // We pass the provider type so we can inject specific instructions (like <thinking> tags for Generic models)
+
+        // --- SMART CONTEXT RETRIEVAL: Handle large workspace files ---
+        const MAX_DIRECT_FILES = 3;
+        const MAX_DIRECT_SIZE = 15000; // characters
+
+        let directAttachments = [...attachments];
+        let virtualFiles: Attachment[] = [];
+        let kbSummary = "";
+
+        // Identify text files that are part of the workspace
+        const textFiles = attachments.filter(a => a.type === 'text');
+
+        // Always populate workspaceFiles for tool usage, even if they are also in direct context
+        this.workspaceFiles = textFiles;
+
+        const totalSize = textFiles.reduce((sum, a) => sum + (a.content?.length || 0), 0);
+
+        if (textFiles.length > MAX_DIRECT_FILES || totalSize > MAX_DIRECT_SIZE) {
+            // Move large/many files to virtual storage
+            virtualFiles = textFiles;
+
+            // Keep only images and non-text attachments in direct
+            directAttachments = attachments.filter(a => a.type !== 'text');
+
+            // Build a summary for the model
+            kbSummary = "\n\n**AVAILABLE WORKSPACE FILES (Knowledge Base):**\n";
+            virtualFiles.forEach(f => {
+                const sizeKb = Math.round((f.content?.length || 0) / 1024);
+                kbSummary += `- ${f.name} (${sizeKb} KB)\n`;
+            });
+            kbSummary += "\n**IMPORTANT:** The full content of these files is NOT currently in your context to save tokens. If you need to read a specific file to answer the user's question accurately, you **MUST** use the `read_workspace_files` tool. Do not guess the content.";
+        } else {
+            // Keep files in direct context, but also available in workspaceFiles for tools
+        }
+
+        const systemInstruction = await this.buildSystemContext(
+            prompt,
+            (systemInstructionOverride ? systemInstructionOverride + "\n\n" : "") + modeInstruction + kbSummary,
+            enableMemory,
+            userProfile,
+            aiProfile,
+            spaceSystemInstruction,
+            provider === ModelProvider.GEMINI ? false : forceReasoning, // Only force XML thinking for non-Gemini
+            provider !== ModelProvider.GEMINI && (forceSearch || virtualFiles.length > 0) // Force explicit tool instruction for generics
+        );
+
+        let result: { text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string } = { text: "", citations: [] as Citation[], relatedQuestions: [] as string[] };
+
+        // 4. Route to Provider
+        if (provider === ModelProvider.GEMINI) {
+            result = await this.generateGeminiResponse(
+                history,
+                prompt,
+                directAttachments,
+                forceSearch,
+                forceReasoning,
+                proMode,
+                enableMemory,
+                systemInstruction,
+                geminiApiKey,
+                onChunk,
+                virtualFiles.length > 0, // Enable readFiles tool
+                threadId
+            );
+        } else {
+            // Generic Providers (OpenAI, OpenRouter, Local)
+            let endpoint = "";
+            let apiKey = "";
+            let modelName = "";
+
+            if (provider === ModelProvider.OPENAI) {
+                endpoint = "https://api.openai.com/v1/chat/completions";
+                apiKey = openAiKey;
+                modelName = openAiModel || "gpt-4o";
+            } else if (provider === ModelProvider.OPENROUTER) {
+                endpoint = "https://openrouter.ai/api/v1/chat/completions";
+                apiKey = openRouterKey;
+                modelName = openRouterModel || "openai/gpt-4o";
+            } else {
+                if (!activeLocalModel) throw new Error("No local model configured.");
+                // Default to standard Ollama port if not specified
+                endpoint = "http://localhost:11434/v1/chat/completions";
+                modelName = activeLocalModel.modelId;
+                apiKey = "not-needed";
+            }
+
+            // Determine correct search key
+            const activeSearchKey = searchProvider === 'brave' ? braveApiKey : tavilyApiKey;
+
+            result = await this.generateGenericResponse(
+                history,
+                prompt,
+                directAttachments,
+                endpoint,
+                apiKey,
+                modelName,
+                systemInstruction,
+                enableMemory,
+                forceSearch,
+                searchProvider,
+                activeSearchKey,
+                onChunk,
+                virtualFiles.length > 0, // Enable readFiles tool
+                proMode,
+                threadId
+            );
+        }
+
+        return result;
+    }
+
+    // --- Helper: Extract JSON content ---
+    private extractJson(text: string): any {
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            let clean = text.trim();
+            clean = clean.replace(/^```[a-z]*\s*/i, '');
+            clean = clean.replace(/\s*```$/, '');
+            try {
+                return JSON.parse(clean);
+            } catch (e2) {
+                const firstOpen = text.indexOf('{');
+                const lastClose = text.lastIndexOf('}');
+                if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
+                    const candidate = text.substring(firstOpen, lastClose + 1);
+                    try { return JSON.parse(candidate); } catch (e3) { }
+                }
+                throw e;
+            }
         }
     }
-  }
 
-  // --- Helper: Extract Related Questions ---
-  private extractRelatedQuestions(text: string): { cleanText: string, questions: string[] } {
-      const jsonBlockRegex = /```json\s*(\[\s*".*?"\s*(?:,\s*".*?"\s*)*\])\s*```$/s;
-      const match = text.match(jsonBlockRegex);
-      let questions: string[] = [];
-      let cleanText = text;
+    // --- Helper: Extract Related Questions ---
+    private extractRelatedQuestions(text: string): { cleanText: string, questions: string[] } {
+        const jsonBlockRegex = /```json\s*(\[\s*".*?"\s*(?:,\s*".*?"\s*)*\])\s*```$/s;
+        const match = text.match(jsonBlockRegex);
+        let questions: string[] = [];
+        let cleanText = text;
 
-      if (match) {
-          try {
-              questions = JSON.parse(match[1]);
-              cleanText = text.replace(match[0], '').trim();
-          } catch (e) {
-              // Failed to parse
-          }
-      }
-      return { cleanText, questions };
-  }
+        if (match) {
+            try {
+                questions = JSON.parse(match[1]);
+                cleanText = text.replace(match[0], '').trim();
+            } catch (e) {
+                // Failed to parse
+            }
+        }
+        return { cleanText, questions };
+    }
 
-  // --- Helper: Extract XML Reasoning (For Generic Models) ---
-  private extractXmlThinking(text: string): { cleanText: string, reasoning?: string } {
-      const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/i;
-      const match = text.match(thinkingRegex);
-      
-      if (match && match[1]) {
-          const reasoning = match[1].trim();
-          const cleanText = text.replace(thinkingRegex, '').trim();
-          return { cleanText, reasoning };
-      }
-      
-      return { cleanText: text };
-  }
+    // --- Helper: Extract XML Reasoning (For Generic Models) ---
+    private extractXmlThinking(text: string): { cleanText: string, reasoning?: string } {
+        const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/i;
+        const match = text.match(thinkingRegex);
 
-  // --- Synthesis Engine (Consolidation) ---
-  private async runConsolidation(
-      provider: ModelProvider,
-      openRouterKey: string,
-      openRouterModel: string,
-      openAiKey: string, 
-      openAiModel: string,
-      geminiApiKey?: string
-  ) {
-      console.log("[Memory] Starting Consolidation...");
-      this.notifyLearningState(true);
-      
-      try {
-        const buffer = memoryManager.workingMemory.getMessages();
-        if (buffer.length === 0) return;
+        if (match && match[1]) {
+            const reasoning = match[1].trim();
+            const cleanText = text.replace(thinkingRegex, '').trim();
+            return { cleanText, reasoning };
+        }
 
-        const currentMemories = memoryManager.semanticMemory.getAllEntries();
-        const currentProjects = await db.get<any[]>(STORES.PROJECTS, 'all') || [];
+        return { cleanText: text };
+    }
 
-        const consolidationPrompt = `
+    // --- Synthesis Engine (Consolidation) ---
+    private async runConsolidation(
+        provider: ModelProvider,
+        openRouterKey: string,
+        openRouterModel: string,
+        openAiKey: string,
+        openAiModel: string,
+        geminiApiKey?: string
+    ) {
+        console.log("[Memory] Starting Consolidation...");
+        this.notifyLearningState(true);
+
+        try {
+            const buffer = memoryManager.workingMemory.getMessages();
+            if (buffer.length === 0) return;
+
+            const currentMemories = memoryManager.semanticMemory.getAllEntries();
+            const currentProjects = await db.get<any[]>(STORES.PROJECTS, 'all') || [];
+
+            const consolidationPrompt = `
         You are the Memory Manager. Your goal is to keep the Long-Term Memory clean, concise, and useful.
         
         RULES:
@@ -1119,581 +1119,573 @@ export class LLMService {
         }
         `;
 
-        let jsonText = "";
+            let jsonText = "";
 
-        if (provider === ModelProvider.GEMINI) {
-            let clientToUse = this.ai;
-            if (geminiApiKey) {
-                try { clientToUse = new GoogleGenAI({ apiKey: geminiApiKey }); } catch(e) {}
-            }
-            if (!clientToUse) return;
-
-            const response = await clientToUse.models.generateContent({
-                model: "gemini-3-flash-preview", 
-                contents: [{ parts: [{ text: consolidationPrompt }] }],
-                config: { responseMimeType: "application/json" }
-            });
-
-            try {
-                jsonText = response.text || "";
-            } catch (e) {
-                // Fallback if text getter fails (e.g. mixed content warning)
-                if (response.candidates?.[0]?.content?.parts) {
-                    for (const part of response.candidates[0].content.parts) {
-                        if (part.text) jsonText += part.text;
-                    }
+            if (provider === ModelProvider.GEMINI) {
+                let clientToUse = this.ai;
+                if (geminiApiKey) {
+                    try { clientToUse = new GoogleGenAI({ apiKey: geminiApiKey }); } catch (e) { }
                 }
-            }
-        } else if (provider === ModelProvider.OPENROUTER || provider === ModelProvider.OPENAI) {
-            const isRouter = provider === ModelProvider.OPENROUTER;
-            const endpoint = isRouter ? 'https://openrouter.ai/api/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions';
-            const apiKey = isRouter ? openRouterKey : openAiKey;
-            const modelName = isRouter ? openRouterModel : openAiModel;
-            
-            if (!apiKey) {
-                console.warn(`[Memory] No API key provided for ${provider}. Consolidation aborted.`);
-                this.notifyLearningState(false);
-                return;
-            }
+                if (!clientToUse) return;
 
-            const headers: Record<string, string> = {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            };
+                const response = await clientToUse.models.generateContent({
+                    model: "gemini-3-flash-preview",
+                    contents: [{ parts: [{ text: consolidationPrompt }] }],
+                    config: { responseMimeType: "application/json" }
+                });
 
-            if (isRouter) {
-                headers['HTTP-Referer'] = window.location.origin;
-                headers['X-Title'] = "Perplex Clone";
-            }
-
-            const body = {
-                model: modelName,
-                messages: [{ role: 'user', content: consolidationPrompt }],
-                // Note: Not all providers support response_format: { type: "json_object" }, 
-                // but we prompt for it nicely.
-                temperature: 0.1
-            };
-
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(body)
-            });
-
-            if (!response.ok) {
-                console.error(`[Memory] Consolidation fetch failed for ${provider}: ${response.status} ${await response.text()}`);
-                this.notifyLearningState(false);
-                return;
-            }
-            
-            const data = await response.json();
-            jsonText = data.choices?.[0]?.message?.content || "";
-        }
-
-        if (jsonText) {
-            try {
-                const updates = this.extractJson(jsonText);
-                // The new memory system handles consolidation automatically based on message count.
-                // If we need to explicitly save new facts from the LLM response:
-                if (updates.new_facts && Array.isArray(updates.new_facts)) {
-                    for (const fact of updates.new_facts) {
-                        await memoryManager.saveExplicitMemory(fact.content, fact.category || 'other');
-                    }
-                }
-                // Projects update
-                if (updates.project_updates && Array.isArray(updates.project_updates)) {
-                    const projects = await db.get<any[]>(STORES.PROJECTS, 'all') || [];
-                    updates.project_updates.forEach((update: any) => {
-                        const existing = projects.find(p => p.title.toLowerCase() === update.title.toLowerCase());
-                        if (existing) {
-                            if (update.progress) existing.progress = update.progress;
-                            if (update.nextStep) existing.nextStep = update.nextStep;
-                            if (update.status) existing.status = update.status;
-                            existing.lastUpdated = Date.now();
-                        } else {
-                            projects.push({
-                                id: crypto.randomUUID(),
-                                title: update.title,
-                                status: update.status || 'active',
-                                progress: update.progress || 'Started',
-                                nextStep: update.nextStep || 'Planning',
-                                techStack: update.techStack || [],
-                                lastUpdated: Date.now()
-                            });
+                try {
+                    jsonText = response.text || "";
+                } catch (e) {
+                    // Fallback if text getter fails (e.g. mixed content warning)
+                    if (response.candidates?.[0]?.content?.parts) {
+                        for (const part of response.candidates[0].content.parts) {
+                            if (part.text) jsonText += part.text;
                         }
-                    });
-                    await db.set(STORES.PROJECTS, 'all', projects);
-                }
-                // Skills update
-                if (updates.new_skills && Array.isArray(updates.new_skills)) {
-                    for (const skill of updates.new_skills) {
-                        await memoryManager.saveExplicitMemory(skill, 'skills' as any);
                     }
                 }
-            } catch (jsonError) {
-                console.error("[Memory] JSON Parse failed during consolidation");
+            } else if (provider === ModelProvider.OPENROUTER || provider === ModelProvider.OPENAI) {
+                const isRouter = provider === ModelProvider.OPENROUTER;
+                const endpoint = isRouter ? 'https://openrouter.ai/api/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions';
+                const apiKey = isRouter ? openRouterKey : openAiKey;
+                const modelName = isRouter ? openRouterModel : openAiModel;
+
+                if (!apiKey) {
+                    console.warn(`[Memory] No API key provided for ${provider}. Consolidation aborted.`);
+                    this.notifyLearningState(false);
+                    return;
+                }
+
+                const headers: Record<string, string> = {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                };
+
+                if (isRouter) {
+                    headers['HTTP-Referer'] = window.location.origin;
+                    headers['X-Title'] = "Perplex Clone";
+                }
+
+                const body = {
+                    model: modelName,
+                    messages: [{ role: 'user', content: consolidationPrompt }],
+                    // Note: Not all providers support response_format: { type: "json_object" }, 
+                    // but we prompt for it nicely.
+                    temperature: 0.1
+                };
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(body)
+                });
+
+                if (!response.ok) {
+                    console.error(`[Memory] Consolidation fetch failed for ${provider}: ${response.status} ${await response.text()}`);
+                    this.notifyLearningState(false);
+                    return;
+                }
+
+                const data = await response.json();
+                jsonText = data.choices?.[0]?.message?.content || "";
+            }
+
+            if (jsonText) {
+                try {
+                    const updates = this.extractJson(jsonText);
+                    // The new memory system handles consolidation automatically based on message count.
+                    // If we need to explicitly save new facts from the LLM response:
+                    if (updates.new_facts && Array.isArray(updates.new_facts)) {
+                        for (const fact of updates.new_facts) {
+                            await memoryManager.saveExplicitMemory(fact.content, fact.category || 'other');
+                        }
+                    }
+                    // Projects update
+                    if (updates.project_updates && Array.isArray(updates.project_updates)) {
+                        const projects = await db.get<any[]>(STORES.PROJECTS, 'all') || [];
+                        updates.project_updates.forEach((update: any) => {
+                            const existing = projects.find(p => p.title.toLowerCase() === update.title.toLowerCase());
+                            if (existing) {
+                                if (update.progress) existing.progress = update.progress;
+                                if (update.nextStep) existing.nextStep = update.nextStep;
+                                if (update.status) existing.status = update.status;
+                                existing.lastUpdated = Date.now();
+                            } else {
+                                projects.push({
+                                    id: crypto.randomUUID(),
+                                    title: update.title,
+                                    status: update.status || 'active',
+                                    progress: update.progress || 'Started',
+                                    nextStep: update.nextStep || 'Planning',
+                                    techStack: update.techStack || [],
+                                    lastUpdated: Date.now()
+                                });
+                            }
+                        });
+                        await db.set(STORES.PROJECTS, 'all', projects);
+                    }
+                    // Skills update
+                    if (updates.new_skills && Array.isArray(updates.new_skills)) {
+                        for (const skill of updates.new_skills) {
+                            await memoryManager.saveExplicitMemory(skill, 'skills' as any);
+                        }
+                    }
+                } catch (jsonError) {
+                    console.error("[Memory] JSON Parse failed during consolidation");
+                }
+            }
+
+        } catch (e) {
+            console.error("[Memory] Consolidation failed", e);
+        } finally {
+            this.notifyLearningState(false);
+        }
+    }
+
+    // --- Gemini Implementation ---
+    private async generateGeminiResponse(
+        history: Message[],
+        prompt: string,
+        attachments: Attachment[],
+        useSearch: boolean,
+        enableReasoning: boolean,
+        proMode: ProMode,
+        _enableMemory: boolean,
+        systemInstruction: string,
+        customApiKey?: string,
+        onChunk?: (text: string, reasoning?: string) => void,
+        useReadFiles: boolean = false,
+        threadId?: string
+    ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
+
+        let clientToUse = this.ai;
+        if (customApiKey) {
+            try {
+                clientToUse = new GoogleGenAI({ apiKey: customApiKey });
+            } catch (e) {
+                return { text: "Error: Invalid Gemini API Key.", citations: [], relatedQuestions: [] };
             }
         }
 
-      } catch (e) {
-          console.error("[Memory] Consolidation failed", e);
-      } finally {
-          this.notifyLearningState(false);
-      }
-  }
-
-  // --- Gemini Implementation ---
-  private async generateGeminiResponse(
-    history: Message[],
-    prompt: string,
-    attachments: Attachment[],
-    useSearch: boolean,
-    enableReasoning: boolean,
-    proMode: ProMode,
-    _enableMemory: boolean,
-    systemInstruction: string,
-    customApiKey?: string,
-    onChunk?: (text: string, reasoning?: string) => void,
-    useReadFiles: boolean = false,
-    threadId?: string
-  ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
-    
-    let clientToUse = this.ai;
-    if (customApiKey) {
-        try {
-            clientToUse = new GoogleGenAI({ apiKey: customApiKey });
-        } catch (e) {
-            return { text: "Error: Invalid Gemini API Key.", citations: [], relatedQuestions: [] };
+        if (!clientToUse) {
+            return { text: "Eroare: API Key pentru Gemini nu este configurat.", citations: [], relatedQuestions: [] };
         }
-    }
 
-    if (!clientToUse) {
-        return { text: "Eroare: API Key pentru Gemini nu este configurat.", citations: [], relatedQuestions: [] };
-    }
+        const modelId = (enableReasoning || proMode === ProMode.REASONING || proMode === ProMode.THINKING)
+            ? "gemini-3.1-pro-preview"
+            : "gemini-3-flash-preview";
 
-    const modelId = (enableReasoning || proMode === ProMode.REASONING || proMode === ProMode.THINKING) 
-        ? "gemini-3.1-pro-preview" 
-        : "gemini-3-flash-preview"; 
-
-    const tools: Tool[] = [];
-    if (useSearch) {
-        tools.push({ googleSearch: {} });
-    }
-    tools.push({ functionDeclarations: [saveToolGemini, insertBlockToolGemini, replaceBlockToolGemini, deleteBlockToolGemini, getPageStructureToolGemini, updateTableToolGemini, listCalendarEventsTool, addCalendarEventTool, updateCalendarEventTool, deleteCalendarEventTool, getCurrentTimeToolGemini, getCalendarHolidaysToolGemini, executeCodeToolGemini] });
-    if (useReadFiles) {
-        tools.push({ functionDeclarations: [readFilesToolGemini, searchFilesToolGemini, getWorkspaceMapToolGemini, semanticSearchToolGemini] });
-    }
+        const tools: Tool[] = [];
+        if (useSearch) {
+            tools.push({ googleSearch: {} });
+        }
+        tools.push({ functionDeclarations: [saveToolGemini, insertBlockToolGemini, replaceBlockToolGemini, deleteBlockToolGemini, getPageStructureToolGemini, updateTableToolGemini, listCalendarEventsTool, addCalendarEventTool, updateCalendarEventTool, deleteCalendarEventTool, getCurrentTimeToolGemini, getCalendarHolidaysToolGemini, executeCodeToolGemini] });
+        if (useReadFiles) {
+            tools.push({ functionDeclarations: [readFilesToolGemini, searchFilesToolGemini, getWorkspaceMapToolGemini, semanticSearchToolGemini] });
+        }
 
 
-    let thinkingConfig = undefined;
-    if (enableReasoning || proMode === ProMode.REASONING || proMode === ProMode.THINKING) {
-        thinkingConfig = { thinkingLevel: ThinkingLevel.HIGH }; 
-    } 
+        let thinkingConfig = undefined;
+        if (enableReasoning || proMode === ProMode.REASONING || proMode === ProMode.THINKING) {
+            thinkingConfig = { thinkingLevel: ThinkingLevel.HIGH };
+        }
 
-    const geminiHistory: Content[] = history.map(msg => {
-        const parts: any[] = [{ text: msg.content }];
-        if (msg.attachments && msg.attachments.length > 0) {
-            msg.attachments.forEach(att => {
+        const geminiHistory: Content[] = history.map(msg => {
+            const parts: any[] = [{ text: msg.content }];
+            if (msg.attachments && msg.attachments.length > 0) {
+                msg.attachments.forEach(att => {
+                    if (att.type === 'image') {
+                        const cleanBase64 = att.content.split(',')[1] || att.content;
+                        parts.push({ inlineData: { mimeType: att.mimeType, data: cleanBase64 } });
+                    }
+                });
+            }
+            return {
+                role: msg.role === Role.USER ? 'user' : 'model',
+                parts: parts
+            };
+        });
+
+        const currentParts: any[] = [{ text: prompt }];
+        if (attachments && attachments.length > 0) {
+            attachments.forEach(att => {
                 if (att.type === 'image') {
                     const cleanBase64 = att.content.split(',')[1] || att.content;
-                    parts.push({ inlineData: { mimeType: att.mimeType, data: cleanBase64 } });
+                    currentParts.push({ inlineData: { mimeType: att.mimeType, data: cleanBase64 } });
+                } else if (att.type === 'text') {
+                    currentParts.push({ text: `\n[Attached File: ${att.name}]\n${att.content}\n` });
                 }
             });
         }
-        return {
-            role: msg.role === Role.USER ? 'user' : 'model',
-            parts: parts
-        };
-    });
 
-    const currentParts: any[] = [{ text: prompt }];
-    if (attachments && attachments.length > 0) {
-        attachments.forEach(att => {
-            if (att.type === 'image') {
-                const cleanBase64 = att.content.split(',')[1] || att.content;
-                currentParts.push({ inlineData: { mimeType: att.mimeType, data: cleanBase64 } });
-            } else if (att.type === 'text') {
-                currentParts.push({ text: `\n[Attached File: ${att.name}]\n${att.content}\n` });
-            }
-        });
-    }
-
-    try {
-        const chat = clientToUse.chats.create({
-            model: modelId,
-            history: geminiHistory,
-            config: {
-                tools: tools,
-                thinkingConfig: thinkingConfig,
-                systemInstruction: systemInstruction,
-            }
-        });
-        
-        let finalResponseText = "";
-        let citations: Citation[] = [];
-        let pendingAction: PendingAction | undefined = undefined;
-        let reasoning = "";
-        let turns = 0;
-        const maxTurns = 5;
-        let currentMessage: any = currentParts;
-        let isThinking = false;
-
-        while (turns < maxTurns) {
-            const result = await chat.sendMessageStream({ message: currentMessage });
-            let turnText = "";
-            let functionCalls: any[] = [];
-
-            for await (const chunk of result) {
-                if (this.abortController?.signal.aborted) break;
-
-                // Extract Function Calls
-                const fc = chunk.functionCalls;
-                if (fc && fc.length > 0) functionCalls = [...functionCalls, ...fc];
-
-                // Extract Text and Reasoning
-                let text = "";
-                if (chunk.candidates?.[0]?.content?.parts) {
-                    for (const part of chunk.candidates[0].content.parts) {
-                        if (part.text) {
-                            text += part.text;
-                        }
-                        // Handle Gemini 2.0/3.0 Thinking models
-                        if ((part as any).thought) {
-                            const thought = (part as any).thought;
-                            reasoning += thought;
-                            if (onChunk) onChunk("", thought);
-                        }
-                    }
+        try {
+            const chat = clientToUse.chats.create({
+                model: modelId,
+                history: geminiHistory,
+                config: {
+                    tools: tools,
+                    thinkingConfig: thinkingConfig,
+                    systemInstruction: systemInstruction,
                 }
+            });
 
-                if (text) {
-                    turnText += text;
-                    
-                    let remainingText = text;
-                    while (remainingText.length > 0) {
-                        if (!isThinking) {
-                            const startThinking = remainingText.indexOf('<thinking>');
-                            const startThought = remainingText.indexOf('<thought>');
-                            
-                            // Find the earliest start tag
-                            let startIndex = -1;
-                            let tagLength = 0;
-                            
-                            if (startThinking !== -1 && (startThought === -1 || startThinking < startThought)) {
-                                startIndex = startThinking;
-                                tagLength = 10; // '<thinking>'.length
-                            } else if (startThought !== -1) {
-                                startIndex = startThought;
-                                tagLength = 9; // '<thought>'.length
-                            }
+            let finalResponseText = "";
+            let citations: Citation[] = [];
+            let pendingAction: PendingAction | undefined = undefined;
+            let reasoning = "";
+            let turns = 0;
+            const maxTurns = 5;
+            let currentMessage: any = currentParts;
+            let isThinking = false;
 
-                            if (startIndex !== -1) {
-                                const before = remainingText.substring(0, startIndex);
-                                if (before) {
-                                    finalResponseText += before;
-                                    if (onChunk) onChunk(before, undefined);
-                                }
-                                isThinking = true;
-                                remainingText = remainingText.substring(startIndex + tagLength);
-                            } else {
-                                finalResponseText += remainingText;
-                                if (onChunk) onChunk(remainingText, undefined);
-                                remainingText = "";
-                            }
-                        } else {
-                            const endThinking = remainingText.indexOf('</thinking>');
-                            const endThought = remainingText.indexOf('</thought>');
-                            
-                            // Find the earliest end tag
-                            let endIndex = -1;
-                            let tagLength = 0;
-                            
-                            if (endThinking !== -1 && (endThought === -1 || endThinking < endThought)) {
-                                endIndex = endThinking;
-                                tagLength = 11; // '</thinking>'.length
-                            } else if (endThought !== -1) {
-                                endIndex = endThought;
-                                tagLength = 10; // '</thought>'.length
-                            }
+            while (turns < maxTurns) {
+                const result = await chat.sendMessageStream({ message: currentMessage });
+                let turnText = "";
+                let functionCalls: any[] = [];
 
-                            if (endIndex !== -1) {
-                                const thought = remainingText.substring(0, endIndex);
-                                if (thought) {
-                                    reasoning += thought;
-                                    if (onChunk) onChunk("", thought);
-                                }
-                                isThinking = false;
-                                remainingText = remainingText.substring(endIndex + tagLength);
-                            } else {
-                                reasoning += remainingText;
-                                if (onChunk) onChunk("", remainingText);
-                                remainingText = "";
+                for await (const chunk of result) {
+                    if (this.abortController?.signal.aborted) break;
+
+                    // Extract Function Calls
+                    const fc = chunk.functionCalls;
+                    if (fc && fc.length > 0) functionCalls = [...functionCalls, ...fc];
+
+                    // Extract Text and Reasoning
+                    let text = "";
+                    if (chunk.candidates?.[0]?.content?.parts) {
+                        for (const part of chunk.candidates[0].content.parts) {
+                            if (part.text) {
+                                text += part.text;
+                            }
+                            // Handle Gemini 2.0/3.0 Thinking models
+                            if ((part as any).thought) {
+                                const thought = (part as any).thought;
+                                reasoning += thought;
+                                if (onChunk) onChunk("", thought);
                             }
                         }
                     }
-                }
 
-                // Grounding Metadata
-                const chunks = chunk.candidates?.[0]?.groundingMetadata?.groundingChunks;
-                if (chunks) {
-                    chunks.forEach((c: any) => {
-                        if (c.web?.uri && c.web?.title) {
-                            citations.push({ title: c.web.title, uri: c.web.uri });
-                        }
-                    });
-                }
-            }
+                    if (text) {
+                        turnText += text;
 
-            if (functionCalls.length > 0) {
-                const toolResponses: any[] = [];
+                        let remainingText = text;
+                        while (remainingText.length > 0) {
+                            if (!isThinking) {
+                                const startThinking = remainingText.indexOf('<thinking>');
+                                const startThought = remainingText.indexOf('<thought>');
 
-                for (const fc of functionCalls) {
-                    if (fc.name === 'save_to_library') {
-                        pendingAction = {
-                            type: fc.args.action === 'update' ? 'update_page' : 'create_page',
-                            data: { title: fc.args.title as string, content: fc.args.content as string },
-                            originalToolCallId: "gemini-fc"
-                        };
-                        toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Action pending user confirmation." } } });
-                    } else if (fc.name === 'get_page_structure') {
-                        const title = fc.args.pageTitle as string;
-                        const pageAttachment = attachments.find(a => a.name === title || a.name === title + ".md");
-                        if (pageAttachment && pageAttachment.content) {
-                            const page = BlockService.fromMarkdown(pageAttachment.content, title);
-                            // Enhanced Structure View: Include context snippet for better identification
-                            const structure = page.blocks.map((b, idx) => {
-                                let context = "";
-                                if (b.type === 'table') {
-                                    context = `[TABLE] Rows: ${b.content.split('\n').length}`;
-                                } else {
-                                    context = b.content.length > 60 ? b.content.substring(0, 60) + "..." : b.content;
+                                // Find the earliest start tag
+                                let startIndex = -1;
+                                let tagLength = 0;
+
+                                if (startThinking !== -1 && (startThought === -1 || startThinking < startThought)) {
+                                    startIndex = startThinking;
+                                    tagLength = 10; // '<thinking>'.length
+                                } else if (startThought !== -1) {
+                                    startIndex = startThought;
+                                    tagLength = 9; // '<thought>'.length
                                 }
-                                return `Block ${idx + 1}: [ID: ${b.id}] (${b.type}) -> ${context}`;
-                            }).join('\n');
-                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: `STRUCTURE OF PAGE "${title}":\n${structure}` } } });
-                        } else {
-                             toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Error: Page not found in current context. Please ask user to open the page first." } } });
-                        }
-                    } else if (fc.name === 'insert_block' || fc.name === 'replace_block' || fc.name === 'delete_block' || fc.name === 'update_table_cell') {
-                         pendingAction = {
-                            type: 'block_operation',
-                            data: { 
-                                operation: fc.name,
-                                args: fc.args
-                            },
-                            originalToolCallId: "gemini-fc"
-                        };
-                        toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Block operation pending user confirmation." } } });
-                    } else if (fc.name === 'list_calendar_events') {
-                        const allEvents = await db.get<CalendarEvent[]>(STORES.CALENDAR, 'all_events') || [];
-                        
-                        // Default: Start from beginning of today, End 7 days from now
-                        let startDate = new Date();
-                        startDate.setHours(0, 0, 0, 0);
-                        
-                        let endDate = new Date(startDate);
-                        endDate.setDate(endDate.getDate() + 7);
-                        endDate.setHours(23, 59, 59, 999);
 
-                        if (fc.args.startDate) {
-                            const parsedStart = new Date(fc.args.startDate as string);
-                            if (!isNaN(parsedStart.getTime())) {
-                                startDate = parsedStart;
-                            }
-                        }
-                        if (fc.args.endDate) {
-                            const parsedEnd = new Date(fc.args.endDate as string);
-                            if (!isNaN(parsedEnd.getTime())) {
-                                endDate = parsedEnd;
-                                // If startDate and endDate are the same day (or close), expand endDate to end of day
-                                if (endDate.getTime() <= startDate.getTime() + 86400000 && endDate.getHours() === 0) {
-                                    endDate.setHours(23, 59, 59, 999);
+                                if (startIndex !== -1) {
+                                    const before = remainingText.substring(0, startIndex);
+                                    if (before) {
+                                        finalResponseText += before;
+                                        if (onChunk) onChunk(before, undefined);
+                                    }
+                                    isThinking = true;
+                                    remainingText = remainingText.substring(startIndex + tagLength);
+                                } else {
+                                    finalResponseText += remainingText;
+                                    if (onChunk) onChunk(remainingText, undefined);
+                                    remainingText = "";
+                                }
+                            } else {
+                                const endThinking = remainingText.indexOf('</thinking>');
+                                const endThought = remainingText.indexOf('</thought>');
+
+                                // Find the earliest end tag
+                                let endIndex = -1;
+                                let tagLength = 0;
+
+                                if (endThinking !== -1 && (endThought === -1 || endThinking < endThought)) {
+                                    endIndex = endThinking;
+                                    tagLength = 11; // '</thinking>'.length
+                                } else if (endThought !== -1) {
+                                    endIndex = endThought;
+                                    tagLength = 10; // '</thought>'.length
+                                }
+
+                                if (endIndex !== -1) {
+                                    const thought = remainingText.substring(0, endIndex);
+                                    if (thought) {
+                                        reasoning += thought;
+                                        if (onChunk) onChunk("", thought);
+                                    }
+                                    isThinking = false;
+                                    remainingText = remainingText.substring(endIndex + tagLength);
+                                } else {
+                                    reasoning += remainingText;
+                                    if (onChunk) onChunk("", remainingText);
+                                    remainingText = "";
                                 }
                             }
                         }
+                    }
 
-                        const relevantEvents = allEvents.filter(e => {
-                             const eStart = new Date(e.startDate);
-                             const eEnd = new Date(e.endDate);
-                             return eStart <= endDate && eEnd >= startDate;
-                        }).sort((a, b) => a.startDate - b.startDate);
-                        
-                        let responseContent = `CALENDAR EVENTS (Range: ${startDate.toLocaleString()} - ${endDate.toLocaleString()}):\n`;
-                        if (relevantEvents.length === 0) {
-                            responseContent += "No events found in this range.";
-                        } else {
-                            relevantEvents.forEach(e => {
-                                const startObj = new Date(e.startDate);
-                                const endObj = new Date(e.endDate);
-                                
-                                if (e.allDay) {
-                                    // For all-day events, show just the date
-                                    const dateStr = startObj.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-                                    responseContent += `\n- [ID: ${e.id}] "${e.title}"\n  TYPE: All-day Event\n  DATE: ${dateStr}\n  Location: ${e.location || 'N/A'}\n  Description: ${e.description || 'N/A'}`;
-                                } else {
-                                    const startStr = startObj.toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
-                                    const endStr = endObj.toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
-                                    responseContent += `\n- [ID: ${e.id}] "${e.title}"\n  SCHEDULED START: ${startStr}\n  SCHEDULED END: ${endStr}\n  Location: ${e.location || 'N/A'}\n  Description: ${e.description || 'N/A'}`;
-                                }
-                            });
-                        }
-                        toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
-                        if (onChunk) onChunk("", `\n📅 Checked calendar: ${relevantEvents.length} events found.\n`);
-
-                    } else if (fc.name === 'add_calendar_event' || fc.name === 'update_calendar_event' || fc.name === 'delete_calendar_event') {
-                         pendingAction = {
-                            type: 'calendar_event',
-                            data: { 
-                                operation: fc.name.replace('_calendar_event', ''),
-                                args: fc.args
-                            },
-                            originalToolCallId: "gemini-fc"
-                        };
-                        toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Calendar action pending user confirmation." } } });
-                    } else if (fc.name === 'get_calendar_holidays') {
-                        const year = fc.args.year as number || new Date().getFullYear();
-                        const holidays = getHolidays(year);
-                        let responseContent = `HOLIDAYS FOR ${year} (RO & DE):\n`;
-                        holidays.forEach(h => {
-                            responseContent += `- ${h.date}: ${h.name} (${h.country}) [${h.isPublic ? 'Non-working' : 'Observance'}]\n`;
+                    // Grounding Metadata
+                    const chunks = chunk.candidates?.[0]?.groundingMetadata?.groundingChunks;
+                    if (chunks) {
+                        chunks.forEach((c: any) => {
+                            if (c.web?.uri && c.web?.title) {
+                                citations.push({ title: c.web.title, uri: c.web.uri });
+                            }
                         });
-                        toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
-                        if (onChunk) onChunk("", `\n📅 Checked holidays for ${year}...\n`);
-                    } else if (fc.name === 'get_current_time') {
-                        const now = new Date();
-                        const timeString = now.toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                        toolResponses.push({ functionResponse: { name: fc.name, response: { content: timeString } } });
-                        if (onChunk) onChunk("", `\n🕒 Time: ${timeString}...\n`);
-                    } else if (fc.name === 'read_workspace_files') {
-                        const filenames = fc.args.filenames as string[];
-                        const requestedFiles = this.workspaceFiles.filter(f => filenames.includes(f.name));
-                        
-                        let responseContent = "";
-                        if (requestedFiles.length > 0) {
-                            requestedFiles.forEach(f => {
-                                responseContent += `\n[File: ${f.name}]\n${sanitizeContentForAgent(f.content || "")}\n`;
+                    }
+                }
+
+                if (functionCalls.length > 0) {
+                    const toolResponses: any[] = [];
+
+                    for (const fc of functionCalls) {
+                        if (fc.name === 'save_to_library') {
+                            pendingAction = {
+                                type: fc.args.action === 'update' ? 'update_page' : 'create_page',
+                                data: { title: fc.args.title as string, content: fc.args.content as string },
+                                originalToolCallId: "gemini-fc"
+                            };
+                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Action pending user confirmation." } } });
+                        } else if (fc.name === 'get_page_structure') {
+                            const title = fc.args.pageTitle as string;
+                            const pageAttachment = attachments.find(a => a.name === title || a.name === title + ".md");
+                            if (pageAttachment && pageAttachment.content) {
+                                const page = BlockService.fromMarkdown(pageAttachment.content, title);
+                                // Enhanced Structure View: Include context snippet for better identification
+                                const structure = page.blocks.map((b, idx) => {
+                                    let context = "";
+                                    if (b.type === 'table') {
+                                        context = `[TABLE] Rows: ${b.content.split('\n').length}`;
+                                    } else {
+                                        context = b.content.length > 60 ? b.content.substring(0, 60) + "..." : b.content;
+                                    }
+                                    return `Block ${idx + 1}: [ID: ${b.id}] (${b.type}) -> ${context}`;
+                                }).join('\n');
+                                toolResponses.push({ functionResponse: { name: fc.name, response: { content: `STRUCTURE OF PAGE "${title}":\n${structure}` } } });
+                            } else {
+                                toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Error: Page not found in current context. Please ask user to open the page first." } } });
+                            }
+                        } else if (fc.name === 'insert_block' || fc.name === 'replace_block' || fc.name === 'delete_block' || fc.name === 'update_table_cell') {
+                            pendingAction = {
+                                type: 'block_operation',
+                                data: {
+                                    operation: fc.name,
+                                    args: fc.args
+                                },
+                                originalToolCallId: "gemini-fc"
+                            };
+                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Block operation pending user confirmation." } } });
+                        } else if (fc.name === 'list_calendar_events') {
+                            const allEvents = await db.get<CalendarEvent[]>(STORES.CALENDAR, 'all_events') || [];
+
+                            // Default: Start from beginning of today, End 7 days from now
+                            let startDate = new Date();
+                            startDate.setHours(0, 0, 0, 0);
+
+                            let endDate = new Date(startDate);
+                            endDate.setDate(endDate.getDate() + 7);
+                            endDate.setHours(23, 59, 59, 999);
+
+                            if (fc.args.startDate) {
+                                const parsedStart = new Date(fc.args.startDate as string);
+                                if (!isNaN(parsedStart.getTime())) {
+                                    startDate = parsedStart;
+                                }
+                            }
+                            if (fc.args.endDate) {
+                                const parsedEnd = new Date(fc.args.endDate as string);
+                                if (!isNaN(parsedEnd.getTime())) {
+                                    endDate = parsedEnd;
+                                    // If startDate and endDate are the same day (or close), expand endDate to end of day
+                                    if (endDate.getTime() <= startDate.getTime() + 86400000 && endDate.getHours() === 0) {
+                                        endDate.setHours(23, 59, 59, 999);
+                                    }
+                                }
+                            }
+
+                            const relevantEvents = allEvents.filter(e => {
+                                const eStart = new Date(e.startDate);
+                                const eEnd = new Date(e.endDate);
+                                return eStart <= endDate && eEnd >= startDate;
+                            }).sort((a, b) => a.startDate - b.startDate);
+
+                            let responseContent = `CALENDAR EVENTS (Range: ${startDate.toLocaleString()} - ${endDate.toLocaleString()}):\n`;
+                            if (relevantEvents.length === 0) {
+                                responseContent += "No events found in this range.";
+                            } else {
+                                relevantEvents.forEach(e => {
+                                    const startObj = new Date(e.startDate);
+                                    const endObj = new Date(e.endDate);
+
+                                    if (e.allDay) {
+                                        // For all-day events, show just the date
+                                        const dateStr = startObj.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                                        responseContent += `\n- [ID: ${e.id}] "${e.title}"\n  TYPE: All-day Event\n  DATE: ${dateStr}\n  Location: ${e.location || 'N/A'}\n  Description: ${e.description || 'N/A'}`;
+                                    } else {
+                                        const startStr = startObj.toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+                                        const endStr = endObj.toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+                                        responseContent += `\n- [ID: ${e.id}] "${e.title}"\n  SCHEDULED START: ${startStr}\n  SCHEDULED END: ${endStr}\n  Location: ${e.location || 'N/A'}\n  Description: ${e.description || 'N/A'}`;
+                                    }
+                                });
+                            }
+                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
+                            if (onChunk) onChunk("", `\n📅 Checked calendar: ${relevantEvents.length} events found.\n`);
+
+                        } else if (fc.name === 'add_calendar_event' || fc.name === 'update_calendar_event' || fc.name === 'delete_calendar_event') {
+                            pendingAction = {
+                                type: 'calendar_event',
+                                data: {
+                                    operation: fc.name.replace('_calendar_event', ''),
+                                    args: fc.args
+                                },
+                                originalToolCallId: "gemini-fc"
+                            };
+                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Calendar action pending user confirmation." } } });
+                        } else if (fc.name === 'get_calendar_holidays') {
+                            const year = fc.args.year as number || new Date().getFullYear();
+                            const holidays = getHolidays(year);
+                            let responseContent = `HOLIDAYS FOR ${year} (RO & DE):\n`;
+                            holidays.forEach(h => {
+                                responseContent += `- ${h.date}: ${h.name} (${h.country}) [${h.isPublic ? 'Non-working' : 'Observance'}]\n`;
                             });
-                        } else {
-                            responseContent = "Error: Requested files not found in workspace.";
-                        }
-                        toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
-                    } else if (fc.name === 'search_workspace_files') {
-                        const queries = fc.args.queries as string[];
-                        let responseContent = `Search results for [${queries.join(', ')}] in workspace files:\n`;
-                        let foundCount = 0;
-                        const apiKeyToUse = customApiKey || this.apiKey;
-                        
-                        if (apiKeyToUse) {
-                            const filenames = this.workspaceFiles.map(f => f.name);
-                            for (const query of queries) {
+                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
+                            if (onChunk) onChunk("", `\n📅 Checked holidays for ${year}...\n`);
+                        } else if (fc.name === 'get_current_time') {
+                            const now = new Date();
+                            const timeString = now.toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: timeString } } });
+                            if (onChunk) onChunk("", `\n🕒 Time: ${timeString}...\n`);
+                        } else if (fc.name === 'read_workspace_files') {
+                            const filenames = fc.args.filenames as string[];
+                            const requestedFiles = this.workspaceFiles.filter(f => filenames.includes(f.name));
+
+                            let responseContent = "";
+                            if (requestedFiles.length > 0) {
+                                requestedFiles.forEach(f => {
+                                    responseContent += `\n[File: ${f.name}]\n${sanitizeContentForAgent(f.content || "")}\n`;
+                                });
+                            } else {
+                                responseContent = "Error: Requested files not found in workspace.";
+                            }
+                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
+                        } else if (fc.name === 'search_workspace_files') {
+                            const queries = fc.args.queries as string[];
+                            let responseContent = `Search results for [${queries.join(', ')}] in workspace files:\n`;
+                            let foundCount = 0;
+                            const apiKeyToUse = customApiKey || this.apiKey;
+
+                            if (apiKeyToUse) {
+                                const filenames = this.workspaceFiles.map(f => f.name);
+                                for (const query of queries) {
+                                    try {
+                                        const results = await RAGService.search(query, undefined, apiKeyToUse, 3, filenames);
+                                        if (results.length > 0) {
+                                            foundCount += results.length;
+                                            responseContent += `\n--- Results for "${query}" ---\n`;
+                                            results.forEach((res, idx) => {
+                                                responseContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${sanitizeContentForAgent(res.chunk.content)}\n`;
+                                            });
+                                        }
+                                    } catch (e) {
+                                        console.error("[RAG] Search error in tool:", e);
+                                    }
+                                }
+                            }
+
+                            // Fallback to basic search if RAG fails or no API key (or no results?)
+                            // Actually, if RAG finds nothing, we could fallback, but let's just use RAG if key exists.
+                            if (!apiKeyToUse || foundCount === 0) {
+                                // Basic string match fallback
+                                let fallbackFound = 0;
+                                const lowerQueries = queries.map(q => q.toLowerCase());
+                                this.workspaceFiles.forEach(f => {
+                                    if (!f.content) return;
+                                    const lines = f.content.split('\n');
+                                    lines.forEach((line, idx) => {
+                                        const lowerLine = line.toLowerCase();
+                                        if (lowerQueries.some(q => lowerLine.includes(q))) {
+                                            fallbackFound++;
+                                            const start = Math.max(0, idx - 1);
+                                            const end = Math.min(lines.length - 1, idx + 1);
+                                            responseContent += `\n[File: ${f.name}, Line ${idx + 1}]\n`;
+                                            for (let i = start; i <= end; i++) {
+                                                responseContent += `${i === idx ? '>> ' : '   '}${lines[i]}\n`;
+                                            }
+                                        }
+                                    });
+                                });
+                                foundCount += fallbackFound;
+                                responseContent = sanitizeContentForAgent(responseContent);
+                            }
+
+                            if (foundCount === 0) responseContent = `No matches found for any of the queries in workspace files.`;
+                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
+                            if (onChunk) onChunk("", `\n🔍 Căutat ${queries.length} termeni în workspace...\n`);
+                        } else if (fc.name === 'get_workspace_map') {
+                            let responseContent = "WORKSPACE KNOWLEDGE BASE MAP:\n";
+
+                            this.workspaceFiles.forEach(f => {
+                                // Extract a semantic snippet (first 500 chars) and key terms
+                                const snippet = sanitizeContentForAgent((f.content || "")).substring(0, 500).replace(/\n/g, ' ');
+                                const sizeKb = Math.round((f.content?.length || 0) / 1024);
+
+                                // Simple heuristic for "topics" - could be improved with another LLM call but let's keep it local for now
+                                responseContent += `\n- FILE: ${f.name} (${sizeKb} KB)\n`;
+                                responseContent += `  PREVIEW: ${snippet}...\n`;
+                                responseContent += `  CONTEXT: This file appears to contain ${f.mimeType || 'text'} data. Use search to find specific entities.\n`;
+                            });
+
+                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
+                            if (onChunk) onChunk("", `\n🗺️ Mapat structura workspace-ului...\n`);
+                        } else if (fc.name === 'semantic_search_workspace') {
+                            const query = fc.args.query as string;
+                            let responseContent = `Semantic search results for "${query}":\n`;
+                            const apiKeyToUse = customApiKey || this.apiKey;
+
+                            if (!apiKeyToUse) {
+                                responseContent = "Error: API key required for semantic search.";
+                            } else {
                                 try {
-                                    const results = await RAGService.search(query, undefined, apiKeyToUse, 3, filenames);
+                                    const filenames = this.workspaceFiles.map(f => f.name);
+                                    const results = await RAGService.search(query, undefined, apiKeyToUse, 5, filenames);
+
                                     if (results.length > 0) {
-                                        foundCount += results.length;
-                                        responseContent += `\n--- Results for "${query}" ---\n`;
                                         results.forEach((res, idx) => {
                                             responseContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${sanitizeContentForAgent(res.chunk.content)}\n`;
                                         });
+                                    } else {
+                                        responseContent = "No semantically relevant information found.";
                                     }
                                 } catch (e) {
-                                    console.error("[RAG] Search error in tool:", e);
+                                    console.error("[RAG] Semantic search error:", e);
+                                    responseContent = "Error: Failed to perform semantic search.";
                                 }
                             }
-                        }
+                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
+                            if (onChunk) onChunk("", `\n🧠 Căutare semantică: "${query}"...\n`);
+                        } else if (fc.name === 'execute_code') {
+                            const { code, language, timeout, packages } = fc.args;
+                            if (onChunk) onChunk("", `\n⚙️ Se execută cod ${language} local...\n`);
 
-                        // Fallback to basic search if RAG fails or no API key (or no results?)
-                        // Actually, if RAG finds nothing, we could fallback, but let's just use RAG if key exists.
-                        if (!apiKeyToUse || foundCount === 0) {
-                            // Basic string match fallback
-                            let fallbackFound = 0;
-                            const lowerQueries = queries.map(q => q.toLowerCase());
-                            this.workspaceFiles.forEach(f => {
-                                if (!f.content) return;
-                                const lines = f.content.split('\n');
-                                lines.forEach((line, idx) => {
-                                    const lowerLine = line.toLowerCase();
-                                    if (lowerQueries.some(q => lowerLine.includes(q))) {
-                                        fallbackFound++;
-                                        const start = Math.max(0, idx - 1);
-                                        const end = Math.min(lines.length - 1, idx + 1);
-                                        responseContent += `\n[File: ${f.name}, Line ${idx + 1}]\n`;
-                                        for (let i = start; i <= end; i++) {
-                                            responseContent += `${i === idx ? '>> ' : '   '}${lines[i]}\n`;
-                                        }
-                                    }
-                                });
-                            });
-                            foundCount += fallbackFound;
-                            responseContent = sanitizeContentForAgent(responseContent);
-                        }
-
-                        if (foundCount === 0) responseContent = `No matches found for any of the queries in workspace files.`;
-                        toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
-                        if (onChunk) onChunk("", `\n🔍 Căutat ${queries.length} termeni în workspace...\n`);
-                    } else if (fc.name === 'get_workspace_map') {
-                        let responseContent = "WORKSPACE KNOWLEDGE BASE MAP:\n";
-                        
-                        this.workspaceFiles.forEach(f => {
-                            // Extract a semantic snippet (first 500 chars) and key terms
-                            const snippet = sanitizeContentForAgent((f.content || "")).substring(0, 500).replace(/\n/g, ' ');
-                            const sizeKb = Math.round((f.content?.length || 0) / 1024);
-                            
-                            // Simple heuristic for "topics" - could be improved with another LLM call but let's keep it local for now
-                            responseContent += `\n- FILE: ${f.name} (${sizeKb} KB)\n`;
-                            responseContent += `  PREVIEW: ${snippet}...\n`;
-                            responseContent += `  CONTEXT: This file appears to contain ${f.mimeType || 'text'} data. Use search to find specific entities.\n`;
-                        });
-
-                        toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
-                        if (onChunk) onChunk("", `\n🗺️ Mapat structura workspace-ului...\n`);
-                    } else if (fc.name === 'semantic_search_workspace') {
-                        const query = fc.args.query as string;
-                        let responseContent = `Semantic search results for "${query}":\n`;
-                        const apiKeyToUse = customApiKey || this.apiKey;
-                        
-                        if (!apiKeyToUse) {
-                             responseContent = "Error: API key required for semantic search.";
-                        } else {
                             try {
-                                const filenames = this.workspaceFiles.map(f => f.name);
-                                const results = await RAGService.search(query, undefined, apiKeyToUse, 5, filenames);
-                                
-                                if (results.length > 0) {
-                                    results.forEach((res, idx) => {
-                                        responseContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${sanitizeContentForAgent(res.chunk.content)}\n`;
-                                    });
-                                } else {
-                                    responseContent = "No semantically relevant information found.";
-                                }
-                            } catch (e) {
-                                console.error("[RAG] Semantic search error:", e);
-                                responseContent = "Error: Failed to perform semantic search.";
-                            }
-                        }
-                        toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
-                        if (onChunk) onChunk("", `\n🧠 Căutare semantică: "${query}"...\n`);
-                    } else if (fc.name === 'execute_code') {
-                        const { code, language, timeout, packages } = fc.args;
-                        if (onChunk) onChunk("", `\n⚙️ Se execută cod ${language} cu E2B Sandbox...\n`);
-                        
-                        // Fetch settings to get API key
-                        const appSettings = await db.get<AppSettings>(STORES.SETTINGS, 'app_settings');
-                        
-                        try {
-                            if (!appSettings?.e2bApiKey) {
-                                toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Error: E2B API Key is not configured in Settings." } } });
-                                continue;
-                            }
+                                const execResult = await E2BService.executeCode({
+                                    code: code as string,
+                                    language: language as 'python' | 'typescript',
+                                    timeout: (timeout as number) || 30,
+                                    packages: (packages as string[]) || [],
+                                    session_id: threadId
+                                });
 
-                            const execResult = await E2BService.executeCode({
-                                code: code as string,
-                                language: language as 'python' | 'typescript',
-                                timeout: (timeout as number) || 30,
-                                packages: (packages as string[]) || [],
-                                session_id: threadId
-                            }, appSettings);
-                            
-                            const content = `Execution finished (Mode: ${execResult.sandbox_mode}).
+                                const content = `Execution finished (Mode: ${execResult.sandbox_mode}).
 Success: ${execResult.success}
 Exit Code: ${execResult.exit_code}
 Time: ${execResult.execution_time}ms
@@ -1702,569 +1694,562 @@ ${execResult.stdout || '<empty>'}
 STDERR:
 ${execResult.stderr || '<empty>'}
 Error Type: ${execResult.error_type || 'None'}`;
-                            
-                            toolResponses.push({ functionResponse: { name: fc.name, response: { content } } });
-                        } catch (e: any) {
-                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: `Code execution failed unexpectedly: ${e.message}` } } });
+
+                                toolResponses.push({ functionResponse: { name: fc.name, response: { content } } });
+                            } catch (e: any) {
+                                toolResponses.push({ functionResponse: { name: fc.name, response: { content: `Code execution failed unexpectedly: ${e.message}` } } });
+                            }
+                        } else {
+                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Error: Unknown tool." } } });
                         }
-                    } else {
-                        toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Error: Unknown tool." } } });
+
                     }
 
-                }
+                    if (pendingAction) {
+                        break;
+                    }
 
-                if (pendingAction) {
+                    currentMessage = toolResponses;
+                    turns++;
+                    if (onChunk) onChunk("", `\n⚙️ Executat ${functionCalls.length} operațiuni...\n`);
+                } else {
                     break;
                 }
-
-                currentMessage = toolResponses;
-                turns++;
-                if (onChunk) onChunk("", `\n⚙️ Executat ${functionCalls.length} operațiuni...\n`);
-            } else {
-                break;
             }
-        }
 
-        const { cleanText, questions } = this.extractRelatedQuestions(finalResponseText);
-        return { 
-            text: cleanText || "", 
-            citations: Array.from(new Map(citations.map(c => [c.uri, c])).values()), 
-            relatedQuestions: questions, 
-            pendingAction,
-            reasoning
-        };
-    } catch (error: any) {
-        console.error("Gemini API Error:", error);
-        return { text: `Error: ${(error as any).message || 'Request Failed'}`, citations: [], relatedQuestions: [] };
-    }
-  }
-
-  // --- Generic Implementation (Unified Agent Loop) ---
-  private async generateGenericResponse(
-    history: Message[],
-    prompt: string,
-    attachments: Attachment[],
-    endpoint: string,
-    apiKey: string,
-    modelName: string,
-    systemInstruction: string,
-    _enableMemory: boolean,
-    useSearch: boolean,
-    searchProvider: 'tavily' | 'brave',
-    searchApiKey?: string,
-    onChunk?: (text: string, reasoning?: string) => void,
-    useReadFiles: boolean = false,
-    _proMode: ProMode = ProMode.STANDARD,
-    threadId?: string
-  ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
-    
-    // 1. Prepare Messages
-    const messages: any[] = [];
-    messages.push({ role: 'system', content: systemInstruction });
-
-    // Format History
-    history.slice(-15).forEach(msg => { // Increased context window
-        // Remove reasoning from history sent to model to save tokens, or keep it if valuable context? 
-        // Usually cleaner to strip old thoughts.
-        const content = msg.content;
-        messages.push({ 
-            role: msg.role === Role.MODEL ? 'assistant' : 'user', 
-            content: content 
-        });
-    });
-
-    // Format Current Turn
-    let finalPrompt = prompt;
-    attachments.forEach(att => {
-        if (att.type === 'text') {
-            finalPrompt += `\n\n[Attached File: ${att.name}]\n${att.content}`;
-        } else if (att.type === 'image') {
-             // For generic models that support vision (gpt-4o, claude-3), we need specific formatting
-             // For simplicity in this "generic" handler, we append text indication.
-             // A robust implementation would construct the array content block for OpenAI specs.
-             finalPrompt += `\n[Image Attached: ${att.name}]`; 
-        }
-    });
-
-    // Handle Vision for OpenAI compatible endpoints properly
-    const currentMessageContent: any[] = [{ type: "text", text: finalPrompt }];
-    attachments.forEach(att => {
-        if (att.type === 'image') {
-             const cleanBase64 = att.content.split(',')[1] || att.content;
-             currentMessageContent.push({
-                 type: "image_url",
-                 image_url: { url: `data:${att.mimeType};base64,${cleanBase64}` }
-             });
-        }
-    });
-
-    messages.push({ role: 'user', content: currentMessageContent });
-
-    // 2. Prepare Tools
-    const tools = [];
-    if (useSearch && searchApiKey) tools.push(searchToolGeneric);
-    tools.push(saveToolGeneric, insertBlockToolGeneric, replaceBlockToolGeneric, deleteBlockToolGeneric, getPageStructureToolGeneric, updateTableToolGeneric, listCalendarEventsToolGeneric, addCalendarEventToolGeneric, updateCalendarEventToolGeneric, deleteCalendarEventToolGeneric, getCurrentTimeToolGeneric, getCalendarHolidaysToolGeneric, executeCodeToolGeneric);
-    if (useReadFiles) tools.push(readFilesToolGeneric, searchFilesToolGeneric, getWorkspaceMapToolGeneric, semanticSearchToolGeneric);
-
-    let finalContent = "";
-    let finalReasoning = "";
-    let turns = 0;
-    const maxTurns = 5; // Allow up to 5 tool-use hops
-    const collectedCitations: Citation[] = [];
-    let pendingAction: PendingAction | undefined = undefined;
-
-    // --- MAIN AGENT LOOP ---
-    while (turns < maxTurns) {
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (apiKey && apiKey !== "not-needed") {
-            headers['Authorization'] = `Bearer ${apiKey}`;
-            if (endpoint.includes("openrouter")) {
-                headers['HTTP-Referer'] = window.location.origin;
-                headers['X-Title'] = "Perplex Clone";
-            }
-        }
-
-        try {
-            const body: any = {
-                model: modelName,
-                messages: messages,
-                stream: true,
-                temperature: 0.7 
+            const { cleanText, questions } = this.extractRelatedQuestions(finalResponseText);
+            return {
+                text: cleanText || "",
+                citations: Array.from(new Map(citations.map(c => [c.uri, c])).values()),
+                relatedQuestions: questions,
+                pendingAction,
+                reasoning
             };
+        } catch (error: any) {
+            console.error("Gemini API Error:", error);
+            return { text: `Error: ${(error as any).message || 'Request Failed'}`, citations: [], relatedQuestions: [] };
+        }
+    }
 
-            // Handle OpenRouter specific reasoning features
-            if (endpoint.includes("openrouter.ai")) {
-                const isReasoningModel = LLMService.OPENROUTER_REASONING_MODELS.some(
-                    m => modelName.toLowerCase().includes(m.toLowerCase())
-                );
-                if (isReasoningModel) {
-                    body.reasoning = { enabled: true };
+    // --- Generic Implementation (Unified Agent Loop) ---
+    private async generateGenericResponse(
+        history: Message[],
+        prompt: string,
+        attachments: Attachment[],
+        endpoint: string,
+        apiKey: string,
+        modelName: string,
+        systemInstruction: string,
+        _enableMemory: boolean,
+        useSearch: boolean,
+        searchProvider: 'tavily' | 'brave',
+        searchApiKey?: string,
+        onChunk?: (text: string, reasoning?: string) => void,
+        useReadFiles: boolean = false,
+        _proMode: ProMode = ProMode.STANDARD,
+        threadId?: string
+    ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
+
+        // 1. Prepare Messages
+        const messages: any[] = [];
+        messages.push({ role: 'system', content: systemInstruction });
+
+        // Format History
+        history.slice(-15).forEach(msg => { // Increased context window
+            // Remove reasoning from history sent to model to save tokens, or keep it if valuable context? 
+            // Usually cleaner to strip old thoughts.
+            const content = msg.content;
+            messages.push({
+                role: msg.role === Role.MODEL ? 'assistant' : 'user',
+                content: content
+            });
+        });
+
+        // Format Current Turn
+        let finalPrompt = prompt;
+        attachments.forEach(att => {
+            if (att.type === 'text') {
+                finalPrompt += `\n\n[Attached File: ${att.name}]\n${att.content}`;
+            } else if (att.type === 'image') {
+                // For generic models that support vision (gpt-4o, claude-3), we need specific formatting
+                // For simplicity in this "generic" handler, we append text indication.
+                // A robust implementation would construct the array content block for OpenAI specs.
+                finalPrompt += `\n[Image Attached: ${att.name}]`;
+            }
+        });
+
+        // Handle Vision for OpenAI compatible endpoints properly
+        const currentMessageContent: any[] = [{ type: "text", text: finalPrompt }];
+        attachments.forEach(att => {
+            if (att.type === 'image') {
+                const cleanBase64 = att.content.split(',')[1] || att.content;
+                currentMessageContent.push({
+                    type: "image_url",
+                    image_url: { url: `data:${att.mimeType};base64,${cleanBase64}` }
+                });
+            }
+        });
+
+        messages.push({ role: 'user', content: currentMessageContent });
+
+        // 2. Prepare Tools
+        const tools = [];
+        if (useSearch && searchApiKey) tools.push(searchToolGeneric);
+        tools.push(saveToolGeneric, insertBlockToolGeneric, replaceBlockToolGeneric, deleteBlockToolGeneric, getPageStructureToolGeneric, updateTableToolGeneric, listCalendarEventsToolGeneric, addCalendarEventToolGeneric, updateCalendarEventToolGeneric, deleteCalendarEventToolGeneric, getCurrentTimeToolGeneric, getCalendarHolidaysToolGeneric, executeCodeToolGeneric);
+        if (useReadFiles) tools.push(readFilesToolGeneric, searchFilesToolGeneric, getWorkspaceMapToolGeneric, semanticSearchToolGeneric);
+
+        let finalContent = "";
+        let finalReasoning = "";
+        let turns = 0;
+        const maxTurns = 5; // Allow up to 5 tool-use hops
+        const collectedCitations: Citation[] = [];
+        let pendingAction: PendingAction | undefined = undefined;
+
+        // --- MAIN AGENT LOOP ---
+        while (turns < maxTurns) {
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (apiKey && apiKey !== "not-needed") {
+                headers['Authorization'] = `Bearer ${apiKey}`;
+                if (endpoint.includes("openrouter")) {
+                    headers['HTTP-Referer'] = window.location.origin;
+                    headers['X-Title'] = "Perplex Clone";
                 }
             }
-            
-            if (tools.length > 0) {
-                body.tools = tools;
-                body.tool_choice = "auto";
-            }
 
-            console.log(`[Generic] Turn ${turns + 1} Request:`, { model: modelName, toolCount: tools.length, useSearch, searchProvider });
+            try {
+                const body: any = {
+                    model: modelName,
+                    messages: messages,
+                    stream: true,
+                    temperature: 0.7
+                };
 
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(body),
-                signal: this.abortController?.signal
-            });
-
-            if (!response.ok) {
-                 const errText = await response.text();
-                 throw new Error(`API Error ${response.status}: ${errText}`);
-            }
-
-            // Streaming Parser
-            const reader = response.body!.getReader();
-            const decoder = new TextDecoder("utf-8");
-            let buffer = "";
-            let currentTurnContent = "";
-            
-            // Tool Call Accumulator
-            let toolCallMap: Record<number, { id: string, name: string, args: string }> = {};
-
-            // XML Parsing State for Reasoning
-            let inThinkingTag = false;
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split("\n");
-                buffer = lines.pop() || ""; 
-
-                for (const line of lines) {
-                    const trimmed = line.trim();
-                    if (trimmed === "data: [DONE]") continue;
-                    if (!trimmed.startsWith("data: ")) continue;
-
-                    try {
-                        const json = JSON.parse(trimmed.slice(6));
-                        const choice = json.choices?.[0];
-                        if (!choice) continue;
-                        const delta = choice.delta;
-
-                        // 1. Handle Reasoning (OpenRouter/OpenAI/DeepSeek)
-                        const reasoningChunk = delta.reasoning || delta.thought || (delta as any).reasoning_content;
-                        if (reasoningChunk) {
-                            finalReasoning += reasoningChunk;
-                            if (onChunk) onChunk("", reasoningChunk);
-                        }
-
-                        // 2. Handle Content (Text)
-                        if (delta.content) {
-                            const chunk = delta.content;
-                            currentTurnContent += chunk;
-
-                            // Streaming Logic for <thinking> tags
-                            // We need to detect if we are inside <thinking>...</thinking>
-                            // This is a simple state machine parser for streaming XML tags
-                            
-                            let remaining = chunk;
-                            while (remaining.length > 0) {
-                                if (!inThinkingTag) {
-                                    const startThinking = remaining.indexOf("<thinking>");
-                                    const startThought = remaining.indexOf("<thought>");
-                                    
-                                    let startIdx = -1;
-                                    let tagLen = 0;
-                                    
-                                    if (startThinking !== -1 && (startThought === -1 || startThinking < startThought)) {
-                                        startIdx = startThinking;
-                                        tagLen = 10;
-                                    } else if (startThought !== -1) {
-                                        startIdx = startThought;
-                                        tagLen = 9;
-                                    }
-
-                                    if (startIdx !== -1) {
-                                        // Found start tag
-                                        const textPart = remaining.substring(0, startIdx);
-                                        if (textPart && onChunk) onChunk(textPart, undefined);
-                                        
-                                        inThinkingTag = true;
-                                        remaining = remaining.substring(startIdx + tagLen);
-                                    } else {
-                                        // No start tag, just text
-                                        if (onChunk) onChunk(remaining, undefined);
-                                        remaining = "";
-                                    }
-                                } else {
-                                    const endThinking = remaining.indexOf("</thinking>");
-                                    const endThought = remaining.indexOf("</thought>");
-                                    
-                                    let endIdx = -1;
-                                    let tagLen = 0;
-                                    
-                                    if (endThinking !== -1 && (endThought === -1 || endThinking < endThought)) {
-                                        endIdx = endThinking;
-                                        tagLen = 11;
-                                    } else if (endThought !== -1) {
-                                        endIdx = endThought;
-                                        tagLen = 10;
-                                    }
-
-                                    if (endIdx !== -1) {
-                                        // Found end tag
-                                        const thoughtPart = remaining.substring(0, endIdx);
-                                        finalReasoning += thoughtPart;
-                                        if (onChunk) onChunk("", thoughtPart);
-                                        
-                                        inThinkingTag = false;
-                                        remaining = remaining.substring(endIdx + tagLen);
-                                    } else {
-                                        // Still in thinking tag
-                                        finalReasoning += remaining;
-                                        if (onChunk) onChunk("", remaining);
-                                        remaining = "";
-                                    }
-                                }
-                            }
-                        }
-
-                        // 2. Handle Tool Calls (Streaming)
-                        if (delta.tool_calls) {
-                            for (const tc of delta.tool_calls) {
-                                const idx = tc.index;
-                                if (!toolCallMap[idx]) toolCallMap[idx] = { id: "", name: "", args: "" };
-                                
-                                if (tc.id) toolCallMap[idx].id = tc.id;
-                                if (tc.function?.name) toolCallMap[idx].name += tc.function.name;
-                                if (tc.function?.arguments) toolCallMap[idx].args += tc.function.arguments;
-                            }
-                        }
-                    } catch (e) {
-                        // Ignore partial JSON parse errors
+                // Handle OpenRouter specific reasoning features
+                if (endpoint.includes("openrouter.ai")) {
+                    const isReasoningModel = LLMService.OPENROUTER_REASONING_MODELS.some(
+                        m => modelName.toLowerCase().includes(m.toLowerCase())
+                    );
+                    if (isReasoningModel) {
+                        body.reasoning = { enabled: true };
                     }
                 }
-            }
 
-            // Turn Complete
-            const toolCalls = Object.values(toolCallMap).map(tc => ({
-                id: tc.id,
-                type: 'function',
-                function: { name: tc.name, arguments: tc.args }
-            }));
-
-            // If no tool calls, we are done
-            if (toolCalls.length === 0) {
-                // Strip thinking/thought tags from final content for clean text
-                const cleanContent = currentTurnContent.replace(/<(thinking|thought)>[\s\S]*?<\/\1>/g, "").trim();
-                if (cleanContent) {
-                    finalContent = cleanContent;
-                } else if (!finalContent) {
-                    // If this turn is empty but we have no previous content, use what we have
-                    finalContent = currentTurnContent.trim();
+                if (tools.length > 0) {
+                    body.tools = tools;
+                    body.tool_choice = "auto";
                 }
-                break; // Exit loop
-            }
 
-            // If we have content in this turn but also tool calls, preserve it
-            const turnCleanContent = currentTurnContent.replace(/<(thinking|thought)>[\s\S]*?<\/\1>/g, "").trim();
-            if (turnCleanContent) {
-                finalContent += (finalContent ? "\n\n" : "") + turnCleanContent;
-            }
+                console.log(`[Generic] Turn ${turns + 1} Request:`, { model: modelName, toolCount: tools.length, useSearch, searchProvider });
 
-            // Process Tool Calls
-            // Add Assistant Message with Tool Calls to history
-            messages.push({
-                role: 'assistant',
-                content: currentTurnContent || null, // Some APIs require null if tool_calls present
-                tool_calls: toolCalls
-            });
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(body),
+                    signal: this.abortController?.signal
+                });
 
-            console.log(`[Generic] Executing ${toolCalls.length} tools...`);
+                if (!response.ok) {
+                    const errText = await response.text();
+                    throw new Error(`API Error ${response.status}: ${errText}`);
+                }
 
-            for (const toolCall of toolCalls) {
-                let toolResultContent = "";
-                
-                try {
-                    const args = JSON.parse(toolCall.function.arguments);
-                    
-                    if (toolCall.function.name === 'perform_search') {
-                         if (!searchApiKey) {
-                             toolResultContent = "Error: Search disabled (Missing API Key).";
-                         } else {
-                             // Execute Search
-                             console.log(`[Generic] Invoking Search via ${searchProvider}...`);
-                             const searchData = await TavilyService.search(args.query, searchApiKey, searchProvider);
-                             
-                             if (searchData && searchData.results.length > 0) {
-                                 // Add to collections
-                                 searchData.results.forEach(res => collectedCitations.push({ title: res.title, uri: res.url }));
-                                 if (searchData.images) {
-                                     // Images removed as requested
-                                 }
-                                 
-                                 // Format for Model
-                                 toolResultContent = TavilyService.formatContext(searchData);
-                                 console.log(`[Generic] Search returned ${searchData.results.length} results.`);
-                             } else {
-                                 toolResultContent = "No results found for query: " + args.query;
-                                 console.warn(`[Generic] Search returned no results.`);
-                             }
-                         }
-                    } else if (toolCall.function.name === 'save_to_library') {
-                        // Intercept Save
-                        pendingAction = {
-                            type: args.action === 'update' ? 'update_page' : 'create_page',
-                            data: { title: args.title, content: args.content },
-                            originalToolCallId: toolCall.id
-                        };
-                        toolResultContent = "Action pending user confirmation.";
-                    } else if (toolCall.function.name === 'get_page_structure') {
-                        const title = args.pageTitle as string;
-                        const pageAttachment = attachments.find(a => a.name === title || a.name === title + ".md");
-                        if (pageAttachment && pageAttachment.content) {
-                            const page = BlockService.fromMarkdown(pageAttachment.content, title);
-                            const structure = page.blocks.map((b, idx) => {
-                                let context = "";
-                                if (b.type === 'table') {
-                                    context = `[TABLE] Rows: ${b.content.split('\n').length}`;
-                                } else {
-                                    context = b.content.length > 60 ? b.content.substring(0, 60) + "..." : b.content;
+                // Streaming Parser
+                const reader = response.body!.getReader();
+                const decoder = new TextDecoder("utf-8");
+                let buffer = "";
+                let currentTurnContent = "";
+
+                // Tool Call Accumulator
+                let toolCallMap: Record<number, { id: string, name: string, args: string }> = {};
+
+                // XML Parsing State for Reasoning
+                let inThinkingTag = false;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n");
+                    buffer = lines.pop() || "";
+
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (trimmed === "data: [DONE]") continue;
+                        if (!trimmed.startsWith("data: ")) continue;
+
+                        try {
+                            const json = JSON.parse(trimmed.slice(6));
+                            const choice = json.choices?.[0];
+                            if (!choice) continue;
+                            const delta = choice.delta;
+
+                            // 1. Handle Reasoning (OpenRouter/OpenAI/DeepSeek)
+                            const reasoningChunk = delta.reasoning || delta.thought || (delta as any).reasoning_content;
+                            if (reasoningChunk) {
+                                finalReasoning += reasoningChunk;
+                                if (onChunk) onChunk("", reasoningChunk);
+                            }
+
+                            // 2. Handle Content (Text)
+                            if (delta.content) {
+                                const chunk = delta.content;
+                                currentTurnContent += chunk;
+
+                                // Streaming Logic for <thinking> tags
+                                // We need to detect if we are inside <thinking>...</thinking>
+                                // This is a simple state machine parser for streaming XML tags
+
+                                let remaining = chunk;
+                                while (remaining.length > 0) {
+                                    if (!inThinkingTag) {
+                                        const startThinking = remaining.indexOf("<thinking>");
+                                        const startThought = remaining.indexOf("<thought>");
+
+                                        let startIdx = -1;
+                                        let tagLen = 0;
+
+                                        if (startThinking !== -1 && (startThought === -1 || startThinking < startThought)) {
+                                            startIdx = startThinking;
+                                            tagLen = 10;
+                                        } else if (startThought !== -1) {
+                                            startIdx = startThought;
+                                            tagLen = 9;
+                                        }
+
+                                        if (startIdx !== -1) {
+                                            // Found start tag
+                                            const textPart = remaining.substring(0, startIdx);
+                                            if (textPart && onChunk) onChunk(textPart, undefined);
+
+                                            inThinkingTag = true;
+                                            remaining = remaining.substring(startIdx + tagLen);
+                                        } else {
+                                            // No start tag, just text
+                                            if (onChunk) onChunk(remaining, undefined);
+                                            remaining = "";
+                                        }
+                                    } else {
+                                        const endThinking = remaining.indexOf("</thinking>");
+                                        const endThought = remaining.indexOf("</thought>");
+
+                                        let endIdx = -1;
+                                        let tagLen = 0;
+
+                                        if (endThinking !== -1 && (endThought === -1 || endThinking < endThought)) {
+                                            endIdx = endThinking;
+                                            tagLen = 11;
+                                        } else if (endThought !== -1) {
+                                            endIdx = endThought;
+                                            tagLen = 10;
+                                        }
+
+                                        if (endIdx !== -1) {
+                                            // Found end tag
+                                            const thoughtPart = remaining.substring(0, endIdx);
+                                            finalReasoning += thoughtPart;
+                                            if (onChunk) onChunk("", thoughtPart);
+
+                                            inThinkingTag = false;
+                                            remaining = remaining.substring(endIdx + tagLen);
+                                        } else {
+                                            // Still in thinking tag
+                                            finalReasoning += remaining;
+                                            if (onChunk) onChunk("", remaining);
+                                            remaining = "";
+                                        }
+                                    }
                                 }
-                                return `Block ${idx + 1}: [ID: ${b.id}] (${b.type}) -> ${context}`;
-                            }).join('\n');
-                            toolResultContent = `STRUCTURE OF PAGE "${title}":\n${structure}`;
-                        } else {
-                             toolResultContent = "Error: Page not found in current context. Please ask user to open the page first.";
-                        }
-                    } else if (toolCall.function.name === 'insert_block' || toolCall.function.name === 'replace_block' || toolCall.function.name === 'delete_block' || toolCall.function.name === 'update_table_cell') {
-                         pendingAction = {
-                            type: 'block_operation',
-                            data: { 
-                                operation: toolCall.function.name,
-                                args: args
-                            },
-                            originalToolCallId: toolCall.id
-                        };
-                        toolResultContent = "Block operation pending user confirmation.";
-                    } else if (toolCall.function.name === 'list_calendar_events') {
-                        let startDate = new Date(args.startDate);
-                        let endDate = new Date(args.endDate);
-                        
-                        // If startDate and endDate are the same day (00:00:00), expand endDate to end of day
-                        if (endDate.getTime() === startDate.getTime()) {
-                            endDate.setHours(23, 59, 59, 999);
-                        }
+                            }
 
-                        const allEvents = await db.get<CalendarEvent[]>(STORES.CALENDAR, 'all_events') || [];
-                        
-                        const filteredEvents = allEvents.filter(e => {
-                            const eStart = new Date(e.startDate);
-                            const eEnd = new Date(e.endDate);
-                            return eStart <= endDate && eEnd >= startDate;
-                        });
+                            // 2. Handle Tool Calls (Streaming)
+                            if (delta.tool_calls) {
+                                for (const tc of delta.tool_calls) {
+                                    const idx = tc.index;
+                                    if (!toolCallMap[idx]) toolCallMap[idx] = { id: "", name: "", args: "" };
 
-                        // Format events to be human-readable and avoid raw timestamps
-                        const formattedEvents = filteredEvents.map(e => ({
-                            ...e,
-                            startDate: new Date(e.startDate).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-                            endDate: new Date(e.endDate).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                        }));
-                        
-                        toolResultContent = JSON.stringify(formattedEvents);
-                        if (onChunk) onChunk("", `\n📅 Checking calendar for ${startDate.toLocaleString()} to ${endDate.toLocaleString()}...\n`);
-                    } else if (toolCall.function.name === 'add_calendar_event') {
-                        pendingAction = {
-                            type: 'calendar_event',
-                            data: {
-                                operation: 'add',
-                                args: args
-                            },
-                            originalToolCallId: toolCall.id
-                        };
-                        toolResultContent = "Action pending user confirmation.";
-                    } else if (toolCall.function.name === 'update_calendar_event') {
-                        pendingAction = {
-                            type: 'calendar_event',
-                            data: {
-                                operation: 'update',
-                                args: args
-                            },
-                            originalToolCallId: toolCall.id
-                        };
-                        toolResultContent = "Action pending user confirmation.";
-                    } else if (toolCall.function.name === 'delete_calendar_event') {
-                        pendingAction = {
-                            type: 'calendar_event',
-                            data: {
-                                operation: 'delete',
-                                args: args
-                            },
-                            originalToolCallId: toolCall.id
-                        };
-                        toolResultContent = "Action pending user confirmation.";
-                    } else if (toolCall.function.name === 'get_current_time') {
-                        const now = new Date();
-                        const timeString = now.toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                        toolResultContent = timeString;
-                        if (onChunk) onChunk("", `\n🕒 Time: ${timeString}...\n`);
-                    } else if (toolCall.function.name === 'read_workspace_files') {
-                        const filenames = args.filenames as string[];
-                        const requestedFiles = this.workspaceFiles.filter(f => filenames.includes(f.name));
-                        
-                        if (requestedFiles.length > 0) {
-                            requestedFiles.forEach(f => {
-                                toolResultContent += `\n[File: ${f.name}]\n${sanitizeContentForAgent(f.content || "")}\n`;
+                                    if (tc.id) toolCallMap[idx].id = tc.id;
+                                    if (tc.function?.name) toolCallMap[idx].name += tc.function.name;
+                                    if (tc.function?.arguments) toolCallMap[idx].args += tc.function.arguments;
+                                }
+                            }
+                        } catch (e) {
+                            // Ignore partial JSON parse errors
+                        }
+                    }
+                }
+
+                // Turn Complete
+                const toolCalls = Object.values(toolCallMap).map(tc => ({
+                    id: tc.id,
+                    type: 'function',
+                    function: { name: tc.name, arguments: tc.args }
+                }));
+
+                // If no tool calls, we are done
+                if (toolCalls.length === 0) {
+                    // Strip thinking/thought tags from final content for clean text
+                    const cleanContent = currentTurnContent.replace(/<(thinking|thought)>[\s\S]*?<\/\1>/g, "").trim();
+                    if (cleanContent) {
+                        finalContent = cleanContent;
+                    } else if (!finalContent) {
+                        // If this turn is empty but we have no previous content, use what we have
+                        finalContent = currentTurnContent.trim();
+                    }
+                    break; // Exit loop
+                }
+
+                // If we have content in this turn but also tool calls, preserve it
+                const turnCleanContent = currentTurnContent.replace(/<(thinking|thought)>[\s\S]*?<\/\1>/g, "").trim();
+                if (turnCleanContent) {
+                    finalContent += (finalContent ? "\n\n" : "") + turnCleanContent;
+                }
+
+                // Process Tool Calls
+                // Add Assistant Message with Tool Calls to history
+                messages.push({
+                    role: 'assistant',
+                    content: currentTurnContent || null, // Some APIs require null if tool_calls present
+                    tool_calls: toolCalls
+                });
+
+                console.log(`[Generic] Executing ${toolCalls.length} tools...`);
+
+                for (const toolCall of toolCalls) {
+                    let toolResultContent = "";
+
+                    try {
+                        const args = JSON.parse(toolCall.function.arguments);
+
+                        if (toolCall.function.name === 'perform_search') {
+                            if (!searchApiKey) {
+                                toolResultContent = "Error: Search disabled (Missing API Key).";
+                            } else {
+                                // Execute Search
+                                console.log(`[Generic] Invoking Search via ${searchProvider}...`);
+                                const searchData = await TavilyService.search(args.query, searchApiKey, searchProvider);
+
+                                if (searchData && searchData.results.length > 0) {
+                                    // Add to collections
+                                    searchData.results.forEach(res => collectedCitations.push({ title: res.title, uri: res.url }));
+                                    if (searchData.images) {
+                                        // Images removed as requested
+                                    }
+
+                                    // Format for Model
+                                    toolResultContent = TavilyService.formatContext(searchData);
+                                    console.log(`[Generic] Search returned ${searchData.results.length} results.`);
+                                } else {
+                                    toolResultContent = "No results found for query: " + args.query;
+                                    console.warn(`[Generic] Search returned no results.`);
+                                }
+                            }
+                        } else if (toolCall.function.name === 'save_to_library') {
+                            // Intercept Save
+                            pendingAction = {
+                                type: args.action === 'update' ? 'update_page' : 'create_page',
+                                data: { title: args.title, content: args.content },
+                                originalToolCallId: toolCall.id
+                            };
+                            toolResultContent = "Action pending user confirmation.";
+                        } else if (toolCall.function.name === 'get_page_structure') {
+                            const title = args.pageTitle as string;
+                            const pageAttachment = attachments.find(a => a.name === title || a.name === title + ".md");
+                            if (pageAttachment && pageAttachment.content) {
+                                const page = BlockService.fromMarkdown(pageAttachment.content, title);
+                                const structure = page.blocks.map((b, idx) => {
+                                    let context = "";
+                                    if (b.type === 'table') {
+                                        context = `[TABLE] Rows: ${b.content.split('\n').length}`;
+                                    } else {
+                                        context = b.content.length > 60 ? b.content.substring(0, 60) + "..." : b.content;
+                                    }
+                                    return `Block ${idx + 1}: [ID: ${b.id}] (${b.type}) -> ${context}`;
+                                }).join('\n');
+                                toolResultContent = `STRUCTURE OF PAGE "${title}":\n${structure}`;
+                            } else {
+                                toolResultContent = "Error: Page not found in current context. Please ask user to open the page first.";
+                            }
+                        } else if (toolCall.function.name === 'insert_block' || toolCall.function.name === 'replace_block' || toolCall.function.name === 'delete_block' || toolCall.function.name === 'update_table_cell') {
+                            pendingAction = {
+                                type: 'block_operation',
+                                data: {
+                                    operation: toolCall.function.name,
+                                    args: args
+                                },
+                                originalToolCallId: toolCall.id
+                            };
+                            toolResultContent = "Block operation pending user confirmation.";
+                        } else if (toolCall.function.name === 'list_calendar_events') {
+                            let startDate = new Date(args.startDate);
+                            let endDate = new Date(args.endDate);
+
+                            // If startDate and endDate are the same day (00:00:00), expand endDate to end of day
+                            if (endDate.getTime() === startDate.getTime()) {
+                                endDate.setHours(23, 59, 59, 999);
+                            }
+
+                            const allEvents = await db.get<CalendarEvent[]>(STORES.CALENDAR, 'all_events') || [];
+
+                            const filteredEvents = allEvents.filter(e => {
+                                const eStart = new Date(e.startDate);
+                                const eEnd = new Date(e.endDate);
+                                return eStart <= endDate && eEnd >= startDate;
                             });
-                        } else {
-                            toolResultContent = "Error: Requested files not found in workspace.";
-                        }
-                        if (onChunk) onChunk("", `\n📖 Citit ${filenames.length} fișiere din workspace...\n`);
-                    } else if (toolCall.function.name === 'search_workspace_files') {
-                        const queries = args.queries as string[];
-                        let foundCount = 0;
-                        toolResultContent = `Search results for [${queries.join(', ')}] in workspace files:\n`;
-                        const apiKeyToUse = apiKey || this.apiKey;
 
-                        if (apiKeyToUse) {
-                            const filenames = this.workspaceFiles.map(f => f.name);
-                            for (const query of queries) {
+                            // Format events to be human-readable and avoid raw timestamps
+                            const formattedEvents = filteredEvents.map(e => ({
+                                ...e,
+                                startDate: new Date(e.startDate).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                                endDate: new Date(e.endDate).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                            }));
+
+                            toolResultContent = JSON.stringify(formattedEvents);
+                            if (onChunk) onChunk("", `\n📅 Checking calendar for ${startDate.toLocaleString()} to ${endDate.toLocaleString()}...\n`);
+                        } else if (toolCall.function.name === 'add_calendar_event') {
+                            pendingAction = {
+                                type: 'calendar_event',
+                                data: {
+                                    operation: 'add',
+                                    args: args
+                                },
+                                originalToolCallId: toolCall.id
+                            };
+                            toolResultContent = "Action pending user confirmation.";
+                        } else if (toolCall.function.name === 'update_calendar_event') {
+                            pendingAction = {
+                                type: 'calendar_event',
+                                data: {
+                                    operation: 'update',
+                                    args: args
+                                },
+                                originalToolCallId: toolCall.id
+                            };
+                            toolResultContent = "Action pending user confirmation.";
+                        } else if (toolCall.function.name === 'delete_calendar_event') {
+                            pendingAction = {
+                                type: 'calendar_event',
+                                data: {
+                                    operation: 'delete',
+                                    args: args
+                                },
+                                originalToolCallId: toolCall.id
+                            };
+                            toolResultContent = "Action pending user confirmation.";
+                        } else if (toolCall.function.name === 'get_current_time') {
+                            const now = new Date();
+                            const timeString = now.toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                            toolResultContent = timeString;
+                            if (onChunk) onChunk("", `\n🕒 Time: ${timeString}...\n`);
+                        } else if (toolCall.function.name === 'read_workspace_files') {
+                            const filenames = args.filenames as string[];
+                            const requestedFiles = this.workspaceFiles.filter(f => filenames.includes(f.name));
+
+                            if (requestedFiles.length > 0) {
+                                requestedFiles.forEach(f => {
+                                    toolResultContent += `\n[File: ${f.name}]\n${sanitizeContentForAgent(f.content || "")}\n`;
+                                });
+                            } else {
+                                toolResultContent = "Error: Requested files not found in workspace.";
+                            }
+                            if (onChunk) onChunk("", `\n📖 Citit ${filenames.length} fișiere din workspace...\n`);
+                        } else if (toolCall.function.name === 'search_workspace_files') {
+                            const queries = args.queries as string[];
+                            let foundCount = 0;
+                            toolResultContent = `Search results for [${queries.join(', ')}] in workspace files:\n`;
+                            const apiKeyToUse = apiKey || this.apiKey;
+
+                            if (apiKeyToUse) {
+                                const filenames = this.workspaceFiles.map(f => f.name);
+                                for (const query of queries) {
+                                    try {
+                                        const results = await RAGService.search(query, undefined, apiKeyToUse, 3, filenames);
+                                        if (results.length > 0) {
+                                            foundCount += results.length;
+                                            toolResultContent += `\n--- Results for "${query}" ---\n`;
+                                            results.forEach((res, idx) => {
+                                                toolResultContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${sanitizeContentForAgent(res.chunk.content)}\n`;
+                                            });
+                                        }
+                                    } catch (e) {
+                                        console.error("[RAG] Search error in tool:", e);
+                                    }
+                                }
+                            }
+
+                            if (!apiKeyToUse || foundCount === 0) {
+                                let fallbackFound = 0;
+                                const lowerQueries = queries.map(q => q.toLowerCase());
+                                this.workspaceFiles.forEach(f => {
+                                    if (!f.content) return;
+                                    const lines = f.content.split('\n');
+                                    lines.forEach((line, idx) => {
+                                        const lowerLine = line.toLowerCase();
+                                        if (lowerQueries.some(q => lowerLine.includes(q))) {
+                                            fallbackFound++;
+                                            const start = Math.max(0, idx - 1);
+                                            const end = Math.min(lines.length - 1, idx + 1);
+                                            toolResultContent += `\n[File: ${f.name}, Line ${idx + 1}]\n`;
+                                            for (let i = start; i <= end; i++) {
+                                                toolResultContent += `${i === idx ? '>> ' : '   '}${lines[i]}\n`;
+                                            }
+                                        }
+                                    });
+                                });
+                                foundCount += fallbackFound;
+                                toolResultContent = sanitizeContentForAgent(toolResultContent);
+                            }
+
+                            if (foundCount === 0) toolResultContent = `No matches found for any of the queries in workspace files.`;
+                            if (onChunk) onChunk("", `\n🔍 Căutat ${queries.length} termeni în workspace...\n`);
+                        } else if (toolCall.function.name === 'get_workspace_map') {
+                            toolResultContent = "WORKSPACE KNOWLEDGE BASE MAP:\n";
+                            this.workspaceFiles.forEach(f => {
+                                const snippet = sanitizeContentForAgent((f.content || "")).substring(0, 500).replace(/\n/g, ' ');
+                                const sizeKb = Math.round((f.content?.length || 0) / 1024);
+                                toolResultContent += `\n- FILE: ${f.name} (${sizeKb} KB)\n`;
+                                toolResultContent += `  PREVIEW: ${snippet}...\n`;
+                                toolResultContent += `  CONTEXT: This file appears to contain ${f.mimeType || 'text'} data. Use search to find specific entities.\n`;
+                            });
+                            if (onChunk) onChunk("", `\n🗺️ Mapat structura workspace-ului...\n`);
+                        } else if (toolCall.function.name === 'semantic_search_workspace') {
+                            const query = args.query as string;
+                            let toolResultContent = `Semantic search results for "${query}":\n`;
+                            const apiKeyToUse = apiKey || this.apiKey;
+
+                            if (!apiKeyToUse) {
+                                toolResultContent = "Error: API key required for semantic search.";
+                            } else {
                                 try {
-                                    const results = await RAGService.search(query, undefined, apiKeyToUse, 3, filenames);
+                                    const filenames = this.workspaceFiles.map(f => f.name);
+                                    const results = await RAGService.search(query, undefined, apiKeyToUse, 5, filenames);
                                     if (results.length > 0) {
-                                        foundCount += results.length;
-                                        toolResultContent += `\n--- Results for "${query}" ---\n`;
                                         results.forEach((res, idx) => {
                                             toolResultContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${sanitizeContentForAgent(res.chunk.content)}\n`;
                                         });
+                                    } else {
+                                        toolResultContent = "No semantically relevant information found.";
                                     }
                                 } catch (e) {
-                                    console.error("[RAG] Search error in tool:", e);
+                                    console.error("[RAG] Semantic search error:", e);
+                                    toolResultContent = "Error: Failed to perform semantic search.";
                                 }
                             }
-                        }
+                            if (onChunk) onChunk("", `\n🧠 Căutare semantică: "${query}"...\n`);
+                        } else if (toolCall.function.name === 'execute_code') {
+                            const { code, language, timeout, packages } = args;
+                            if (onChunk) onChunk("", `\n⚙️ Se execută cod ${language} local...\n`);
 
-                        if (!apiKeyToUse || foundCount === 0) {
-                            let fallbackFound = 0;
-                            const lowerQueries = queries.map(q => q.toLowerCase());
-                            this.workspaceFiles.forEach(f => {
-                                if (!f.content) return;
-                                const lines = f.content.split('\n');
-                                lines.forEach((line, idx) => {
-                                    const lowerLine = line.toLowerCase();
-                                    if (lowerQueries.some(q => lowerLine.includes(q))) {
-                                        fallbackFound++;
-                                        const start = Math.max(0, idx - 1);
-                                        const end = Math.min(lines.length - 1, idx + 1);
-                                        toolResultContent += `\n[File: ${f.name}, Line ${idx + 1}]\n`;
-                                        for (let i = start; i <= end; i++) {
-                                            toolResultContent += `${i === idx ? '>> ' : '   '}${lines[i]}\n`;
-                                        }
-                                    }
-                                });
-                            });
-                            foundCount += fallbackFound;
-                            toolResultContent = sanitizeContentForAgent(toolResultContent);
-                        }
-
-                        if (foundCount === 0) toolResultContent = `No matches found for any of the queries in workspace files.`;
-                        if (onChunk) onChunk("", `\n🔍 Căutat ${queries.length} termeni în workspace...\n`);
-                    } else if (toolCall.function.name === 'get_workspace_map') {
-                        toolResultContent = "WORKSPACE KNOWLEDGE BASE MAP:\n";
-                        this.workspaceFiles.forEach(f => {
-                            const snippet = sanitizeContentForAgent((f.content || "")).substring(0, 500).replace(/\n/g, ' ');
-                            const sizeKb = Math.round((f.content?.length || 0) / 1024);
-                            toolResultContent += `\n- FILE: ${f.name} (${sizeKb} KB)\n`;
-                            toolResultContent += `  PREVIEW: ${snippet}...\n`;
-                            toolResultContent += `  CONTEXT: This file appears to contain ${f.mimeType || 'text'} data. Use search to find specific entities.\n`;
-                        });
-                        if (onChunk) onChunk("", `\n🗺️ Mapat structura workspace-ului...\n`);
-                    } else if (toolCall.function.name === 'semantic_search_workspace') {
-                        const query = args.query as string;
-                        let toolResultContent = `Semantic search results for "${query}":\n`;
-                        const apiKeyToUse = apiKey || this.apiKey;
-                        
-                        if (!apiKeyToUse) {
-                            toolResultContent = "Error: API key required for semantic search.";
-                        } else {
                             try {
-                                const filenames = this.workspaceFiles.map(f => f.name);
-                                const results = await RAGService.search(query, undefined, apiKeyToUse, 5, filenames);
-                                if (results.length > 0) {
-                                    results.forEach((res, idx) => {
-                                        toolResultContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${sanitizeContentForAgent(res.chunk.content)}\n`;
-                                    });
-                                } else {
-                                    toolResultContent = "No semantically relevant information found.";
-                                }
-                            } catch (e) {
-                                console.error("[RAG] Semantic search error:", e);
-                                toolResultContent = "Error: Failed to perform semantic search.";
-                            }
-                        }
-                        if (onChunk) onChunk("", `\n🧠 Căutare semantică: "${query}"...\n`);
-                    } else if (toolCall.function.name === 'execute_code') {
-                        const { code, language, timeout, packages } = args;
-                        if (onChunk) onChunk("", `\n⚙️ Se execută cod ${language} cu E2B Sandbox...\n`);
-                        
-                        const appSettings = await db.get<AppSettings>(STORES.SETTINGS, 'app_settings');
-                        
-                        try {
-                            if (!appSettings?.e2bApiKey) {
-                                toolResultContent = "Error: E2B API Key is not configured in Settings.";
-                                continue;
-                            }
+                                const execResult = await E2BService.executeCode({
+                                    code: code,
+                                    language: language,
+                                    timeout: timeout || 30,
+                                    packages: packages || [],
+                                    session_id: threadId
+                                });
 
-                            const execResult = await E2BService.executeCode({
-                                code: code,
-                                language: language,
-                                timeout: timeout || 30,
-                                packages: packages || [],
-                                session_id: threadId
-                            }, appSettings);
-                            
-                            toolResultContent = `Execution finished (Mode: ${execResult.sandbox_mode}).
+                                toolResultContent = `Execution finished (Mode: ${execResult.sandbox_mode}).
 Success: ${execResult.success}
 Exit Code: ${execResult.exit_code}
 Time: ${execResult.execution_time}ms
@@ -2273,174 +2258,174 @@ ${execResult.stdout || '<empty>'}
 STDERR:
 ${execResult.stderr || '<empty>'}
 Error Type: ${execResult.error_type || 'None'}`;
-                            
-                        } catch (e: any) {
-                            toolResultContent = `Code execution failed unexpectedly: ${e.message}`;
+
+                            } catch (e: any) {
+                                toolResultContent = `Code execution failed unexpectedly: ${e.message}`;
+                            }
+                        } else {
+                            toolResultContent = "Unknown tool.";
                         }
-                    } else {
-                        toolResultContent = "Unknown tool.";
+                    } catch (err: any) {
+                        toolResultContent = `Error executing tool: ${err.message}`;
+                        console.error(`[Generic] Tool Execution Error:`, err);
                     }
-                } catch (err: any) {
-                    toolResultContent = `Error executing tool: ${err.message}`;
-                    console.error(`[Generic] Tool Execution Error:`, err);
+
+                    // Add Tool Result to History
+                    messages.push({
+                        role: 'tool',
+                        tool_call_id: toolCall.id,
+                        name: toolCall.function.name,
+                        content: toolResultContent
+                    });
                 }
 
-                // Add Tool Result to History
-                messages.push({
-                    role: 'tool',
-                    tool_call_id: toolCall.id,
-                    name: toolCall.function.name,
-                    content: toolResultContent
-                });
+                // If we found a pending action, stop the loop and return immediately
+                if (pendingAction) break;
+
+                turns++;
+                // Loop continues to generate the answer based on tool results
+
+            } catch (error: any) {
+                console.error("Generic API Loop Error:", error);
+                return { text: `Error: ${error.message}`, citations: [], relatedQuestions: [] };
             }
+        } // End While
 
-            // If we found a pending action, stop the loop and return immediately
-            if (pendingAction) break;
+        // --- Post-Processing ---
 
-            turns++;
-            // Loop continues to generate the answer based on tool results
-
-        } catch (error: any) {
-            console.error("Generic API Loop Error:", error);
-            return { text: `Error: ${error.message}`, citations: [], relatedQuestions: [] };
+        // 1. Extract XML Thinking (Simulated Reasoning) - Fallback if streaming missed it
+        if (!finalReasoning) {
+            const { cleanText, reasoning } = this.extractXmlThinking(finalContent);
+            finalContent = cleanText;
+            finalReasoning = reasoning || "";
+        } else {
+            // Ensure final content is clean if we streamed reasoning
+            finalContent = finalContent.replace(/<thinking>[\s\S]*?<\/thinking>/g, "").trim();
         }
-    } // End While
 
-    // --- Post-Processing ---
+        // 2. Extract Related Questions (JSON)
+        const extracted = this.extractRelatedQuestions(finalContent);
+        finalContent = extracted.cleanText;
 
-    // 1. Extract XML Thinking (Simulated Reasoning) - Fallback if streaming missed it
-    if (!finalReasoning) {
-        const { cleanText, reasoning } = this.extractXmlThinking(finalContent);
-        finalContent = cleanText;
-        finalReasoning = reasoning || "";
-    } else {
-        // Ensure final content is clean if we streamed reasoning
-        finalContent = finalContent.replace(/<thinking>[\s\S]*?<\/thinking>/g, "").trim();
+        // 3. Deduplicate Citations
+        const uniqueCitations = Array.from(new Map(collectedCitations.map(item => [item.uri, item])).values());
+
+        return {
+            text: finalContent || "",
+            citations: uniqueCitations,
+            relatedQuestions: extracted.questions,
+            pendingAction,
+            reasoning: finalReasoning
+        };
     }
 
-    // 2. Extract Related Questions (JSON)
-    const extracted = this.extractRelatedQuestions(finalContent);
-    finalContent = extracted.cleanText;
+    // --- TTS ---
+    async generateSpeech(text: string, context: AudioContext, customApiKey?: string): Promise<AudioBuffer | null> {
+        let clientToUse = this.ai;
+        if (customApiKey) {
+            try { clientToUse = new GoogleGenAI({ apiKey: customApiKey }); } catch (e) { }
+        }
+        if (!clientToUse || !text.trim()) return null;
 
-    // 3. Deduplicate Citations
-    const uniqueCitations = Array.from(new Map(collectedCitations.map(item => [item.uri, item])).values());
+        try {
+            const response = await clientToUse.models.generateContent({
+                model: "gemini-2.5-flash-preview-tts",
+                contents: [{ parts: [{ text: text.substring(0, 4000) }] }],
+                config: {
+                    responseModalities: [Modality.AUDIO],
+                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } } },
+                },
+            });
 
-    return { 
-        text: finalContent || "", 
-        citations: uniqueCitations,
-        relatedQuestions: extracted.questions,
-        pendingAction,
-        reasoning: finalReasoning
-    };
-  }
+            const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+            if (!base64Audio) return null;
+            return await this.decodeAudioData(this.decodeBase64(base64Audio), context, 24000, 1);
 
-  // --- TTS ---
-  async generateSpeech(text: string, context: AudioContext, customApiKey?: string): Promise<AudioBuffer | null> {
-    let clientToUse = this.ai;
-    if (customApiKey) {
-        try { clientToUse = new GoogleGenAI({ apiKey: customApiKey }); } catch (e) {}
+        } catch (e: any) {
+            console.error("TTS Error:", e);
+            return null;
+        }
     }
-    if (!clientToUse || !text.trim()) return null;
 
-    try {
-        const response = await clientToUse.models.generateContent({
-            model: "gemini-2.5-flash-preview-tts",
-            contents: [{ parts: [{ text: text.substring(0, 4000) }] }],
-            config: {
-                responseModalities: [Modality.AUDIO],
-                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } } },
-            },
+    private decodeBase64(base64: string): Uint8Array {
+        const binaryString = atob(base64);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes;
+    }
+
+    private async decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
+        const dataInt16 = new Int16Array(data.buffer);
+        const frameCount = dataInt16.length / numChannels;
+        const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+        for (let channel = 0; channel < numChannels; channel++) {
+            const channelData = buffer.getChannelData(channel);
+            for (let i = 0; i < frameCount; i++) {
+                channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+            }
+        }
+        return buffer;
+    }
+
+
+
+    // --- Context Builder ---
+    private async buildSystemContext(
+        prompt: string,
+        modeInstruction: string,
+        enableMemory: boolean,
+        userProfile: UserProfile,
+        aiProfile: AiProfile,
+        spaceSystemInstruction?: string,
+        forceXmlThinking: boolean = false,
+        forceExplicitToolUse: boolean = false
+    ): Promise<string> {
+        const parts: string[] = [];
+
+        // [1] Agent Identity + Core Instructions
+        if (aiProfile.systemInstructions) {
+            parts.push(aiProfile.systemInstructions);
+        } else {
+            parts.push("You are a helpful AI assistant. Answer concisely and accurately. Use Markdown formatting.");
+        }
+
+        if (aiProfile.language && aiProfile.language !== 'English') {
+            parts.push(`\nPlease respond in ${aiProfile.language}.`);
+        }
+
+        if (modeInstruction) {
+            parts.push("\nMODE INSTRUCTION: " + modeInstruction);
+        }
+
+        if (spaceSystemInstruction) {
+            parts.push(`\nWorkspace Instructions:\n${spaceSystemInstruction}`);
+        }
+
+        if (userProfile.bio || userProfile.location || userProfile.name) {
+            let userStr = "\nUser Profile:";
+            if (userProfile.name) userStr += `\n- Name: ${userProfile.name}`;
+            if (userProfile.location) userStr += `\n- Location: ${userProfile.location}`;
+            if (userProfile.bio) userStr += `\n- Bio: ${userProfile.bio}`;
+            parts.push(userStr);
+        }
+
+        // [2] Current Date and Time
+        const now = new Date();
+        const timeStr = now.toLocaleString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZoneName: 'short'
         });
 
-        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        if (!base64Audio) return null;
-        return await this.decodeAudioData(this.decodeBase64(base64Audio), context, 24000, 1);
-
-    } catch (e: any) {
-        console.error("TTS Error:", e);
-        return null;
-    }
-  }
-
-  private decodeBase64(base64: string): Uint8Array {
-      const binaryString = atob(base64);
-      const len = binaryString.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-      }
-      return bytes;
-  }
-
-  private async decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
-    const dataInt16 = new Int16Array(data.buffer);
-    const frameCount = dataInt16.length / numChannels;
-    const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-    for (let channel = 0; channel < numChannels; channel++) {
-        const channelData = buffer.getChannelData(channel);
-        for (let i = 0; i < frameCount; i++) {
-            channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-        }
-    }
-    return buffer;
-  }
-
-
-
-  // --- Context Builder ---
-  private async buildSystemContext(
-    prompt: string,
-    modeInstruction: string,
-    enableMemory: boolean,
-    userProfile: UserProfile,
-    aiProfile: AiProfile,
-    spaceSystemInstruction?: string,
-    forceXmlThinking: boolean = false,
-    forceExplicitToolUse: boolean = false
-  ): Promise<string> {
-      const parts: string[] = [];
-
-      // [1] Agent Identity + Core Instructions
-      if (aiProfile.systemInstructions) {
-          parts.push(aiProfile.systemInstructions);
-      } else {
-          parts.push("You are a helpful AI assistant. Answer concisely and accurately. Use Markdown formatting.");
-      }
-
-      if (aiProfile.language && aiProfile.language !== 'English') {
-          parts.push(`\nPlease respond in ${aiProfile.language}.`);
-      }
-
-      if (modeInstruction) {
-          parts.push("\nMODE INSTRUCTION: " + modeInstruction);
-      }
-
-      if (spaceSystemInstruction) {
-          parts.push(`\nWorkspace Instructions:\n${spaceSystemInstruction}`);
-      }
-
-      if (userProfile.bio || userProfile.location || userProfile.name) {
-          let userStr = "\nUser Profile:";
-          if (userProfile.name) userStr += `\n- Name: ${userProfile.name}`;
-          if (userProfile.location) userStr += `\n- Location: ${userProfile.location}`;
-          if (userProfile.bio) userStr += `\n- Bio: ${userProfile.bio}`;
-          parts.push(userStr);
-      }
-
-      // [2] Current Date and Time
-      const now = new Date();
-      const timeStr = now.toLocaleString('en-US', { 
-          weekday: 'long', 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric', 
-          hour: '2-digit', 
-          minute: '2-digit',
-          timeZoneName: 'short'
-      });
-
-      parts.push(`\n**CURRENT SYSTEM TIME:** ${timeStr}`);
-      parts.push(`**DATE INTERPRETATION RULES:**
+        parts.push(`\n**CURRENT SYSTEM TIME:** ${timeStr}`);
+        parts.push(`**DATE INTERPRETATION RULES:**
 1. Use the current system time above as your absolute reference.
 2. Interpret "today", "tomorrow", "yesterday" relative to this date.
 3. For dates without a year (e.g., "March 30th"):
@@ -2450,22 +2435,22 @@ Error Type: ${execResult.error_type || 'None'}`;
 4. ALWAYS confirm the calculated absolute date internally before calling a tool.
 5. When adding events, if the user doesn't specify a year, apply the logic above.`);
 
-      // [3-6] Memory Layers (Topic Filtered)
-      if (enableMemory) {
-          const memoryContext = await memoryManager.formatContextString(prompt);
-          if (memoryContext) {
-              parts.push(memoryContext);
-          }
-      }
+        // [3-6] Memory Layers (Topic Filtered)
+        if (enableMemory) {
+            const memoryContext = await memoryManager.formatContextString(prompt);
+            if (memoryContext) {
+                parts.push(memoryContext);
+            }
+        }
 
-      // [7-8] Global Tools / Skills / Protocols
-      parts.push(`\n**REAL-TIME INFORMATION PROTOCOL:**
+        // [7-8] Global Tools / Skills / Protocols
+        parts.push(`\n**REAL-TIME INFORMATION PROTOCOL:**
 1. If the user asks about "today", "recent", "news", "crypto", "stocks", or "current events", you **MUST** use the available search tool (e.g., \`perform_search\` or built-in Google Search).
 2. Your internal knowledge is frozen in time. For any dynamic topic, the web is your source of truth.
 3. When searching for "today's news", explicitly include the current date (${timeStr}) in your search queries to get the most relevant results.
 4. If you are in a research loop, focus on gathering facts from the search results rather than your internal memory.`);
 
-      parts.push(`\n**CALENDAR PROTOCOL (CRITICAL):**
+        parts.push(`\n**CALENDAR PROTOCOL (CRITICAL):**
 1. **SOURCE OF TRUTH:** The user's calendar is the ONLY source of truth for events. Do NOT rely on your internal memory or previous conversation turns for event dates/times, as they may be outdated.
 2. **ALWAYS VERIFY:** Before answering ANY question about the calendar (reading, updating, moving, deleting), you **MUST** first call \`list_calendar_events\` to get the current, real-time state of the calendar.
 3. **SCHEDULED DATE VS CREATION DATE:** Users ALWAYS refer to the "Scheduled Date" (when the event happens), NEVER the "Creation Date". When you list events, pay attention to the \`startDate\` and \`endDate\` fields.
@@ -2478,21 +2463,21 @@ Error Type: ${execResult.error_type || 'None'}`;
    e. Do NOT ask the user to confirm if you have already verified the data. Just do it.
 6. **CONFLICTS:** If a move creates a conflict, warn the user but proceed if they insisted, or ask for confirmation if ambiguous.`);
 
-      parts.push(`\n**LIBRARY/SOURCE PROTOCOL (CRITICAL):**
+        parts.push(`\n**LIBRARY/SOURCE PROTOCOL (CRITICAL):**
 1. **PRIORITY:** If the user has attached a file, page, or source (e.g., from the Library), this attachment is your **PRIMARY SOURCE OF TRUTH**.
 2. **VERIFY FIRST:** Do NOT answer from your internal memory or assumptions about what the file *might* contain. You MUST read and analyze the actual content of the attachment provided in the context.
 3. **NO HALLUCINATIONS:** If the attached file does not contain the answer, state that clearly. Do not invent information to fill the gap.
 4. **TOOL USAGE:** If the file content is truncated or summarized (indicated by a system message), you **MUST** use the \`read_workspace_files\` tool to retrieve the full content before answering specific questions about it.
 5. **ANALYSIS:** When asked about a source, first analyze its structure, key points, and details *before* formulating your response.`);
 
-      // Simulate Reasoning via XML for non-Gemini models
-      if (forceXmlThinking) {
-          parts.push("\nIMPORTANT: Before answering, you must output your internal thought process inside <thinking>...</thinking> tags. Analyze the request, plan your search strategy, and critique your findings inside these tags. The user will see this as a 'Thought Process'. Then provide your final answer outside the tags.");
-      }
+        // Simulate Reasoning via XML for non-Gemini models
+        if (forceXmlThinking) {
+            parts.push("\nIMPORTANT: Before answering, you must output your internal thought process inside <thinking>...</thinking> tags. Analyze the request, plan your search strategy, and critique your findings inside these tags. The user will see this as a 'Thought Process'. Then provide your final answer outside the tags.");
+        }
 
-      // Explicit Tool Usage Instruction (Crucial for generic OpenRouter/OpenAI models)
-      if (forceExplicitToolUse) {
-          parts.push(`\n**CRITICAL INSTRUCTION: REAL-TIME SEARCH & KNOWLEDGE BASE**
+        // Explicit Tool Usage Instruction (Crucial for generic OpenRouter/OpenAI models)
+        if (forceExplicitToolUse) {
+            parts.push(`\n**CRITICAL INSTRUCTION: REAL-TIME SEARCH & KNOWLEDGE BASE**
 1. **Real-Time Search:** You have access to \`perform_search\`. If the user asks about current events, news, weather, or ANY information that might have changed since your training cutoff, you **MUST** use it.
 2. **Workspace Knowledge Base:** You have access to workspace files. If the user asks for specific data (ID numbers, tax codes like 'Steuer number', IBAN, names, dates) that might be in these files, you **MUST** find it.
 3. **Semantic Mapping:** Use \`get_workspace_map\` first if you are unsure which file contains the information. This gives you a high-level overview of the topics and context of each file.
@@ -2502,13 +2487,13 @@ Error Type: ${execResult.error_type || 'None'}`;
 7. **Accuracy:** Never hallucinate or guess personal data. If you cannot find it after searching/reading, state that clearly.
 8. **Form Filling:** If asked to fill a form or provide a list of personal details, use the tools to gather every single piece of information requested.
 9. **Calendar Management:** You have full access to the user's calendar. You can list, add, update, and delete events. ALWAYS check the current time using \`get_current_time\` before making any date-relative assumptions (like "tomorrow" or "next week"). Check for conflicts using \`list_calendar_events\` before adding new events.`);
-      } else {
-          // For Gemini models, we still want to mention the calendar capability
-          parts.push(`\n**CALENDAR CAPABILITY:** You have full access to the user's calendar. You can list, add, update, and delete events. ALWAYS check the current time using \`get_current_time\` before making any date-relative assumptions. Check for conflicts before adding events.`);
-      }
+        } else {
+            // For Gemini models, we still want to mention the calendar capability
+            parts.push(`\n**CALENDAR CAPABILITY:** You have full access to the user's calendar. You can list, add, update, and delete events. ALWAYS check the current time using \`get_current_time\` before making any date-relative assumptions. Check for conflicts before adding events.`);
+        }
 
-      // GLOBAL PROCESS INSTRUCTION (Enforces the Plan -> Execute -> Analyze -> Answer loop)
-      parts.push(`\n**OPERATIONAL PROTOCOL:**
+        // GLOBAL PROCESS INSTRUCTION (Enforces the Plan -> Execute -> Analyze -> Answer loop)
+        parts.push(`\n**OPERATIONAL PROTOCOL:**
 1. **PLAN:** Understand the user's goal. If information is missing (from web or workspace), use tools (Search/Read) to find it.
 2. **EXECUTE:** Call necessary tools.
 3. **ANALYZE:** Critically evaluate the tool results. Are they relevant? Are they sufficient? If not, search again with a better query.
@@ -2525,15 +2510,15 @@ Folosește variabile CSS: var(--text-primary), var(--bg-secondary), var(--border
 Nu folosi culori hardcodate. Nu folosi DOCTYPE/html/head/body în cod.
 `);
 
-      // Explicit Citation Instruction for Generic Models
-      parts.push("\nCITATION RULES: If you use the 'perform_search' tool, you must cite the results in your final answer. Use the format [1], [2], etc., corresponding to the order of the sources provided by the tool. Do NOT invent sources.");
+        // Explicit Citation Instruction for Generic Models
+        parts.push("\nCITATION RULES: If you use the 'perform_search' tool, you must cite the results in your final answer. Use the format [1], [2], etc., corresponding to the order of the sources provided by the tool. Do NOT invent sources.");
 
-      // Add capabilities instruction for Saving
-      parts.push("\n\nCAPABILITIES: You can save information to the user's library. CRITICAL RULE: ONLY use `save_to_library` if the user EXPLICITLY and DIRECTLY commands you to 'save this', 'create a page', or 'remember this'. DO NOT call this tool automatically at the end of a research task or conversation. If the user just asks a question or asks for research, DO NOT save it.");
+        // Add capabilities instruction for Saving
+        parts.push("\n\nCAPABILITIES: You can save information to the user's library. CRITICAL RULE: ONLY use `save_to_library` if the user EXPLICITLY and DIRECTLY commands you to 'save this', 'create a page', or 'remember this'. DO NOT call this tool automatically at the end of a research task or conversation. If the user just asks a question or asks for research, DO NOT save it.");
 
-      // Instruction to generate related questions
-      parts.push("\n\nIMPORTANT: After your main response (and after </thinking> if applicable), generate 3 relevant follow-up questions. Return them as a JSON array in a markdown code block at the very end, e.g., ```json\n[\"Q1?\", \"Q2?\"]\n```.");
+        // Instruction to generate related questions
+        parts.push("\n\nIMPORTANT: After your main response (and after </thinking> if applicable), generate 3 relevant follow-up questions. Return them as a JSON array in a markdown code block at the very end, e.g., ```json\n[\"Q1?\", \"Q2?\"]\n```.");
 
-      return parts.join("\n");
-  }
+        return parts.join("\n");
+    }
 }

@@ -58,13 +58,13 @@ export interface Note {
   id: string;
   title: string;
   content: string;
-  
+
   // Notion-like properties
   emoji?: string;
   cover?: string; // CSS gradient or image URL
   tags?: string[];
   status?: 'Idea' | 'In Progress' | 'Done';
-  
+
   // New Page Properties
   isFavorite?: boolean;
   isLocked?: boolean;
@@ -80,7 +80,7 @@ export interface Note {
 
 
 // ENUM for Memory Categories
-export type MemoryCategory = 
+export type MemoryCategory =
   | 'AboutUser'
   | 'Work'
   | 'Projects'
@@ -165,16 +165,15 @@ export interface AppSettings {
   openRouterModelId: string; // Specific model for OpenRouter
   openAiApiKey: string; // Specific key for OpenAI
   openAiModelId: string; // Specific model for OpenAI
-  
+
   // Search Configuration
   searchProvider: 'tavily' | 'brave'; // Selector
-  tavilyApiKey: string; 
+  tavilyApiKey: string;
   braveApiKey: string; // NEW: Key for Brave Search
-  
+
   // Local/Custom Models Configuration
   localModels: LocalModelConfig[]; // Array of downloaded models
   activeLocalModelId: string;
-  e2bApiKey: string; // E2B API Key for code execution
 
   // Langflow Configuration
   langflowEnabled: boolean;       // toggle on/off
@@ -186,13 +185,13 @@ export interface AppSettings {
   useSearch: boolean;
   defaultProMode: ProMode; // Default mode for the left button
   enableMemory: boolean; // Toggle for memory system
-  
+
   // General Preferences
   theme: 'system' | 'dark' | 'light';
   textSize: 'small' | 'medium' | 'large';
   searchRegion: 'global' | 'us' | 'uk' | 'eu' | 'asia';
   interfaceLanguage: 'en' | 'ro'; // New setting for UI Language
-  
+
   // Mobile Dock Settings
   enableMobileDock: boolean;
   dockShortcuts: string[]; // IDs of pages for the two custom slots
@@ -206,17 +205,16 @@ export const DEFAULT_SETTINGS: AppSettings = {
   modelProvider: ModelProvider.GEMINI,
   geminiApiKey: '',
   openRouterApiKey: '',
-  openRouterModelId: 'openai/gpt-4o', 
+  openRouterModelId: 'openai/gpt-4o',
   openAiApiKey: '',
-  openAiModelId: 'gpt-4o', 
-  
+  openAiModelId: 'gpt-4o',
+
   searchProvider: 'tavily',
-  tavilyApiKey: '', 
+  tavilyApiKey: '',
   braveApiKey: '',
 
   localModels: [], // Starts empty, populated by downloads
   activeLocalModelId: '',
-  e2bApiKey: '',
 
   langflowEnabled: false,
   langflowUrl: 'http://localhost:7860',
