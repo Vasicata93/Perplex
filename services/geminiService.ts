@@ -775,7 +775,8 @@ export class LLMService {
         // If Agentic Research is disabled, bypass the planner and execute directly
         if (!useAgenticResearch) {
             if (onChunk) customOnChunk("", "⚡ Mod Chat Simplu (Fără etape)...\n");
-            const result = await this.runCoreGeneration(shortTermHistory, prompt, attachments, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel, useSearch, proMode, enableMemory, userProfile, aiProfile, spaceSystemInstruction, tavilyApiKey, geminiApiKey, searchProvider, braveApiKey, customOnChunk, undefined, threadId);
+            // In simple chat mode, force ProMode.STANDARD to ensure a fast, direct response without reasoning.
+            const result = await this.runCoreGeneration(shortTermHistory, prompt, attachments, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel, useSearch, ProMode.STANDARD, enableMemory, userProfile, aiProfile, spaceSystemInstruction, tavilyApiKey, geminiApiKey, searchProvider, braveApiKey, customOnChunk, undefined, threadId);
             this.triggerMemoryConsolidation(prompt, result.text, enableMemory, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
             result.reasoning = accumulatedReasoning + (result.reasoning || "");
             return result;
@@ -882,8 +883,10 @@ export class LLMService {
 
         // 2. Determine System Logic based on ProMode
         let modeInstruction = "";
-        let forceReasoning = false;
         let forceSearch = useSearch;
+
+        // Reasoning is forced if Agent Mode is active or if the ProMode requires it.
+        let forceReasoning = (systemInstructionOverride && systemInstructionOverride.includes('AGENT OPERATIONAL PROTOCOL'));
 
         switch (proMode) {
             case ProMode.STANDARD:
@@ -907,11 +910,6 @@ export class LLMService {
                 forceSearch = true;
                 modeInstruction = "You are in SHOPPING RESEARCH mode. Find products, compare prices, and look for reviews.";
                 break;
-        }
-
-        // If Agent Mode is active (detected by systemInstructionOverride containing agent protocol), force reasoning
-        if (systemInstructionOverride && systemInstructionOverride.includes('AGENT OPERATIONAL PROTOCOL')) {
-            forceReasoning = true;
         }
 
         // 3. Build the System Context (Used by all providers)

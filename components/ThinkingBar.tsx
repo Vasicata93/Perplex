@@ -28,8 +28,8 @@ export const ThinkingBar: React.FC<ThinkingBarProps> = ({ events }) => {
             <button
                 onClick={() => setIsExpanded(!isExpanded)}
                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg border transition-all duration-200 group ${isExpanded
-                        ? 'bg-pplx-secondary border-pplx-border'
-                        : 'bg-pplx-secondary/50 border-transparent hover:bg-pplx-secondary hover:border-pplx-border/50'
+                        ? 'bg-pplx-secondary/20 border-pplx-border/30'
+                        : 'bg-transparent border-transparent hover:bg-pplx-secondary/10 hover:border-pplx-border/20'
                     }`}
             >
                 <div className="flex items-center gap-3 overflow-hidden">

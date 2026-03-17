@@ -389,7 +389,7 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: { type: 'chart
     const colors = ['#20B8CD', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6'];
 
     return (
-        <div className="my-6 p-6 border border-pplx-border rounded-2xl bg-pplx-card shadow-sm group/chart relative overflow-hidden">
+        <div className="my-6 p-4 bg-transparent group/chart relative overflow-hidden">
             {!readOnly && (
                 <div className="absolute top-3 right-3 z-20 opacity-0 group-hover/chart:opacity-100 transition-opacity">
                     <button onClick={() => setIsEditing(!isEditing)} className="p-1.5 bg-pplx-secondary/80 backdrop-blur hover:bg-pplx-hover rounded-lg border border-pplx-border text-xs flex items-center gap-1.5 font-medium shadow-sm">

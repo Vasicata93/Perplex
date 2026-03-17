@@ -66,7 +66,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <div className={`absolute top-0 left-0 right-0 bg-gradient-to-b from-pplx-card to-transparent z-10 pointer-events-none ${isSidePanel ? 'h-6 opacity-80' : 'h-12'}`} />
 
       {/* Messages Area */}
-      <div className={`flex-1 overflow-y-auto custom-scrollbar p-4 space-y-8 relative ${isSidePanel ? 'pt-2' : 'pt-12'}`}>
+      <div className={`flex-1 overflow-y-auto custom-scrollbar p-4 space-y-8 relative ${isSidePanel ? 'pt-2' : 'pt-12'} pb-10`}>
         {filteredMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-pplx-muted opacity-50">
             <PerplexityLogo className="w-12 h-12 mb-4" />
@@ -168,7 +168,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         : 'w-full text-pplx-text'
                       }`}>
                       {msg.role === Role.MODEL && msg.reasoning && (
-                        <div className="mb-4 p-4 bg-pplx-secondary rounded-lg border border-pplx-border text-sm text-pplx-text/80 font-mono whitespace-pre-wrap">
+                        <div className="mb-4 p-4 bg-transparent rounded-lg border border-pplx-border/30 text-sm text-pplx-text/70 font-mono whitespace-pre-wrap">
                           <div className="font-bold text-pplx-accent mb-2">Reasoning Process:</div>
                           {msg.reasoning}
                         </div>
@@ -225,7 +225,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       {/* Input Area */}
-      <div className={`p-4 bg-pplx-card relative z-20 ${isSidePanel ? 'md:p-4 p-2' : ''}`}>
+      <div className={`p-4 bg-pplx-card sticky bottom-0 z-30 border-t border-pplx-border/10 ${isSidePanel ? 'md:p-4 p-2' : ''}`}>
         {/* Bottom Gradient Fade - Perfectly glued to input box */}
         <div className="absolute bottom-[calc(100%-16px)] left-0 right-0 h-12 bg-gradient-to-t from-pplx-card via-pplx-card/50 to-transparent z-10 pointer-events-none" />
         <InputArea

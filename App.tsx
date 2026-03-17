@@ -1753,7 +1753,7 @@ function App() {
                         <div
                             ref={chatContainerRef}
                             onScroll={handleScroll}
-                            className={`flex-1 overflow-y-auto overflow-x-hidden w-full p-2 md:p-0 scroll-smooth pt-24 pb-28 ${activeView === 'chat' && !activeThreadId ? 'md:pb-0' : 'md:pb-64'}`} // Reduced padding-bottom on mobile
+                            className={`flex-1 overflow-y-auto overflow-x-hidden w-full p-2 md:p-0 scroll-smooth pt-24 pb-8`} 
                         >
                             {!activeThreadId || !activeThread ? (
                                 <div className="flex flex-col min-h-full relative z-10">
@@ -2190,7 +2190,7 @@ function App() {
 
                         </div>
 
-                        <div className={`w-full bg-pplx-primary pt-2 px-4 z-30 shrink-0 border-t border-transparent transition-all duration-500 relative ${settings.enableMobileDock ? 'sm:pb-6' : 'pb-0'} ${activeView === 'chat' && !activeThreadId && !activeSpace ? 'md:pb-[35vh]' : 'md:pb-0'}`}>
+                        <div className={`w-full bg-pplx-primary pt-2 px-4 z-40 shrink-0 border-t border-transparent sticky bottom-0 transition-opacity duration-300 ${settings.enableMobileDock ? 'sm:pb-6' : 'pb-0'} ${activeView === 'chat' && !activeThreadId && !activeSpace ? 'md:pb-[35vh]' : 'md:pb-0'}`}>
                             {/* BOTTOM GRADIENT MASK (Desktop) - Perfectly glued to input box */}
                             <div className="absolute bottom-[calc(100%-8px)] left-0 right-0 h-14 bg-gradient-to-t from-pplx-primary via-pplx-primary/80 to-transparent pointer-events-none z-10 hidden md:block" />
 

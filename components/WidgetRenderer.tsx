@@ -233,23 +233,24 @@ ${content}
 
   return (
     <div
-      className="my-4 rounded-xl overflow-hidden"
+      className="my-2 bg-transparent"
       onMouseEnter={() => setIsInteracting(true)}
       onMouseLeave={() => setIsInteracting(false)}
       onTouchStart={() => setIsInteracting(true)}
       onTouchEnd={() => setTimeout(() => setIsInteracting(false), 300)}
     >
-      {title && (
-        <div className="px-4 py-2 text-xs text-pplx-muted font-medium flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-pplx-accent inline-block" />
-          {title}
-        </div>
-      )}
       <iframe
         ref={iframeRef}
         src={blobUrl}
         sandbox="allow-scripts"
-        style={{ width: '100%', height: `${height}px`, border: 'none', display: 'block', pointerEvents: isInteracting ? 'auto' : 'none' }}
+        style={{ 
+          width: '100%', 
+          height: `${height}px`, 
+          border: 'none', 
+          display: 'block', 
+          background: 'transparent',
+          pointerEvents: isInteracting ? 'auto' : 'none' 
+        }}
         title={title || 'Widget interactiv'}
       />
     </div>
