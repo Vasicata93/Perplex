@@ -8,6 +8,7 @@ interface WidgetRendererProps {
 export const WidgetRenderer: React.FC<WidgetRendererProps> = ({ code, title }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(300);
+  const [isInteracting, setIsInteracting] = useState(false);
 
   // Construim HTML complet pentru iframe
   const buildHtml = (content: string): string => {
@@ -168,14 +169,14 @@ ${content}
   }
   // Auto-resize iframe la înălțimea conținutului
   function reportHeight() {
-    const h = document.body.scrollHeight;
+    const h = document.documentElement.scrollHeight || document.body.scrollHeight;
     window.parent.postMessage({ type: 'PERPLEX_WIDGET_HEIGHT', height: h }, '*');
   }
-  const ro = new ResizeObserver(reportHeight);
-  if(document.body) ro.observe(document.body);
-  window.addEventListener('load', reportHeight);
-  setTimeout(reportHeight, 500);
-  setTimeout(reportHeight, 1500);
+  window.addEventListener('load', function() {
+    reportHeight();
+    setTimeout(reportHeight, 500);
+  });
+  window.addEventListener('resize', reportHeight);
 </script>
 </body>
 </html>`;
@@ -185,7 +186,10 @@ ${content}
   useEffect(() => {
     const handler = (e: MessageEvent) => {
       if (e.data?.type === 'PERPLEX_WIDGET_HEIGHT') {
-        setHeight(Math.max(100, e.data.height + 16));
+        setHeight(h => {
+          const newH = Math.max(100, e.data.height + 20);
+          return Math.abs(newH - h) > 5 ? newH : h;
+        });
       }
       // sendPrompt din widget → trimite în inputul de chat
       if (e.data?.type === 'PERPLEX_SEND_PROMPT') {
@@ -212,9 +216,15 @@ ${content}
   }, [blobUrl]);
 
   return (
-    <div className="my-4 rounded-xl overflow-hidden border border-pplx-border bg-pplx-card">
+    <div
+      className="my-4 rounded-xl overflow-hidden"
+      onMouseEnter={() => setIsInteracting(true)}
+      onMouseLeave={() => setIsInteracting(false)}
+      onTouchStart={() => setIsInteracting(true)}
+      onTouchEnd={() => setTimeout(() => setIsInteracting(false), 300)}
+    >
       {title && (
-        <div className="px-4 py-2 border-b border-pplx-border text-xs text-pplx-muted font-medium flex items-center gap-2">
+        <div className="px-4 py-2 text-xs text-pplx-muted font-medium flex items-center gap-2 bg-pplx-secondary/5">
           <span className="w-2 h-2 rounded-full bg-pplx-accent inline-block" />
           {title}
         </div>
@@ -223,7 +233,7 @@ ${content}
         ref={iframeRef}
         src={blobUrl}
         sandbox="allow-scripts"
-        style={{ width: '100%', height: `${height}px`, border: 'none', display: 'block' }}
+        style={{ width: '100%', height: `${height}px`, border: 'none', display: 'block', pointerEvents: isInteracting ? 'auto' : 'none' }}
         title={title || 'Widget interactiv'}
       />
     </div>

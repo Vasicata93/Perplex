@@ -1,40 +1,40 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-    Plus, FileText, X, ArrowUpRight, AtSign, 
-    MoreHorizontal, Edit3, MousePointerClick, CalendarDays, 
+import {
+    Plus, FileText, X, ArrowUpRight, AtSign,
+    MoreHorizontal, Edit3, MousePointerClick, CalendarDays,
     ChevronLeft, ChevronRight, BarChart3,
     ListOrdered, Sigma
 } from 'lucide-react';
 import { Note } from '../types';
 
 // --- Types needed for blocks ---
-export type BlockType = 
-    | 'text' | 'h1' | 'h2' | 'h3' | 'bullet' | 'number' | 'todo' | 'quote' | 'code' | 'divider' 
+export type BlockType =
+    | 'text' | 'h1' | 'h2' | 'h3' | 'bullet' | 'number' | 'todo' | 'quote' | 'code' | 'divider'
     | 'image' | 'video' | 'audio' | 'file' | 'newpage'
-    | 'table' | 'calendar' 
+    | 'table' | 'calendar'
     | 'chart_bar_v' | 'chart_bar_h' | 'chart_line' | 'chart_donut'
-    | 'toc' | 'button' | 'block_synced' | 'equation' 
+    | 'toc' | 'button' | 'block_synced' | 'equation'
     | 'mention_person' | 'mention_page' | 'widget';
 
 export interface Block {
     id: string;
     type: BlockType;
-    content: string; 
+    content: string;
     metadata?: {
         name?: string;
         mimeType?: string;
-        pageId?: string; 
+        pageId?: string;
         title?: string;
     };
-    checked?: boolean; 
+    checked?: boolean;
 }
 
 // --- UTILS ---
 
-export const AutoResizeTextarea = ({ 
+export const AutoResizeTextarea = ({
     value, onChange, onEnter, onBackspace, onPaste, className, placeholder, autoFocus, onFocus, readOnly = false
-}: { 
+}: {
     value: string, onChange: (val: string) => void, onEnter?: () => void, onBackspace?: () => void,
     onPaste?: (e: React.ClipboardEvent) => void, className: string, placeholder?: string,
     autoFocus?: boolean, onFocus?: () => void, readOnly?: boolean
@@ -67,10 +67,10 @@ export const AutoResizeTextarea = ({
         });
 
         observer.observe(textarea);
-        
+
         // Initial adjustment
         adjustHeight();
-        
+
         return () => observer.disconnect();
     }, []);
 
@@ -84,8 +84,8 @@ export const AutoResizeTextarea = ({
             value={value}
             onChange={(e) => !readOnly && onChange(e.target.value)}
             onKeyDown={(e) => {
-                if(readOnly) return;
-                if(e.key === 'Enter' && !e.shiftKey && onEnter) {
+                if (readOnly) return;
+                if (e.key === 'Enter' && !e.shiftKey && onEnter) {
                     e.preventDefault();
                     onEnter();
                 }
@@ -123,9 +123,9 @@ export const MentionPageBlock = ({ content, metadata, notes, onUpdate, onNavigat
     const filteredNotes = notes.filter(n => n.title.toLowerCase().includes(search.toLowerCase()));
 
     const handleSelect = (note: Note) => {
-        onUpdate({ 
-            content: note.title || 'Untitled', 
-            metadata: { ...metadata, pageId: note.id } 
+        onUpdate({
+            content: note.title || 'Untitled',
+            metadata: { ...metadata, pageId: note.id }
         });
         setIsMenuOpen(false);
     };
@@ -133,16 +133,16 @@ export const MentionPageBlock = ({ content, metadata, notes, onUpdate, onNavigat
     if (!metadata?.pageId && !readOnly) {
         return (
             <div className="relative inline-block my-1">
-                <button 
+                <button
                     onClick={() => setIsMenuOpen(!isMenuOpen)}
                     className="inline-flex items-center gap-1 bg-pplx-secondary text-pplx-muted px-2 py-0.5 rounded text-sm hover:bg-pplx-hover cursor-pointer border border-dashed border-pplx-border hover:text-pplx-text"
                 >
                     <ArrowUpRight size={12} /> Select a Page
                 </button>
-                
+
                 {isMenuOpen && (
                     <div ref={menuRef} className="absolute top-full left-0 mt-1 w-64 bg-pplx-card border border-pplx-border rounded-lg shadow-xl z-50 p-2 max-h-60 overflow-y-auto">
-                        <input 
+                        <input
                             autoFocus
                             className="bg-transparent text-xs text-pplx-text outline-none w-full placeholder-gray-500 mb-2 border-b border-pplx-border/50 pb-1"
                             placeholder="Search pages..."
@@ -150,7 +150,7 @@ export const MentionPageBlock = ({ content, metadata, notes, onUpdate, onNavigat
                             onChange={e => setSearch(e.target.value)}
                         />
                         {filteredNotes.map(note => (
-                            <button 
+                            <button
                                 key={note.id}
                                 onClick={() => handleSelect(note)}
                                 className="w-full text-left px-2 py-1.5 text-xs text-pplx-text hover:bg-pplx-hover rounded flex items-center gap-2"
@@ -168,13 +168,13 @@ export const MentionPageBlock = ({ content, metadata, notes, onUpdate, onNavigat
     return (
         <div className="my-1 inline-flex items-center gap-1 bg-pplx-secondary text-pplx-text px-1.5 py-0.5 rounded text-sm hover:bg-pplx-hover border border-transparent hover:border-pplx-border group cursor-pointer">
             <div onClick={() => metadata?.pageId && onNavigate(metadata.pageId)} className="flex items-center gap-1">
-                <FileText size={12} className="text-pplx-accent" /> 
+                <FileText size={12} className="text-pplx-accent" />
                 <span className="underline decoration-transparent hover:decoration-pplx-text underline-offset-2 transition-all">
                     {content || "Untitled Page"}
                 </span>
             </div>
             {!readOnly && (
-                <button 
+                <button
                     onClick={() => onUpdate({ metadata: { ...metadata, pageId: undefined } })}
                     className="w-0 overflow-hidden group-hover:w-auto pl-1 text-pplx-muted hover:text-red-400 transition-all"
                 >
@@ -197,7 +197,7 @@ export const MentionPersonBlock = ({ content, onChange, readOnly }: { content: s
         return (
             <div className="my-1 inline-flex items-center gap-1 bg-pplx-secondary text-pplx-text px-1.5 py-0.5 rounded text-sm border border-pplx-accent">
                 <AtSign size={12} className="text-pplx-accent" />
-                <input 
+                <input
                     ref={inputRef}
                     value={content}
                     onChange={(e) => onChange(e.target.value)}
@@ -211,11 +211,11 @@ export const MentionPersonBlock = ({ content, onChange, readOnly }: { content: s
     }
 
     return (
-        <button 
+        <button
             onClick={() => !readOnly && setIsEditing(true)}
             className="my-1 inline-flex items-center gap-1 bg-pplx-secondary text-pplx-text px-1.5 py-0.5 rounded text-sm hover:bg-pplx-hover cursor-pointer border border-transparent hover:border-pplx-border transition-colors"
         >
-            <AtSign size={12} className="text-pplx-accent" /> 
+            <AtSign size={12} className="text-pplx-accent" />
             <span>{content || "Person"}</span>
         </button>
     );
@@ -227,7 +227,7 @@ export const NewPageBlock = ({ content, metadata, onNavigate, notes }: { content
     const displayEmoji = linkedNote?.emoji || '📄';
 
     return (
-        <div 
+        <div
             onClick={() => metadata?.pageId && onNavigate(metadata.pageId)}
             className="my-1 flex items-center gap-2 px-2 py-1.5 hover:bg-pplx-hover rounded-lg cursor-pointer transition-colors group/page w-max max-w-full"
         >
@@ -263,7 +263,7 @@ export const TableBlock = ({ content, onChange, readOnly }: { content: string, o
                         <tr>
                             {data[0].map((cell, i) => (
                                 <th key={i} className="border-b border-r border-pplx-border last:border-r-0 bg-pplx-secondary/50 p-0 min-w-[120px]">
-                                    <input 
+                                    <input
                                         className="w-full bg-transparent p-2 text-sm font-semibold text-pplx-text outline-none placeholder-gray-500"
                                         value={cell}
                                         onChange={(e) => !readOnly && updateCell(0, i, e.target.value)}
@@ -283,7 +283,7 @@ export const TableBlock = ({ content, onChange, readOnly }: { content: string, o
                             <tr key={rIdx}>
                                 {row.map((cell, cIdx) => (
                                     <td key={cIdx} className="border-b border-r border-pplx-border last:border-r-0 p-0 min-w-[120px]">
-                                        <input 
+                                        <input
                                             className="w-full bg-transparent p-2 text-sm text-pplx-text outline-none"
                                             value={cell}
                                             onChange={(e) => !readOnly && updateCell(rIdx + 1, cIdx, e.target.value)}
@@ -309,7 +309,7 @@ export const TableBlock = ({ content, onChange, readOnly }: { content: string, o
 export const CalendarBlock = ({ content, onChange, readOnly }: { content: string, onChange: (val: string) => void, readOnly?: boolean }) => {
     const now = new Date();
     let state = { month: now.getMonth(), year: now.getFullYear(), selected: [] as string[] };
-    
+
     try {
         const parsed = JSON.parse(content);
         if (parsed && typeof parsed.month === 'number') state = { ...state, ...parsed };
@@ -323,7 +323,7 @@ export const CalendarBlock = ({ content, onChange, readOnly }: { content: string
     const toggleDate = (day: number) => {
         if (readOnly) return;
         const dateStr = new Date(state.year, state.month, day).toISOString().split('T')[0];
-        const newSelected = state.selected.includes(dateStr) 
+        const newSelected = state.selected.includes(dateStr)
             ? state.selected.filter(d => d !== dateStr)
             : [...state.selected, dateStr];
         saveState({ selected: newSelected });
@@ -355,8 +355,8 @@ export const CalendarBlock = ({ content, onChange, readOnly }: { content: string
                         const isSelected = state.selected.includes(dateStr);
                         const isToday = new Date().toISOString().split('T')[0] === dateStr;
                         return (
-                            <button 
-                                key={day} 
+                            <button
+                                key={day}
                                 onClick={() => toggleDate(day)}
                                 disabled={readOnly}
                                 className={`h-9 w-9 mx-auto rounded-full flex items-center justify-center text-sm transition-all duration-200
@@ -376,15 +376,15 @@ export const CalendarBlock = ({ content, onChange, readOnly }: { content: string
 
 export const ChartBlock = ({ type, content, onChange, readOnly }: { type: 'chart_bar_v' | 'chart_bar_h' | 'chart_line' | 'chart_donut', content: string, onChange: (val: string) => void, readOnly?: boolean }) => {
     const [isEditing, setIsEditing] = useState(false);
-    
+
     const parseData = (str: string) => str.split('\n').map(line => {
         const [label, val] = line.split(',');
         return { label: label || 'Item', value: parseFloat(val) || 0 };
     }).filter(d => d.label);
 
     let data = parseData(content);
-    if (data.length === 0) data = [{label: 'Jan', value: 10}, {label: 'Feb', value: 25}];
-    
+    if (data.length === 0) data = [{ label: 'Jan', value: 10 }, { label: 'Feb', value: 25 }];
+
     const maxVal = Math.max(...data.map(d => d.value)) * 1.1 || 100;
     const colors = ['#20B8CD', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6'];
 
@@ -462,19 +462,19 @@ export const ButtonBlock = ({ content, onChange, onAction, readOnly }: { content
 
 export const SyncedBlock = ({ content, onChange, readOnly }: { content: string, onChange: (val: string) => void, readOnly?: boolean }) => (
     <div className="my-4 p-0.5 border-2 border-orange-400/50 rounded-lg relative group/sync">
-         <div className="absolute -top-3 left-3 bg-pplx-primary px-2 text-[10px] text-orange-400 flex items-center gap-1 font-medium z-10"><div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-pulse" /> Synced content</div>
-         <div className="bg-pplx-secondary/10 p-4 rounded-md">
-             <AutoResizeTextarea value={content} onChange={onChange} className="text-base text-pplx-text leading-relaxed w-full" placeholder="Type content to sync..." readOnly={readOnly} />
-         </div>
-         {!readOnly && <div className="absolute top-2 right-2 opacity-0 group-hover/sync:opacity-100 transition-opacity"><button className="p-1 hover:bg-pplx-hover rounded text-pplx-muted hover:text-pplx-text"><MoreHorizontal size={14} /></button></div>}
+        <div className="absolute -top-3 left-3 bg-pplx-primary px-2 text-[10px] text-orange-400 flex items-center gap-1 font-medium z-10"><div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-pulse" /> Synced content</div>
+        <div className="bg-pplx-secondary/10 p-4 rounded-md">
+            <AutoResizeTextarea value={content} onChange={onChange} className="text-base text-pplx-text leading-relaxed w-full" placeholder="Type content to sync..." readOnly={readOnly} />
+        </div>
+        {!readOnly && <div className="absolute top-2 right-2 opacity-0 group-hover/sync:opacity-100 transition-opacity"><button className="p-1 hover:bg-pplx-hover rounded text-pplx-muted hover:text-pplx-text"><MoreHorizontal size={14} /></button></div>}
     </div>
 );
 
 export const EquationBlock = ({ content, onChange, readOnly }: { content: string, onChange: (val: string) => void, readOnly?: boolean }) => (
-     <div className="my-2 p-3 bg-pplx-card border border-pplx-border rounded flex items-center font-mono text-lg text-pplx-text group/eq relative">
-         <Sigma size={18} className="mr-3 text-pplx-muted shrink-0" />
-         <AutoResizeTextarea value={content} onChange={onChange} className="text-center bg-transparent w-full outline-none" placeholder="E = mc^2" readOnly={readOnly} />
-     </div>
+    <div className="my-2 p-3 bg-pplx-card border border-pplx-border rounded flex items-center font-mono text-lg text-pplx-text group/eq relative">
+        <Sigma size={18} className="mr-3 text-pplx-muted shrink-0" />
+        <AutoResizeTextarea value={content} onChange={onChange} className="text-center bg-transparent w-full outline-none" placeholder="E = mc^2" readOnly={readOnly} />
+    </div>
 );
 
 // ── WidgetBlock ─────────────────────────────────────────────────────
@@ -488,6 +488,7 @@ export const WidgetBlock: React.FC<{
 }> = ({ content, metadata }) => {
     const [height, setHeight] = React.useState(300);
     const containerRef = React.useRef<HTMLDivElement>(null);
+    const [isInteracting, setIsInteracting] = React.useState(false);
 
     // Detectăm dark mode din clasa pe <html>
     const isDark = document.documentElement.classList.contains('dark');
@@ -575,13 +576,14 @@ ${code}
 <script>
 function sendPrompt(text){window.parent.postMessage({type:'PERPLEX_SEND_PROMPT',text},'*')}
 function reportHeight(){
-    var h=document.body.scrollHeight;
+    var h = document.documentElement.scrollHeight || document.body.scrollHeight;
     window.parent.postMessage({type:'PERPLEX_WIDGET_HEIGHT',height:h},'*');
 }
-var ro=new ResizeObserver(reportHeight);
-if(document.body) ro.observe(document.body);
-window.addEventListener('load',reportHeight);
-setTimeout(reportHeight,300);setTimeout(reportHeight,1000);
+window.addEventListener('load', function() {
+    reportHeight();
+    setTimeout(reportHeight, 500);
+});
+window.addEventListener('resize', reportHeight);
 </script>
 </body>
 </html>`;
@@ -590,7 +592,10 @@ setTimeout(reportHeight,300);setTimeout(reportHeight,1000);
     React.useEffect(() => {
         const handler = (e: MessageEvent) => {
             if (e.data?.type === 'PERPLEX_WIDGET_HEIGHT') {
-                setHeight(Math.max(80, e.data.height + 16));
+                setHeight(h => {
+                    const newH = Math.max(80, e.data.height + 20);
+                    return Math.abs(newH - h) > 5 ? newH : h;
+                });
             }
         };
         window.addEventListener('message', handler);
@@ -606,10 +611,14 @@ setTimeout(reportHeight,300);setTimeout(reportHeight,1000);
     return (
         <div
             ref={containerRef}
-            className="my-3 rounded-xl overflow-hidden border border-pplx-border bg-pplx-card"
+            className="my-3 rounded-xl overflow-hidden"
+            onMouseEnter={() => setIsInteracting(true)}
+            onMouseLeave={() => setIsInteracting(false)}
+            onTouchStart={() => setIsInteracting(true)}
+            onTouchEnd={() => setTimeout(() => setIsInteracting(false), 300)}
         >
             {metadata?.title && (
-                <div className="px-3 py-1.5 border-b border-pplx-border text-xs text-pplx-muted font-medium flex items-center gap-2">
+                <div className="px-3 py-1.5 text-xs text-pplx-muted font-medium flex items-center gap-2 bg-pplx-secondary/5">
                     <span className="w-2 h-2 rounded-full bg-pplx-accent inline-block" />
                     {metadata.title}
                 </div>
@@ -622,7 +631,8 @@ setTimeout(reportHeight,300);setTimeout(reportHeight,1000);
                     height: `${height}px`,
                     border: 'none',
                     display: 'block',
-                    background: 'transparent'
+                    background: 'transparent',
+                    pointerEvents: isInteracting ? 'auto' : 'none'
                 }}
                 title={metadata?.title || 'Widget'}
             />
