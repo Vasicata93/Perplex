@@ -2178,11 +2178,14 @@ Error Type: ${execResult.error_type || 'None'}`;
                             });
 
                             // Format events to be human-readable and avoid raw timestamps
-                            const formattedEvents = filteredEvents.map(e => ({
-                                ...e,
-                                startDate: new Date(e.startDate).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-                                endDate: new Date(e.endDate).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                            }));
+                            const formattedEvents = filteredEvents.map(e => {
+                                const { startDate, endDate, ...rest } = e;
+                                return {
+                                    ...rest,
+                                    startDate: new Date(startDate).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                                    endDate: new Date(endDate).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                };
+                            });
 
                             toolResultContent = JSON.stringify(formattedEvents);
                             if (onChunk) onChunk("", `\n📅 Checking calendar for ${startDate.toLocaleString()} to ${endDate.toLocaleString()}...\n`);
