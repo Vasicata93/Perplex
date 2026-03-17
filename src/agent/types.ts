@@ -194,3 +194,12 @@ export const DEFAULT_AGENT_CONFIG: AgentConfig = {
   maxIterationsPerSkill: 5,
   maxRecoveryToolCalls: 2
 };
+
+export type ThinkingStatus = 'pending' | 'active' | 'done' | 'error';
+
+export interface ThinkingEvent {
+  stepId: number;
+  label: string;
+  status: ThinkingStatus;
+  detail?: string;
+}

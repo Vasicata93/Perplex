@@ -2,7 +2,7 @@
 // Adding ThinkingEvent import and prop propagation
 import React from 'react';
 import { ChatInterface } from './ChatInterface';
-import { Message, FocusMode, Attachment, Note, ProMode } from '../types';
+import { Message, FocusMode, Attachment, Note } from '../types';
 import { ThinkingEvent } from '../src/agent/types'; // Import
 import { X, Maximize2, Minimize2, Trash2 } from 'lucide-react';
 

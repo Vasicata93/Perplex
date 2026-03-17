@@ -16,6 +16,7 @@ import { TornadoIndicator } from './components/TornadoIndicator';
 import { MessageRenderer } from './components/MessageRenderer';
 import { PerplexityLogo } from './constants';
 import { Role, Message, Thread, AppSettings, DEFAULT_SETTINGS, ModelProvider, FocusMode, Attachment, Space, Note, ProMode, PendingAction, CalendarEvent } from './types';
+import { ThinkingEvent } from './src/agent/types';
 import { RAGService } from './services/ragService';
 import { LLMService } from './services/geminiService';
 import { BlockService } from './services/blockService';
@@ -187,6 +188,7 @@ function App() {
     const [isSideChatOpen, setIsSideChatOpen] = useState(false);
     const [chatMode, setChatMode] = useState<'sidebar' | 'floating'>('sidebar');
     const [sideChatThreadId, setSideChatThreadId] = useState<string | null>(null);
+    const [thinkingEvents, setThinkingEvents] = useState<ThinkingEvent[]>([]);
 
     const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
     const [backupSettings, setBackupSettings] = useState<AppSettings | null>(null);
@@ -1148,6 +1150,7 @@ function App() {
         const placeholderMsg: Message = { id: tempBotId, role: Role.MODEL, content: '', timestamp: Date.now(), isThinking: true };
 
         setThreads(prev => prev.map(t => t.id === threadId ? { ...t, messages: [...history, placeholderMsg], updatedAt: Date.now() } : t));
+        setThinkingEvents([{ stepId: 1, label: 'Initializing...', status: 'active' }]);
 
         let effectiveUseSearch = settings.useSearch;
         let modifiedPrompt = prompt;
@@ -1320,6 +1323,8 @@ function App() {
             messages: [...t.messages, userMsg, placeholderMsg],
             updatedAt: Date.now()
         } : t));
+
+        setThinkingEvents([{ stepId: 1, label: 'Clarifying intent...', status: 'active' }]);
 
         let effectiveUseSearch = settings.useSearch;
         let modifiedPrompt = text;

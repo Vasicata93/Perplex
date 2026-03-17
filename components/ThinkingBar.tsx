@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ThinkingEvent } from '../agent/types';
+import { ThinkingEvent } from '../src/agent/types';
 import { ChevronDown, ChevronUp, Loader2, CheckCircle2 } from 'lucide-react';
 
 interface ThinkingBarProps {

@@ -5,7 +5,7 @@ import { MessageRenderer } from './MessageRenderer';
 import { TornadoIndicator } from './TornadoIndicator';
 import { PerplexityLogo } from '../constants';
 import { User, BookOpen, Globe, Copy, Check, RefreshCw, Share2, Volume2, FileText, Pencil } from 'lucide-react';
-import { ThinkingBar } from '../src/components/ThinkingBar';
+import { ThinkingBar } from './ThinkingBar';
 import { ThinkingEvent } from '../src/agent/types';
 
 interface ChatInterfaceProps {
@@ -217,6 +217,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           ))
         )}
         <div ref={messagesEndRef} className="h-4" />
+        {isThinking && thinkingEvents && thinkingEvents.length > 0 && (
+          <div className="pb-4">
+            <ThinkingBar events={thinkingEvents} />
+          </div>
+        )}
       </div>
 
       {/* Input Area */}
