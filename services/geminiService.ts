@@ -802,7 +802,7 @@ export class LLMService {
 
         // Build the base system context (identity, profiles, protocols)
         const baseSystemContext = await this.buildSystemContext(
-            prompt, '', enableMemory, userProfile, aiProfile, spaceSystemInstruction, false, false
+            prompt, '', enableMemory, userProfile, aiProfile, spaceSystemInstruction, false, false, false
         );
 
         // Build the full 5-step agent system prompt via the orchestrator
@@ -957,7 +957,8 @@ export class LLMService {
             aiProfile,
             spaceSystemInstruction,
             provider === ModelProvider.GEMINI ? false : forceReasoning, // Only force XML thinking for non-Gemini
-            provider !== ModelProvider.GEMINI && (forceSearch || virtualFiles.length > 0) // Force explicit tool instruction for generics
+            provider !== ModelProvider.GEMINI && (forceSearch || virtualFiles.length > 0), // Force explicit tool instruction for generics
+            proMode === ProMode.STANDARD // isSimpleChat
         );
 
         let result: { text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string } = { text: "", citations: [] as Citation[], relatedQuestions: [] as string[] };
@@ -2428,7 +2429,8 @@ Error Type: ${execResult.error_type || 'None'}`;
         aiProfile: AiProfile,
         spaceSystemInstruction?: string,
         forceXmlThinking: boolean = false,
-        forceExplicitToolUse: boolean = false
+        forceExplicitToolUse: boolean = false,
+        isSimpleChat: boolean = false
     ): Promise<string> {
         const parts: string[] = [];
 
@@ -2493,29 +2495,30 @@ Error Type: ${execResult.error_type || 'None'}`;
         // [7-8] Global Tools / Skills / Protocols
         parts.push(`\n**REAL-TIME INFORMATION PROTOCOL:**
 1. If the user asks about "today", "recent", "news", "crypto", "stocks", or "current events", you **MUST** use the available search tool (e.g., \`perform_search\` or built-in Google Search).
-2. Your internal knowledge is frozen in time. For any dynamic topic, the web is your source of truth.
-3. When searching for "today's news", explicitly include the current date (${timeStr}) in your search queries to get the most relevant results.
+2. Your internal knowledge is frozen in time. For any dynamic topic, the web is your source of truth.`);
+
+        // Simplificăm protocolul pentru Simple Chat
+        if (!isSimpleChat) {
+            parts.push(`3. When searching for "today's news", explicitly include the current date (${timeStr}) in your search queries to get the most relevant results.
 4. If you are in a research loop, focus on gathering facts from the search results rather than your internal memory.`);
 
-        parts.push(`\n**CALENDAR PROTOCOL (CRITICAL):**
-1. **SOURCE OF TRUTH:** The user's calendar is the ONLY source of truth for events. Do NOT rely on your internal memory or previous conversation turns for event dates/times, as they may be outdated.
-2. **ALWAYS VERIFY:** Before answering ANY question about the calendar (reading, updating, moving, deleting), you **MUST** first call \`list_calendar_events\` to get the current, real-time state of the calendar.
-3. **SCHEDULED DATE VS CREATION DATE:** Users ALWAYS refer to the "Scheduled Date" (when the event happens), NEVER the "Creation Date". When you list events, pay attention to the \`startDate\` and \`endDate\` fields.
-4. **RELATIVE DATES:** If the user says "tomorrow" or "next Friday", use \`get_current_time\` to calculate the exact date, then query \`list_calendar_events\` with that specific date range.
-5. **MOVING EVENTS:** To move an event:
-   a. Call \`list_calendar_events\` to find the event and its ID.
-   b. Verify the *current* date of the event from the tool output.
-   c. Calculate the *new* date based on the user's request.
-   d. Call \`update_calendar_event\` with the event ID and the NEW start/end times.
-   e. Do NOT ask the user to confirm if you have already verified the data. Just do it.
-6. **CONFLICTS:** If a move creates a conflict, warn the user but proceed if they insisted, or ask for confirmation if ambiguous.`);
+            parts.push(`\n**CALENDAR PROTOCOL (CRITICAL):**
+1. **SOURCE OF TRUTH:** The user's calendar is the ONLY source of truth for events.
+2. **ALWAYS VERIFY:** Before answering ANY question about the calendar you **MUST** first call \`list_calendar_events\`.
+3. **MOVING EVENTS:** Call \`list_calendar_events\`, verify date, call \`update_calendar_event\`. Do NOT ask for confirmation if verified.`);
+        } else {
+            // Versiune light pentru Chat Mode
+            parts.push(`\n**CALENDAR:** You have access to the user's calendar. Use \`list_calendar_events\` ONLY if the user explicitly asks about their schedule.`);
+        }
 
-        parts.push(`\n**LIBRARY/SOURCE PROTOCOL (CRITICAL):**
+        if (!isSimpleChat) {
+            parts.push(`\n**LIBRARY/SOURCE PROTOCOL (CRITICAL):**
 1. **PRIORITY:** If the user has attached a file, page, or source (e.g., from the Library), this attachment is your **PRIMARY SOURCE OF TRUTH**.
 2. **VERIFY FIRST:** Do NOT answer from your internal memory or assumptions about what the file *might* contain. You MUST read and analyze the actual content of the attachment provided in the context.
-3. **NO HALLUCINATIONS:** If the attached file does not contain the answer, state that clearly. Do not invent information to fill the gap.
-4. **TOOL USAGE:** If the file content is truncated or summarized (indicated by a system message), you **MUST** use the \`read_workspace_files\` tool to retrieve the full content before answering specific questions about it.
-5. **ANALYSIS:** When asked about a source, first analyze its structure, key points, and details *before* formulating your response.`);
+3. **NO HALLUCINATIONS:** If the attached file does not contain the answer, state that clearly.`);
+        } else {
+            parts.push(`\n**CONTEXT:** Use attached files as your primary source of truth.`);
+        }
 
         // Simulate Reasoning via XML for non-Gemini models
         if (forceXmlThinking) {
@@ -2539,15 +2542,20 @@ Error Type: ${execResult.error_type || 'None'}`;
             parts.push(`\n**CALENDAR CAPABILITY:** You have full access to the user's calendar. You can list, add, update, and delete events. ALWAYS check the current time using \`get_current_time\` before making any date-relative assumptions. Check for conflicts before adding events.`);
         }
 
-        // GLOBAL PROCESS INSTRUCTION (Enforces the Plan -> Execute -> Analyze -> Answer loop)
-        parts.push(`\n**OPERATIONAL PROTOCOL:**
+        if (!isSimpleChat) {
+            // GLOBAL PROCESS INSTRUCTION (Enforces the Plan -> Execute -> Analyze -> Answer loop) - ONLY FOR AGENT/COMPLEX MODES
+            parts.push(`\n**OPERATIONAL PROTOCOL:**
 1. **PLAN:** Understand the user's goal. If information is missing (from web or workspace), use tools (Search/Read) to find it.
 2. **EXECUTE:** Call necessary tools.
 3. **ANALYZE:** Critically evaluate the tool results. Are they relevant? Are they sufficient? If not, search again with a better query.
 4. **SYNTHESIZE:** Formulate a clear, comprehensive answer based *only* on the verified information.
-5. **CITE:** Support your claims with [1], [2] citations from the search results.
+5. **CITE:** Support your claims with [1], [2] citations from the search results.`);
+        } else {
+            parts.push(`\n**RESPONSE GUIDELINES:** Answer directly, concisely, and naturally. Do not simulate a thought process. Use tools only if absolutely necessary for the specific request. Focus on speed and directness.`);
+        }
 
-**INTERACTIVE WIDGET FORMAT (MANDATORY FOR ALL VISUALIZATIONS):**
+        // WIDGET INSTRUCTIONS - ALWAYS AVAILABLE
+        parts.push(`\n**INTERACTIVE WIDGET FORMAT (MANDATORY FOR ALL VISUALIZATIONS):**
 Când userul cere un grafic, diagramă, chart, vizualizare sau orice reprezentare vizuală a datelor — indiferent de modul de operare (Chat sau Agent) — TREBUIE să generezi un bloc widget interactiv folosind EXACT această sintaxă:
 
 :::widget[Titlu opțional]
