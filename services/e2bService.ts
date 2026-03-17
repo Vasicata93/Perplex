@@ -1,5 +1,3 @@
-import { AppSettings } from '../types';
-
 export interface ExecuteCodeParams {
     code: string;
     language: 'python' | 'typescript';
@@ -14,175 +12,146 @@ export interface ExecuteCodeResult {
     stderr: string;
     exit_code: number;
     execution_time: number;
-    sandbox_mode: 'e2b_cloud' | 'local_fallback';
-    error_type: 'api_key_missing' | 'timeout' | 'execution_error' | null;
+    sandbox_mode: 'local_pyodide' | 'local_webworker';
+    error_type: 'timeout' | 'execution_error' | null;
 }
 
-export class E2BService {
-    /**
-     * Internal helper to call the backend API.
-     * Centralizes URL, request structure, and basic error handling.
-     */
-    private static async _callApi(body: any): Promise<any> {
-        const response = await fetch('/api/execute', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        });
+// Singleton for Pyodide instance
+let pyodideInstance: any = null;
+let pyodideLoading: Promise<any> | null = null;
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`[E2BService] Backend API call failed with status ${response.status}:`, errorText);
-            throw new Error(`Backend Error: ${response.status}`);
-        }
+async function getPyodide(): Promise<any> {
+    if (pyodideInstance) return pyodideInstance;
+    if (pyodideLoading) return pyodideLoading;
 
-        return response.json();
-    }
-
-    /**
-     * Executes code using E2B Cloud Sandbox or falls back to local Web Worker execution.
-     */
-    static async executeCode(params: ExecuteCodeParams, settings: AppSettings): Promise<ExecuteCodeResult> {
-        const hasInternet = navigator.onLine;
-
-        if (!settings.e2bApiKey || !hasInternet) {
-            return this.executeLocalFallback(params);
-        }
-
-        try {
-            return await this._callApi({
-                ...params,
-                apiKey: settings.e2bApiKey,
+    pyodideLoading = (async () => {
+        if (!(window as any).loadPyodide) {
+            await new Promise<void>((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/pyodide.js';
+                script.onload = () => resolve();
+                script.onerror = () => reject(new Error('Failed to load Pyodide'));
+                document.head.appendChild(script);
             });
-        } catch (error) {
-            console.error("[E2B] Execution failed, falling back to local:", error);
-            return this.executeLocalFallback(params);
+        }
+        pyodideInstance = await (window as any).loadPyodide({
+            indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/'
+        });
+        return pyodideInstance;
+    })();
+
+    return pyodideLoading;
+}
+
+export class LocalSandboxService {
+
+    static async executeCode(params: ExecuteCodeParams): Promise<ExecuteCodeResult> {
+        if (params.language === 'python') {
+            return this.executePython(params);
+        } else {
+            return this.executeJavaScript(params);
         }
     }
 
-    /**
-     * Executes code locally in the browser via a Web Worker (JavaScript/TypeScript only).
-     * Python is not supported in the local fallback.
-     */
-    private static async executeLocalFallback(params: ExecuteCodeParams): Promise<ExecuteCodeResult> {
+    private static async executePython(params: ExecuteCodeParams): Promise<ExecuteCodeResult> {
         const startTime = Date.now();
+        try {
+            const pyodide = await getPyodide();
 
-        if (params.language === 'python') {
+            if (params.packages && params.packages.length > 0) {
+                await pyodide.loadPackagesFromImports(params.code);
+                try {
+                    await pyodide.runPythonAsync(`
+import micropip
+await micropip.install([${params.packages.map(p => `'${p}'`).join(', ')}])
+                    `);
+                } catch (e) {
+                    console.warn('[Pyodide] Package install warning:', e);
+                }
+            }
+
+            await pyodide.runPythonAsync(`
+import sys
+import io
+_stdout_capture = io.StringIO()
+sys.stdout = _stdout_capture
+            `);
+
+            await pyodide.runPythonAsync(params.code);
+
+            const stdout = await pyodide.runPythonAsync(`
+sys.stdout = sys.__stdout__
+_stdout_capture.getvalue()
+            `);
+
+            return {
+                success: true,
+                stdout: String(stdout || ''),
+                stderr: '',
+                exit_code: 0,
+                execution_time: Date.now() - startTime,
+                sandbox_mode: 'local_pyodide',
+                error_type: null
+            };
+        } catch (err: any) {
             return {
                 success: false,
                 stdout: '',
-                stderr: 'Python is not supported in local fallback mode. Please configure your E2B API Key in Settings.',
+                stderr: err.message || String(err),
                 exit_code: 1,
                 execution_time: Date.now() - startTime,
-                sandbox_mode: 'local_fallback',
+                sandbox_mode: 'local_pyodide',
                 error_type: 'execution_error'
             };
         }
+    }
 
-        // Web Worker execution for JS/TS
+    private static executeJavaScript(params: ExecuteCodeParams): Promise<ExecuteCodeResult> {
+        const startTime = Date.now();
         return new Promise((resolve) => {
             const workerCode = `
                 self.onmessage = async function(e) {
                     const { code } = e.data;
                     let logs = [];
-                    const originalConsoleLog = console.log;
+                    const _log = console.log;
                     console.log = (...args) => {
                         logs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
                     };
-
                     try {
                         const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-                        const fn = new AsyncFunction(code);
-                        await fn();
+                        await new AsyncFunction(code)();
                         self.postMessage({ success: true, stdout: logs.join('\\n'), stderr: '' });
                     } catch (err) {
                         self.postMessage({ success: false, stdout: logs.join('\\n'), stderr: err.toString() });
                     } finally {
-                        console.log = originalConsoleLog;
+                        console.log = _log;
                     }
                 };
             `;
-
             const blob = new Blob([workerCode], { type: 'application/javascript' });
             const workerUrl = URL.createObjectURL(blob);
             const worker = new Worker(workerUrl);
-
-            let timeoutId: NodeJS.Timeout;
+            const timeoutId = setTimeout(() => {
+                worker.terminate();
+                URL.revokeObjectURL(workerUrl);
+                resolve({ success: false, stdout: '', stderr: 'Execution timed out', exit_code: 1, execution_time: Date.now() - startTime, sandbox_mode: 'local_webworker', error_type: 'timeout' });
+            }, (params.timeout || 30) * 1000);
 
             worker.onmessage = (e) => {
                 clearTimeout(timeoutId);
                 worker.terminate();
                 URL.revokeObjectURL(workerUrl);
-                resolve({
-                    success: e.data.success,
-                    stdout: e.data.stdout,
-                    stderr: e.data.stderr,
-                    exit_code: e.data.success ? 0 : 1,
-                    execution_time: Date.now() - startTime,
-                    sandbox_mode: 'local_fallback',
-                    error_type: e.data.success ? null : 'execution_error'
-                });
+                resolve({ ...e.data, exit_code: e.data.success ? 0 : 1, execution_time: Date.now() - startTime, sandbox_mode: 'local_webworker', error_type: e.data.success ? null : 'execution_error' });
             };
-
             worker.onerror = (err) => {
                 clearTimeout(timeoutId);
                 worker.terminate();
                 URL.revokeObjectURL(workerUrl);
-                resolve({
-                    success: false,
-                    stdout: '',
-                    stderr: err.message,
-                    exit_code: 1,
-                    execution_time: Date.now() - startTime,
-                    sandbox_mode: 'local_fallback',
-                    error_type: 'execution_error'
-                });
+                resolve({ success: false, stdout: '', stderr: err.message, exit_code: 1, execution_time: Date.now() - startTime, sandbox_mode: 'local_webworker', error_type: 'execution_error' });
             };
-
-            timeoutId = setTimeout(() => {
-                worker.terminate();
-                URL.revokeObjectURL(workerUrl);
-                resolve({
-                    success: false,
-                    stdout: '',
-                    stderr: 'Execution timed out',
-                    exit_code: 1,
-                    execution_time: Date.now() - startTime,
-                    sandbox_mode: 'local_fallback',
-                    error_type: 'timeout'
-                });
-            }, (params.timeout || 30) * 1000);
-
-            // Send code
-            // Strip ts types if needed, or assume code is JS. For simplicity, we just evaluate it.
-            // In a real app we'd transpile TS to JS first (e.g., using ts script), but this is a simple fallback
             worker.postMessage({ code: params.code });
         });
     }
-
-    /**
-     * Checks if the E2B API key is valid by sending a test execution.
-     */
-    static async verifyConnection(apiKey: string): Promise<boolean> {
-        if (!apiKey?.trim()) return false;
-
-        try {
-            console.log("[E2B] Testing connection...");
-            const data = await this._callApi({
-                apiKey,
-                code: 'print("success")',
-                language: 'python',
-                timeout: 10 // Slightly longer for potential cold starts
-            });
-
-            console.log("[E2B] Connection test result:", data);
-            return data?.success === true;
-        } catch (error: any) {
-            console.error("[E2B] Connection test failed (Network/Server Error):", error);
-            if (error.message?.includes('Backend Error')) {
-                throw new Error("Backend server is not responding correctly. Check if Perplex server is running.");
-            }
-            return false;
-        }
-    }
 }
+
+export { LocalSandboxService as E2BService };

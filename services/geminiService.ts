@@ -10,7 +10,6 @@ import { RAGService } from "./ragService";
 import { buildAgentSystemPrompt } from "../src/agent/AgentOrchestrator";
 import { DEFAULT_AGENT_CONFIG } from "../src/agent/types";
 import { E2BService } from "./e2bService";
-import { AppSettings } from "../types";
 
 
 // --- Helper Functions ---

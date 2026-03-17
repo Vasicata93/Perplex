@@ -11,7 +11,6 @@ import { AppSettings, ModelProvider, LocalModelConfig, MemoryCategory } from '..
 import { SemanticMemoryEntry } from '../memory';
 import { memoryManager } from '../memory';
 import { UI_STRINGS, AVAILABLE_OFFLINE_MODELS } from '../constants';
-import { E2BService } from '../services/e2bService';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -44,8 +43,8 @@ const SidebarItem = ({ id, label, icon: Icon, activeTab, onSelect }: { id: TabTy
     <button
         onClick={() => onSelect(id)}
         className={`w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl text-sm transition-all group ${activeTab === id
-                ? 'bg-pplx-hover text-pplx-text shadow-sm'
-                : 'text-pplx-muted hover:bg-pplx-secondary hover:text-pplx-text'
+            ? 'bg-pplx-hover text-pplx-text shadow-sm'
+            : 'text-pplx-muted hover:bg-pplx-secondary hover:text-pplx-text'
             }`}
     >
         <div className={`${activeTab === id ? 'text-pplx-accent' : 'text-pplx-muted group-hover:text-pplx-text opacity-70'}`}>
@@ -88,8 +87,8 @@ const FilterPill: React.FC<FilterPillProps> = ({ id, label, icon: Icon, isActive
     <button
         onClick={() => onClick(id)}
         className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 ${isActive
-                ? 'bg-pplx-text text-pplx-primary shadow-lg ring-1 ring-pplx-text/10'
-                : 'bg-pplx-secondary/50 text-pplx-muted hover:bg-pplx-hover hover:text-pplx-text'
+            ? 'bg-pplx-text text-pplx-primary shadow-lg ring-1 ring-pplx-text/10'
+            : 'bg-pplx-secondary/50 text-pplx-muted hover:bg-pplx-hover hover:text-pplx-text'
             }`}
     >
         <Icon size={14} className={isActive ? "text-pplx-primary" : "opacity-70"} />
@@ -177,8 +176,8 @@ const OfflineModelCard: React.FC<OfflineModelCardProps> = ({ model, isDownloaded
                                 onClick={onSelect}
                                 disabled={isActive}
                                 className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${isActive
-                                        ? 'bg-pplx-text text-pplx-primary cursor-default'
-                                        : 'bg-pplx-secondary hover:bg-pplx-hover text-pplx-text'
+                                    ? 'bg-pplx-text text-pplx-primary cursor-default'
+                                    : 'bg-pplx-secondary hover:bg-pplx-hover text-pplx-text'
                                     }`}
                             >
                                 {isActive ? 'Selected' : 'Select'}
@@ -544,8 +543,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                                         key={opt.id}
                                                         onClick={() => updateFormData({ theme: opt.id as any })}
                                                         className={`flex flex-col items-center justify-center py-5 px-2 rounded-2xl transition-all duration-300 ${formData.theme === opt.id
-                                                                ? 'bg-pplx-card text-pplx-text shadow-xl shadow-black/5 ring-1 ring-black/5 dark:ring-white/10'
-                                                                : 'bg-pplx-secondary/30 text-pplx-muted hover:bg-pplx-secondary/60 hover:text-pplx-text'
+                                                            ? 'bg-pplx-card text-pplx-text shadow-xl shadow-black/5 ring-1 ring-black/5 dark:ring-white/10'
+                                                            : 'bg-pplx-secondary/30 text-pplx-muted hover:bg-pplx-secondary/60 hover:text-pplx-text'
                                                             }`}
                                                     >
                                                         <opt.icon size={22} className={`mb-3 ${formData.theme === opt.id ? 'text-pplx-text' : 'opacity-50'}`} strokeWidth={1.5} />
@@ -653,8 +652,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                             <button
                                                 onClick={() => updateFormData({ searchProvider: 'tavily' })}
                                                 className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all duration-200 ${formData.searchProvider === 'tavily'
-                                                        ? 'bg-pplx-text text-pplx-primary shadow-md transform scale-[1.02]'
-                                                        : 'bg-transparent text-pplx-muted hover:text-pplx-text hover:bg-pplx-secondary/50'
+                                                    ? 'bg-pplx-text text-pplx-primary shadow-md transform scale-[1.02]'
+                                                    : 'bg-transparent text-pplx-muted hover:text-pplx-text hover:bg-pplx-secondary/50'
                                                     }`}
                                             >
                                                 Tavily
@@ -662,8 +661,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                             <button
                                                 onClick={() => updateFormData({ searchProvider: 'brave' })}
                                                 className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all duration-200 ${formData.searchProvider === 'brave'
-                                                        ? 'bg-pplx-text text-pplx-primary shadow-md transform scale-[1.02]'
-                                                        : 'bg-transparent text-pplx-muted hover:text-pplx-text hover:bg-pplx-secondary/50'
+                                                    ? 'bg-pplx-text text-pplx-primary shadow-md transform scale-[1.02]'
+                                                    : 'bg-transparent text-pplx-muted hover:text-pplx-text hover:bg-pplx-secondary/50'
                                                     }`}
                                             >
                                                 Brave
@@ -692,8 +691,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                             <button
                                                 onClick={() => setModelType('cloud')}
                                                 className={`flex-1 md:flex-none px-8 py-3 rounded-xl text-xs md:text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${modelType === 'cloud'
-                                                        ? 'bg-pplx-text text-pplx-primary shadow-lg transform scale-[1.02]'
-                                                        : 'bg-transparent text-pplx-muted hover:text-pplx-text'
+                                                    ? 'bg-pplx-text text-pplx-primary shadow-lg transform scale-[1.02]'
+                                                    : 'bg-transparent text-pplx-muted hover:text-pplx-text'
                                                     }`}
                                             >
                                                 <Cloud size={16} /><span>Cloud</span>
@@ -701,8 +700,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                             <button
                                                 onClick={() => setModelType('local')}
                                                 className={`flex-1 md:flex-none px-8 py-3 rounded-xl text-xs md:text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${modelType === 'local'
-                                                        ? 'bg-pplx-text text-pplx-primary shadow-lg transform scale-[1.02]'
-                                                        : 'bg-transparent text-pplx-muted hover:text-pplx-text'
+                                                    ? 'bg-pplx-text text-pplx-primary shadow-lg transform scale-[1.02]'
+                                                    : 'bg-transparent text-pplx-muted hover:text-pplx-text'
                                                     }`}
                                             >
                                                 <Smartphone size={16} /><span>Offline</span>
