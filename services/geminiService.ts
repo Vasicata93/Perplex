@@ -2609,7 +2609,7 @@ REGULI OBLIGATORII pentru codul din widget:
 - NICIODATĂ culori hardcodate (#333, black, white) — sunt invizibile în dark mode
 - Chart.js interactiv: importă din CDN: <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 - **REGULĂ CULORI CHART.JS (IMPORTANT):** Pentru a asigura vizibilitate în Dark Mode, configurează culorile explicit în opțiunile graficului. Chart.js folosește negru by default. Exemplu de configurare corectă:
-  `options: { scales: { y: { ticks: { color: 'var(--text-muted)' }, grid: { color: 'var(--border-color)' } }, x: { ticks: { color: 'var(--text-muted)' }, grid: { color: 'var(--border-color)' } } }, plugins: { legend: { labels: { color: 'var(--text-primary)' } }, title: { display: true, text: 'Titlul Graficului', color: 'var(--text-primary)' } } }`
+  \`options: { scales: { y: { ticks: { color: 'var(--text-muted)' }, grid: { color: 'var(--border-color)' } }, x: { ticks: { color: 'var(--text-muted)' }, grid: { color: 'var(--border-color)' } } }, plugins: { legend: { labels: { color: 'var(--text-primary)' } }, title: { display: true, text: 'Titlul Graficului', color: 'var(--text-primary)' } } }\`
 - Canvas Chart.js: întotdeauna în <div style="position:relative; width:100%; height:300px">
 - SVG diagrame: folosește viewBox="0 0 680 H" cu width="100%"
 - Tot codul într-un singur bloc (fără fișiere CSS/JS separate)
