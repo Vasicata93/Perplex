@@ -2547,14 +2547,34 @@ Error Type: ${execResult.error_type || 'None'}`;
 4. **SYNTHESIZE:** Formulate a clear, comprehensive answer based *only* on the verified information.
 5. **CITE:** Support your claims with [1], [2] citations from the search results.
 
-**LIBRARY CONTENT FORMAT:**
-Când generezi conținut pentru Library (save_to_library sau restructurare pagini), poți și TREBUIE să incluzi blocuri vizuale folosind sintaxa:
-:::widget[Titlu]
-<!-- HTML/SVG/JS pentru vizualizare -->
+**INTERACTIVE WIDGET FORMAT (MANDATORY FOR ALL VISUALIZATIONS):**
+Când userul cere un grafic, diagramă, chart, vizualizare sau orice reprezentare vizuală a datelor — indiferent de modul de operare (Chat sau Agent) — TREBUIE să generezi un bloc widget interactiv folosind EXACT această sintaxă:
+
+:::widget[Titlu opțional]
+<!-- Conținutul HTML/SVG/JS complet aici — fără DOCTYPE, html, head, body -->
 :::
-Aceste blocuri sunt randate ca widget-uri interactive în Library.
-Folosește variabile CSS: var(--text-primary), var(--bg-secondary), var(--border-color), var(--accent).
-Nu folosi culori hardcodate. Nu folosi DOCTYPE/html/head/body în cod.
+
+REGULI OBLIGATORII pentru codul din widget:
+- Nu folosi DOCTYPE, <html>, <head>, <body> — NUMAI conținut direct
+- Folosește variabilele CSS: var(--text-primary), var(--text-muted), var(--bg-secondary), var(--border-color), var(--accent)
+- NICIODATĂ culori hardcodate (#333, black, white) — sunt invizibile în dark mode
+- Chart.js interactiv: importă din CDN: <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+- Canvas Chart.js: întotdeauna în <div style="position:relative; width:100%; height:300px">
+- SVG diagrame: folosește viewBox="0 0 680 H" cu width="100%"
+- Tot codul într-un singur bloc (fără fișiere CSS/JS separate)
+
+CÂND să generezi widget (OBLIGATORIU):
+- Userul cere grafic, chart, diagramă, vizualizare, pie chart, bar chart, line chart
+- Userul cere să "afișezi" sau "arată" date numerice
+- Userul cere comparații vizuale
+- Ai date numerice care se explică mai bine vizual
+
+CÂND să NU generezi widget:
+- Răspuns text simplu, explicații, cod pentru proiect
+- Userul vrea explicit codul sursă, nu vizualizarea lui
+
+**LIBRARY CONTENT FORMAT:**
+Când generezi conținut pentru Library (save_to_library sau restructurare pagini), aplică aceleași reguli widget de mai sus.
 `);
 
         // Explicit Citation Instruction for Generic Models

@@ -142,7 +142,7 @@ DECISION AFTER EACH OBSERVE:
 - Tool failed → Attempt ONE alternative tool. If alternative also fails → continue without data, note the gap.
 - NEVER retry the same failed tool with the same parameters.
 
-HARD LIMIT: Maximum 5 iterations. When reached → stop immediately, synthesize best answer.
+HARD LIMIT: Maximum 10 iterations. When reached → stop immediately, synthesize best answer.
 
 PARALLEL TOOL CALLS: If two pieces of information are completely independent → request both in one turn.
 
