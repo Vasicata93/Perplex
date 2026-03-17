@@ -1,97 +1,153 @@
 import * as webllm from "@mlc-ai/web-llm";
 
-// ─────────────────────────────────────────────
-// Singleton Engine Manager
-// ─────────────────────────────────────────────
+const CUSTOM_MODEL_RECORDS: Record<string, webllm.ModelRecord> = {
+  'LFM2-1B-MLC': {
+    model: 'https://huggingface.co/mlc-ai/LFM2-1B-Instruct-q4f16_1-MLC',
+    model_id: 'LFM2-1B-Instruct-q4f16_1-MLC',
+    model_lib:
+      webllm.modelLibURLPrefix +
+      webllm.modelVersion +
+      '/LFM2-1B-Instruct-q4f16_1-ctx4k_cs1k-webgpu.wasm',
+    vram_required_MB: 850,
+    low_resource_required: true,
+    overrides: { context_window_size: 4096 },
+  },
+};
+
 class WebLLMService {
-    private engine: webllm.MLCEngine | null = null;
-    private currentModelId: string | null = null;
-    private isLoading: boolean = false;
+  private engine: webllm.MLCEngine | null = null;
+  private currentModelId: string | null = null;
+  private _isLoading: boolean = false;
+  // Flag setat de UI când userul apasă Cancel
+  private _cancelRequested: boolean = false;
 
-    /**
-     * Loads (or reuses) a model engine.
-     * @param modelId  — modelId from LocalModelConfig (e.g. "Llama-3.2-1B-Instruct-q4f16_1")
-     * @param onProgress — callback for download/init progress (0–100)
-     */
-    async loadModel(
-        modelId: string,
-        onProgress?: (progress: number, text: string) => void
-    ): Promise<void> {
-        // Already loaded — skip
-        if (this.engine && this.currentModelId === modelId) return;
+  /**
+   * Încarcă modelul cu progres smooth și suport cancel.
+   * onProgress(percent, text, phase)
+   * - percent: 0-100, GARANTAT monoton crescător (nu scade niciodată)
+   * - text: descriere fază curentă
+   * - phase: 'fetch' | 'cache' | 'init' | 'done'
+   */
+  async loadModel(
+    modelId: string,
+    onProgress?: (progress: number, text: string, phase: string) => void
+  ): Promise<'success' | 'cancelled'> {
+    if (this.engine && this.currentModelId === modelId) return 'success';
 
-        // Unload previous engine
-        if (this.engine) {
-            await this.engine.unload();
-            this.engine = null;
-            this.currentModelId = null;
-        }
-
-        this.isLoading = true;
-
-        try {
-            this.engine = await webllm.CreateMLCEngine(modelId, {
-                initProgressCallback: (report: webllm.InitProgressReport) => {
-                    const percent = Math.round(report.progress * 100);
-                    onProgress?.(percent, report.text);
-                },
-            });
-            this.currentModelId = modelId;
-        } finally {
-            this.isLoading = false;
-        }
+    if (this.engine) {
+      await this.engine.unload();
+      this.engine = null;
+      this.currentModelId = null;
     }
 
-    /**
-     * Streams a chat completion using the loaded model.
-     * Throws if no model is loaded.
-     */
-    async *streamChat(
-        messages: { role: "system" | "user" | "assistant"; content: string }[],
-        temperature = 0.7,
-        maxTokens = 1024
-    ): AsyncGenerator<string> {
-        if (!this.engine) {
-            throw new Error("[WebLLM] No model loaded. Call loadModel() first.");
-        }
+    this._isLoading = true;
+    this._cancelRequested = false;
 
-        const stream = await this.engine.chat.completions.create({
-            messages,
-            temperature,
-            max_tokens: maxTokens,
-            stream: true,
-        });
+    // Progres smooth — nu permite scăderi
+    let lastReportedPercent = 0;
+    // WebLLM raportează 3 faze, fiecare 0→1.
+    // Le mapăm în segmente: fetch=0-60%, cache=60-90%, init=90-99%
+    let currentPhase = 'fetch';
+    let phaseOffset = 0;
+    let phaseScale = 60;
 
-        for await (const chunk of stream) {
-            const delta = chunk.choices[0]?.delta?.content;
-            if (delta) yield delta;
-        }
+    const detectPhase = (text: string): { offset: number; scale: number; phase: string } => {
+      const t = text.toLowerCase();
+      if (t.includes('cache') || t.includes('loading cache')) {
+        return { offset: 60, scale: 30, phase: 'cache' };
+      }
+      if (t.includes('init') || t.includes('model loading') || t.includes('compiling')) {
+        return { offset: 90, scale: 9, phase: 'init' };
+      }
+      return { offset: 0, scale: 60, phase: 'fetch' };
+    };
+
+    const initConfig: webllm.MLCEngineConfig = {
+      initProgressCallback: (report: webllm.InitProgressReport) => {
+        const phaseInfo = detectPhase(report.text);
+        phaseOffset = phaseInfo.offset;
+        phaseScale = phaseInfo.scale;
+        currentPhase = phaseInfo.phase;
+
+        const rawPercent = phaseOffset + Math.round(report.progress * phaseScale);
+        // GARANTAT monoton — nu permite scăderi
+        const smoothPercent = Math.max(lastReportedPercent, Math.min(rawPercent, 99));
+        lastReportedPercent = smoothPercent;
+
+        onProgress?.(smoothPercent, report.text, currentPhase);
+      },
+    };
+
+    try {
+      const customRecord = CUSTOM_MODEL_RECORDS[modelId];
+      if (customRecord) {
+        this.engine = await webllm.CreateMLCEngine(
+          customRecord.model_id,
+          { ...initConfig, appConfig: { model_list: [customRecord] } }
+        );
+        this.currentModelId = modelId;
+      } else {
+        this.engine = await webllm.CreateMLCEngine(modelId, initConfig);
+        this.currentModelId = modelId;
+      }
+
+      // Verifică dacă userul a anulat în timp ce așteptam
+      if (this._cancelRequested) {
+        await this.unload();
+        return 'cancelled';
+      }
+
+      return 'success';
+    } finally {
+      this._isLoading = false;
+      this._cancelRequested = false;
     }
+  }
 
-    /** Check if a specific model is currently loaded */
-    isModelLoaded(modelId: string): boolean {
-        return this.currentModelId === modelId && this.engine !== null;
-    }
+  /** Apelat de UI când userul apasă butonul Cancel */
+  cancelLoad(): void {
+    this._cancelRequested = true;
+  }
 
-    /** Check if any model is currently being initialized */
-    get loading(): boolean {
-        return this.isLoading;
+  async *streamChat(
+    messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
+    temperature = 0.7,
+    maxTokens = 1024
+  ): AsyncGenerator<string> {
+    if (!this.engine) throw new Error('[WebLLM] No model loaded.');
+    const stream = await this.engine.chat.completions.create({
+      messages, temperature, max_tokens: maxTokens, stream: true,
+    });
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) yield delta;
     }
+  }
 
-    /** Currently active model ID */
-    get activeModelId(): string | null {
-        return this.currentModelId;
-    }
+  async chat(
+    messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
+    temperature = 0.7,
+    maxTokens = 1024
+  ): Promise<string> {
+    let result = '';
+    for await (const chunk of this.streamChat(messages, temperature, maxTokens)) result += chunk;
+    return result;
+  }
 
-    /** Unload engine to free memory */
-    async unload(): Promise<void> {
-        if (this.engine) {
-            await this.engine.unload();
-            this.engine = null;
-            this.currentModelId = null;
-        }
+  isModelLoaded(modelId: string): boolean {
+    return this.currentModelId === modelId && this.engine !== null;
+  }
+
+  get loading(): boolean { return this._isLoading; }
+  get activeModelId(): string | null { return this.currentModelId; }
+
+  async unload(): Promise<void> {
+    if (this.engine) {
+      await this.engine.unload();
+      this.engine = null;
+      this.currentModelId = null;
     }
+  }
 }
 
-// Export singleton
 export const webLLMService = new WebLLMService();

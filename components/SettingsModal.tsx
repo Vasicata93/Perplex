@@ -129,79 +129,119 @@ const ToggleRow = ({ label, description, checked, onChange, isBeta = false }: an
     </div>
 );
 
+// Offline Model Card Component
 interface OfflineModelCardProps {
-    model: LocalModelConfig;
-    isDownloaded: boolean;
-    isActive: boolean;
-    onDownload: () => void;
-    onSelect: () => void;
-    onDelete: () => void;
-    progress: number;
+  model: LocalModelConfig;
+  isDownloaded: boolean;
+  isActive: boolean;
+  onDownload: () => void;
+  onSelect: () => void;
+  onDelete: () => void;
+  onCancel: () => void;
+  progress: number;
+  isDownloading: boolean;
 }
 
-// Offline Model Card Component
-const OfflineModelCard: React.FC<OfflineModelCardProps> = ({ model, isDownloaded, isActive, onDownload, onSelect, onDelete, progress }) => {
-    return (
-        <div className={`p-4 rounded-2xl border transition-all duration-300 ${isActive ? 'bg-pplx-card border-pplx-accent shadow-md' : 'bg-pplx-secondary/20 border-pplx-border hover:bg-pplx-secondary/40'}`}>
-            <div className="flex justify-between items-start mb-2">
-                <div className="flex items-center gap-2">
-                    <span className="font-bold text-pplx-text text-sm">{model.name}</span>
-                    <span className="text-[10px] font-bold bg-pplx-secondary text-pplx-muted px-1.5 py-0.5 rounded uppercase tracking-wide">{model.family}</span>
-                </div>
-                {isDownloaded ? (
-                    <div className="flex items-center gap-1 text-[10px] text-green-500 font-bold uppercase tracking-wider bg-green-500/10 px-2 py-0.5 rounded-full">
-                        <Check size={10} strokeWidth={3} /> Ready
-                    </div>
-                ) : (
-                    <span className="text-[10px] text-pplx-muted font-medium bg-pplx-secondary px-2 py-0.5 rounded-full">{model.fileSize}</span>
-                )}
-            </div>
+const OfflineModelCard: React.FC<OfflineModelCardProps> = ({
+  model, isDownloaded, isActive, onDownload, onSelect, onDelete, onCancel, progress, isDownloading
+}) => {
+  const phaseLabel = progress < 60
+    ? 'Downloading weights...'
+    : progress < 90
+    ? 'Caching model...'
+    : 'Initializing...';
 
-            <p className="text-xs text-pplx-muted mb-4 leading-relaxed line-clamp-2 min-h-[32px]">{model.description}</p>
-
-            {progress > 0 && progress < 100 ? (
-                <div className="space-y-1.5">
-                    <div className="flex justify-between text-[10px] text-pplx-muted font-bold uppercase tracking-wider">
-                        <span>Downloading...</span>
-                        <span>{progress}%</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-pplx-secondary rounded-full overflow-hidden">
-                        <div className="h-full bg-pplx-accent transition-all duration-300 ease-out" style={{ width: `${progress}%` }} />
-                    </div>
-                </div>
-            ) : (
-                <div className="flex items-center gap-2">
-                    {isDownloaded ? (
-                        <>
-                            <button
-                                onClick={onSelect}
-                                disabled={isActive}
-                                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${isActive
-                                    ? 'bg-pplx-text text-pplx-primary cursor-default'
-                                    : 'bg-pplx-secondary hover:bg-pplx-hover text-pplx-text'
-                                    }`}
-                            >
-                                {isActive ? 'Selected' : 'Select'}
-                            </button>
-                            <button
-                                onClick={onDelete}
-                                className="p-2 rounded-xl bg-pplx-secondary/50 text-pplx-muted hover:text-red-400 hover:bg-pplx-hover transition-colors"
-                            >
-                                <Trash2 size={16} />
-                            </button>
-                        </>
-                    ) : (
-                        <button
-                            onClick={onDownload}
-                            className="w-full py-2 rounded-xl bg-pplx-text text-pplx-primary text-xs font-bold hover:opacity-90 transition-all flex items-center justify-center gap-2"
-                        >
-                            <Download size={14} /> Download
-                        </button>
-                    )}
-                </div>
-            )}
+  return (
+    <div className={`p-4 rounded-2xl border transition-all duration-300 ${
+      isActive
+        ? 'bg-pplx-card border-pplx-accent shadow-md'
+        : 'bg-pplx-secondary/20 border-pplx-border hover:bg-pplx-secondary/40'
+    }`}>
+      <div className="flex justify-between items-start mb-2">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-pplx-text text-sm">{model.name}</span>
+          <span className="text-[10px] font-bold bg-pplx-secondary text-pplx-muted px-1.5 py-0.5 rounded uppercase tracking-wide">
+            {model.family}
+          </span>
         </div>
-    );
+        {isDownloaded ? (
+          <div className="flex items-center gap-1 text-[10px] text-green-500 font-bold uppercase tracking-wider bg-green-500/10 px-2 py-0.5 rounded-full">
+            <Check size={10} strokeWidth={3} /> Ready
+          </div>
+        ) : (
+          <span className="text-[10px] text-pplx-muted font-medium bg-pplx-secondary px-2 py-0.5 rounded-full">
+            {model.fileSize}
+          </span>
+        )}
+      </div>
+
+      <p className="text-xs text-pplx-muted mb-4 leading-relaxed line-clamp-2 min-h-[32px]">
+        {model.description}
+      </p>
+
+      {isDownloading ? (
+        // ── Progress bar cu buton Cancel ──
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] text-pplx-muted font-medium">{phaseLabel}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-pplx-accent font-bold tabular-nums">{progress}%</span>
+              <button
+                onClick={onCancel}
+                className="text-[10px] text-red-400 hover:text-red-300 font-bold px-2 py-0.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 transition-colors"
+                title="Anulează descărcarea"
+              >
+                ✕ Stop
+              </button>
+            </div>
+          </div>
+          <div className="w-full h-1.5 bg-pplx-secondary rounded-full overflow-hidden">
+            <div
+              className="h-full bg-pplx-accent rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          {progress === 100 && (
+            <p className="text-[10px] text-green-400 font-medium text-center animate-pulse">
+              ✓ Finalizing...
+            </p>
+          )}
+        </div>
+      ) : (
+        // ── Butoane normale ──
+        <div className="flex items-center gap-2">
+          {isDownloaded ? (
+            <>
+              <button
+                onClick={onSelect}
+                disabled={isActive}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
+                  isActive
+                    ? 'bg-pplx-text text-pplx-primary cursor-default'
+                    : 'bg-pplx-secondary hover:bg-pplx-hover text-pplx-text'
+                }`}
+              >
+                {isActive ? 'Selected' : 'Select'}
+              </button>
+              <button
+                onClick={onDelete}
+                className="p-2 rounded-xl bg-pplx-secondary/50 text-pplx-muted hover:text-red-400 hover:bg-pplx-hover transition-colors"
+              >
+                <Trash2 size={16} />
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={onDownload}
+              className="w-full py-2 rounded-xl bg-pplx-text text-pplx-primary text-xs font-bold hover:opacity-90 transition-all flex items-center justify-center gap-2"
+            >
+              <Download size={14} /> Download
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
 };
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings, onSave, onPreview }) => {
@@ -229,6 +269,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
 
     // Offline Model State
     const [downloadProgress, setDownloadProgress] = useState<{ [key: string]: number }>({});
+    const [downloadingModelId, setDownloadingModelId] = useState<string | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -332,41 +373,70 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
 
     // --- Offline Model Logic ---
     const handleDownloadModel = async (model: LocalModelConfig) => {
-        setDownloadProgress(prev => ({ ...prev, [model.id]: 0 }));
+      setDownloadProgress(prev => ({ ...prev, [model.id]: 1 }));
+      setDownloadingModelId(model.id);
 
-        try {
-            await webLLMService.loadModel(model.modelId, (percent, text) => {
-                console.log(`[WebLLM] ${text}`);
-                setDownloadProgress(prev => ({ ...prev, [model.id]: percent }));
-            });
+      try {
+        const result = await webLLMService.loadModel(
+          model.modelId,
+          (percent, text, phase) => {
+            console.log(`[WebLLM] ${model.name} [${phase}]: ${percent}% — ${text}`);
+            setDownloadProgress(prev => ({ ...prev, [model.id]: percent }));
+          }
+        );
 
-            // Mark as downloaded in settings
-            const updatedLocalModels = [...formData.localModels];
-            const existingIdx = updatedLocalModels.findIndex(m => m.id === model.id);
-            const completedModel = { ...model, isDownloaded: true };
-
-            if (existingIdx >= 0) {
-                updatedLocalModels[existingIdx] = completedModel;
-            } else {
-                updatedLocalModels.push(completedModel);
-            }
-
-            updateFormData({
-                localModels: updatedLocalModels,
-                activeLocalModelId: formData.activeLocalModelId || model.id,
-                modelProvider: ModelProvider.LOCAL
-            });
-
-        } catch (err) {
-            console.error('[WebLLM] Download/init failed:', err);
-            alert(`Failed to load model: ${model.name}.\nMake sure your browser supports WebGPU (Chrome 113+).`);
-        } finally {
-            setDownloadProgress(prev => {
-                const next = { ...prev };
-                delete next[model.id];
-                return next;
-            });
+        if (result === 'cancelled') {
+          console.log(`[WebLLM] Download cancelled for ${model.name}`);
+          return; // finally va curăța starea
         }
+
+        // Succes — setează 100% vizual înainte de a marca ca downloaded
+        setDownloadProgress(prev => ({ ...prev, [model.id]: 100 }));
+        await new Promise(resolve => setTimeout(resolve, 600)); // pauză scurtă ca userul să vadă 100%
+
+        const updatedLocalModels = [...formData.localModels];
+        const existingIdx = updatedLocalModels.findIndex(m => m.id === model.id);
+        const completedModel: LocalModelConfig = { ...model, isDownloaded: true };
+
+        if (existingIdx >= 0) {
+          updatedLocalModels[existingIdx] = completedModel;
+        } else {
+          updatedLocalModels.push(completedModel);
+        }
+
+        updateFormData({
+          localModels: updatedLocalModels,
+          activeLocalModelId: formData.activeLocalModelId || model.id,
+          modelProvider: ModelProvider.LOCAL,
+        });
+
+      } catch (err: any) {
+        console.error('[WebLLM] Error loading model:', err);
+        alert(
+          `Nu s-a putut încărca modelul "${model.name}".\n\n` +
+          `Cauze posibile:\n` +
+          `• Browser fără WebGPU (necesită Chrome 113+ sau Edge 113+)\n` +
+          `• VRAM insuficient — încearcă un model mai mic\n\n` +
+          `Eroare: ${err?.message || err}`
+        );
+      } finally {
+        setDownloadingModelId(null);
+        setDownloadProgress(prev => {
+          const next = { ...prev };
+          delete next[model.id];
+          return next;
+        });
+      }
+    };
+
+    const handleCancelDownload = (model: LocalModelConfig) => {
+      webLLMService.cancelLoad();
+      setDownloadingModelId(null);
+      setDownloadProgress(prev => {
+        const next = { ...prev };
+        delete next[model.id];
+        return next;
+      });
     };
 
     const handleDeleteModel = (id: string) => {
@@ -927,9 +997,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                                                 isDownloaded={isDownloaded}
                                                                 isActive={isActive}
                                                                 progress={progress}
+                                                                isDownloading={downloadingModelId === model.id}
                                                                 onDownload={() => handleDownloadModel(model)}
                                                                 onSelect={() => updateFormData({ activeLocalModelId: model.id, modelProvider: ModelProvider.LOCAL })}
                                                                 onDelete={() => handleDeleteModel(model.id)}
+                                                                onCancel={() => handleCancelDownload(model)}
                                                             />
                                                         );
                                                     })}

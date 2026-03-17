@@ -2243,6 +2243,7 @@ function App() {
                 onNewChat={handleClearSideChat}
                 mode={chatMode}
                 onModeChange={setChatMode}
+                thinkingEvents={thinkingEvents}
             />
 
             {/* Floating Action Button for Side Chat (Only in Library Mode) */}

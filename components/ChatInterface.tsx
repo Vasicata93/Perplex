@@ -5,6 +5,8 @@ import { MessageRenderer } from './MessageRenderer';
 import { TornadoIndicator } from './TornadoIndicator';
 import { PerplexityLogo } from '../constants';
 import { User, BookOpen, Globe, Copy, Check, RefreshCw, Share2, Volume2, FileText, Pencil } from 'lucide-react';
+import { ThinkingBar } from '../src/components/ThinkingBar';
+import { ThinkingEvent } from '../src/agent/types';
 
 interface ChatInterfaceProps {
   messages: Message[];
@@ -20,6 +22,7 @@ interface ChatInterfaceProps {
   copiedId: string | null;
   isSidePanel?: boolean;
   activeNote?: Note;
+  thinkingEvents?: ThinkingEvent[];
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -35,7 +38,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   isPlayingAudio,
   copiedId,
   isSidePanel = false,
-  activeNote
+  activeNote,
+  thinkingEvents = []
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -72,7 +76,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           filteredMessages.map((msg) => (
             <div key={msg.id} className="flex flex-col space-y-3 animate-fadeIn">
               <div className={`flex ${msg.role === Role.USER ? 'justify-end' : 'justify-start flex-col'} w-full group items-start`}>
-                
+
                 {/* Model Header */}
                 {msg.role === Role.MODEL && (
                   <div className="flex items-center gap-3 mb-2 select-none">
@@ -85,26 +89,26 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
                 {/* Content Container */}
                 <div className={`flex flex-col min-w-0 ${msg.role === Role.USER ? 'items-end max-w-[90%]' : 'items-start w-full'} group`}>
-                  
+
                   {/* User Label */}
                   {msg.role === Role.USER && (
                     <div className="flex items-center gap-2 mb-2 mr-1 justify-end w-full group">
                       {/* User Actions (Visible on hover) */}
                       <div className={`flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mr-2 ${editingMessageId === msg.id ? 'opacity-100' : ''}`}>
-                         <button 
-                            onClick={() => { setEditingMessageId(msg.id); setEditValue(msg.content); }}
-                            className="p-1 text-pplx-muted hover:text-pplx-text rounded hover:bg-pplx-hover transition-colors"
-                            title="Edit"
-                         >
-                             <Pencil size={12} />
-                         </button>
-                         <button 
-                            onClick={() => onCopyText(msg.id, msg.content)}
-                            className="p-1 text-pplx-muted hover:text-pplx-text rounded hover:bg-pplx-hover transition-colors relative"
-                            title="Copy"
-                         >
-                             {copiedId === msg.id ? <Check size={12} className="text-green-400"/> : <Copy size={12} />}
-                         </button>
+                        <button
+                          onClick={() => { setEditingMessageId(msg.id); setEditValue(msg.content); }}
+                          className="p-1 text-pplx-muted hover:text-pplx-text rounded hover:bg-pplx-hover transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                        <button
+                          onClick={() => onCopyText(msg.id, msg.content)}
+                          className="p-1 text-pplx-muted hover:text-pplx-text rounded hover:bg-pplx-hover transition-colors relative"
+                          title="Copy"
+                        >
+                          {copiedId === msg.id ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                        </button>
                       </div>
 
                       <span className="text-[10px] font-bold text-pplx-text/50 uppercase tracking-widest">You</span>
@@ -137,33 +141,32 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   {/* Content Bubble OR Edit Mode */}
                   {editingMessageId === msg.id ? (
                     <div className="w-full bg-pplx-secondary border border-pplx-border rounded-2xl p-4 mt-1 animate-fadeIn">
-                        <textarea 
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          className="w-full bg-transparent text-pplx-text outline-none resize-none text-[15px] leading-7 font-sans min-h-[80px]"
-                          autoFocus
-                        />
-                        <div className="flex justify-end gap-2 mt-2">
-                            <button 
-                              onClick={() => setEditingMessageId(null)}
-                              className="px-3 py-1.5 text-xs font-medium text-pplx-muted hover:text-pplx-text hover:bg-pplx-hover rounded-lg transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button 
-                              onClick={() => handleEditSubmit(msg.id)}
-                              className="px-4 py-1.5 text-xs font-bold text-black bg-pplx-accent hover:bg-cyan-400 rounded-lg transition-colors"
-                            >
-                                Save & Submit
-                            </button>
-                        </div>
+                      <textarea
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className="w-full bg-transparent text-pplx-text outline-none resize-none text-[15px] leading-7 font-sans min-h-[80px]"
+                        autoFocus
+                      />
+                      <div className="flex justify-end gap-2 mt-2">
+                        <button
+                          onClick={() => setEditingMessageId(null)}
+                          className="px-3 py-1.5 text-xs font-medium text-pplx-muted hover:text-pplx-text hover:bg-pplx-hover rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleEditSubmit(msg.id)}
+                          className="px-4 py-1.5 text-xs font-bold text-black bg-pplx-accent hover:bg-cyan-400 rounded-lg transition-colors"
+                        >
+                          Save & Submit
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <div className={`font-normal text-[16px] leading-7 transition-all relative ${
-                      msg.role === Role.USER 
-                        ? 'bg-pplx-card border border-pplx-border/60 px-4 py-3 rounded-3xl rounded-tr-sm text-pplx-text text-right whitespace-pre-wrap shadow-md backdrop-blur-md' 
+                    <div className={`font-normal text-[16px] leading-7 transition-all relative ${msg.role === Role.USER
+                        ? 'bg-pplx-card border border-pplx-border/60 px-4 py-3 rounded-3xl rounded-tr-sm text-pplx-text text-right whitespace-pre-wrap shadow-md backdrop-blur-md'
                         : 'w-full text-pplx-text'
-                    }`}>
+                      }`}>
                       {msg.role === Role.MODEL && msg.reasoning && (
                         <div className="mb-4 p-4 bg-pplx-secondary rounded-lg border border-pplx-border text-sm text-pplx-text/80 font-mono whitespace-pre-wrap">
                           <div className="font-bold text-pplx-accent mb-2">Reasoning Process:</div>
@@ -220,7 +223,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <div className={`p-4 bg-pplx-card relative z-20 ${isSidePanel ? 'md:p-4 p-2' : ''}`}>
         {/* Bottom Gradient Fade - Perfectly glued to input box */}
         <div className="absolute bottom-[calc(100%-16px)] left-0 right-0 h-12 bg-gradient-to-t from-pplx-card via-pplx-card/50 to-transparent z-10 pointer-events-none" />
-        <InputArea 
+        <InputArea
           onSendMessage={(text, focusModes, _proMode, atts) => onSendMessage(text, focusModes, atts)}
           isThinking={isThinking}
           onStop={onStopGeneration}
@@ -233,4 +236,3 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     </div>
   );
 };
-
