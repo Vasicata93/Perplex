@@ -909,6 +909,11 @@ export class LLMService {
                 break;
         }
 
+        // If Agent Mode is active (detected by systemInstructionOverride containing agent protocol), force reasoning
+        if (systemInstructionOverride && systemInstructionOverride.includes('AGENT OPERATIONAL PROTOCOL')) {
+            forceReasoning = true;
+        }
+
         // 3. Build the System Context (Used by all providers)
         // We pass the provider type so we can inject specific instructions (like <thinking> tags for Generic models)
 

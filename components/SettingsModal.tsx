@@ -902,7 +902,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                                             </div>
 
                                             {/* WebGPU Compatibility Warning */}
-                                            {!navigator.gpu && (
+                                            {!(navigator as any).gpu && (
                                                 <div className="mb-4 px-4 py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl">
                                                     <p className="text-xs text-yellow-400 font-medium">
                                                         ⚠️ Your browser doesn't support WebGPU. Please use Chrome 113+ or Edge 113+ for offline models.
