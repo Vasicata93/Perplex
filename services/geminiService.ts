@@ -8,7 +8,7 @@ import { db, STORES } from "./db";
 import { getHolidays } from "../src/services/holidayService";
 import { RAGService } from "./ragService";
 import { buildAgentSystemPrompt } from "../src/agent/AgentOrchestrator";
-import { DEFAULT_AGENT_CONFIG } from "../src/agent/types";
+import { DEFAULT_AGENT_CONFIG, ThinkingEvent } from "../src/agent/types";
 import { E2BService } from "./e2bService";
 import { webLLMService } from "./webLLMService";
 
@@ -756,7 +756,8 @@ export class LLMService {
         braveApiKey?: string,
         onChunk?: (text: string, reasoning?: string) => void,
         useAgenticResearch: boolean = false,
-        threadId?: string
+        threadId?: string,
+        onThinkingEvent?: (event: ThinkingEvent) => void
     ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
 
         this.abortController = new AbortController();
@@ -776,7 +777,7 @@ export class LLMService {
         if (!useAgenticResearch) {
             if (onChunk) customOnChunk("", "⚡ Mod Chat Simplu (Fără etape)...\n");
             // In simple chat mode, force ProMode.STANDARD to ensure a fast, direct response without reasoning.
-            const result = await this.runCoreGeneration(shortTermHistory, prompt, attachments, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel, useSearch, ProMode.STANDARD, enableMemory, userProfile, aiProfile, spaceSystemInstruction, tavilyApiKey, geminiApiKey, searchProvider, braveApiKey, customOnChunk, undefined, threadId);
+            const result = await this.runCoreGeneration(shortTermHistory, prompt, attachments, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel, useSearch, ProMode.STANDARD, enableMemory, userProfile, aiProfile, spaceSystemInstruction, tavilyApiKey, geminiApiKey, searchProvider, braveApiKey, customOnChunk, undefined, threadId, onThinkingEvent);
             this.triggerMemoryConsolidation(prompt, result.text, enableMemory, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
             result.reasoning = accumulatedReasoning + (result.reasoning || "");
             return result;
@@ -836,7 +837,8 @@ export class LLMService {
             braveApiKey,
             customOnChunk,
             agentSystemPrompt,
-            threadId
+            threadId,
+            onThinkingEvent
         );
 
         this.triggerMemoryConsolidation(prompt, result.text, enableMemory, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
@@ -870,7 +872,8 @@ export class LLMService {
         braveApiKey?: string,
         onChunk?: (text: string, reasoning?: string) => void,
         systemInstructionOverride?: string,
-        threadId?: string
+        threadId?: string,
+        onThinkingEvent?: (event: ThinkingEvent) => void
     ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
 
         // Reset AbortController
@@ -977,7 +980,8 @@ export class LLMService {
                 geminiApiKey,
                 onChunk,
                 virtualFiles.length > 0, // Enable readFiles tool
-                threadId
+                threadId,
+                onThinkingEvent
             );
         } else if (provider === ModelProvider.LOCAL) {
             // ── WebLLM: rulează 100% în browser, fără server ──
@@ -1063,7 +1067,8 @@ export class LLMService {
                 onChunk,
                 virtualFiles.length > 0, // Enable readFiles tool
                 proMode,
-                threadId
+                threadId,
+                onThinkingEvent
             );
         }
 
@@ -1303,7 +1308,8 @@ export class LLMService {
         customApiKey?: string,
         onChunk?: (text: string, reasoning?: string) => void,
         useReadFiles: boolean = false,
-        threadId?: string
+        threadId?: string,
+        onThinkingEvent?: (event: ThinkingEvent) => void
     ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
 
         let clientToUse = this.ai;
@@ -1496,6 +1502,14 @@ export class LLMService {
                     const toolResponses: any[] = [];
 
                     for (const fc of functionCalls) {
+                        // EMIT THINKING EVENT: START
+                        if (onThinkingEvent) {
+                            onThinkingEvent({
+                                stepId: `tool_start_${fc.name}_${Date.now()}`,
+                                label: `Using tool: ${fc.name}...`,
+                                status: 'active'
+                            });
+                        }
                         if (fc.name === 'save_to_library') {
                             pendingAction = {
                                 type: fc.args.action === 'update' ? 'update_page' : 'create_page',
@@ -1751,6 +1765,15 @@ Error Type: ${execResult.error_type || 'None'}`;
                             toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Error: Unknown tool." } } });
                         }
 
+                        // EMIT THINKING EVENT: DONE
+                        if (onThinkingEvent) {
+                            onThinkingEvent({
+                                stepId: `tool_end_${fc.name}_${Date.now()}`,
+                                label: `Finished ${fc.name}`,
+                                status: 'done'
+                            });
+                        }
+
                     }
 
                     if (pendingAction) {
@@ -1795,7 +1818,8 @@ Error Type: ${execResult.error_type || 'None'}`;
         onChunk?: (text: string, reasoning?: string) => void,
         useReadFiles: boolean = false,
         _proMode: ProMode = ProMode.STANDARD,
-        threadId?: string
+        threadId?: string,
+        onThinkingEvent?: (event: ThinkingEvent) => void
     ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
 
         // 1. Prepare Messages
@@ -2064,6 +2088,14 @@ Error Type: ${execResult.error_type || 'None'}`;
                 console.log(`[Generic] Executing ${toolCalls.length} tools...`);
 
                 for (const toolCall of toolCalls) {
+                    // EMIT THINKING EVENT: START
+                    if (onThinkingEvent) {
+                        onThinkingEvent({
+                            stepId: `tool_start_${toolCall.function.name}_${Date.now()}`,
+                            label: `Using tool: ${toolCall.function.name}...`,
+                            status: 'active'
+                        });
+                    }
                     let toolResultContent = "";
 
                     try {
@@ -2316,6 +2348,15 @@ Error Type: ${execResult.error_type || 'None'}`;
                     } catch (err: any) {
                         toolResultContent = `Error executing tool: ${err.message}`;
                         console.error(`[Generic] Tool Execution Error:`, err);
+                    }
+
+                    // EMIT THINKING EVENT: DONE
+                    if (onThinkingEvent) {
+                        onThinkingEvent({
+                            stepId: `tool_end_${toolCall.function.name}_${Date.now()}`,
+                            label: `Finished ${toolCall.function.name}`,
+                            status: 'done'
+                        });
                     }
 
                     // Add Tool Result to History

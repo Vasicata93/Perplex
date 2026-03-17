@@ -1189,6 +1189,18 @@ function App() {
                 }));
             };
 
+            // FIX 2: Define onThinkingEvent callback
+            const handleThinkingEvent = (event: ThinkingEvent) => {
+                setThinkingEvents(prev => {
+                    // Upsert logic: if stepId exists, update it; otherwise append
+                    const exists = prev.find(e => e.stepId === event.stepId);
+                    if (exists) {
+                        return prev.map(e => e.stepId === event.stepId ? event : e);
+                    }
+                    return [...prev, event];
+                });
+            };
+
             const response = await llmService.generateResponse(
                 history, modifiedPrompt, combinedAttachments, provider,
                 settings.openRouterApiKey, settings.openRouterModelId,
@@ -1200,7 +1212,8 @@ function App() {
                 settings.searchProvider, settings.braveApiKey,
                 onChunk,
                 false,
-                threadId
+                threadId,
+                handleThinkingEvent // Pass callback
             );
 
             if (response.pendingAction) {
@@ -1244,6 +1257,8 @@ function App() {
             } : t));
         } finally {
             setIsThinking(false);
+            // FIX 4: Cleanup
+            setTimeout(() => setThinkingEvents([]), 1500);
         }
     };
 
@@ -1409,6 +1424,18 @@ function App() {
                 }));
             };
 
+            // FIX 2: Define onThinkingEvent callback
+            const handleThinkingEvent = (event: ThinkingEvent) => {
+                setThinkingEvents(prev => {
+                    // Upsert logic
+                    const exists = prev.find(e => e.stepId === event.stepId);
+                    if (exists) {
+                        return prev.map(e => e.stepId === event.stepId ? event : e);
+                    }
+                    return [...prev, event];
+                });
+            };
+
             const response = await llmService.generateResponse(
                 history.slice(0, -1), // History excluding current user message (handled by params)
                 modifiedPrompt, combinedAttachments, provider,
@@ -1421,7 +1448,8 @@ function App() {
                 settings.searchProvider, settings.braveApiKey,
                 onChunk, // Pass the streaming callback
                 isAgentMode,
-                threadId
+                threadId,
+                handleThinkingEvent // Pass callback
             );
 
             if (isStoppedRef.current) return;
@@ -1478,6 +1506,8 @@ function App() {
             }
         } finally {
             setIsThinking(false);
+            // FIX 4: Cleanup
+            setTimeout(() => setThinkingEvents([]), 1500);
         }
     };
 
@@ -1753,7 +1783,7 @@ function App() {
                         <div
                             ref={chatContainerRef}
                             onScroll={handleScroll}
-                            className={`flex-1 overflow-y-auto overflow-x-hidden w-full p-2 md:p-0 scroll-smooth pt-24 pb-8`} 
+                            className={`flex-1 overflow-y-auto overflow-x-hidden w-full p-2 md:p-0 scroll-smooth pt-24 pb-8`}
                         >
                             {!activeThreadId || !activeThread ? (
                                 <div className="flex flex-col min-h-full relative z-10">
