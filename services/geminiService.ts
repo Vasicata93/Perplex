@@ -886,7 +886,7 @@ export class LLMService {
         let forceSearch = useSearch;
 
         // Reasoning is forced if Agent Mode is active or if the ProMode requires it.
-        let forceReasoning = (systemInstructionOverride && systemInstructionOverride.includes('AGENT OPERATIONAL PROTOCOL'));
+        let forceReasoning = !!(systemInstructionOverride && systemInstructionOverride.includes('AGENT OPERATIONAL PROTOCOL'));
 
         switch (proMode) {
             case ProMode.STANDARD:
