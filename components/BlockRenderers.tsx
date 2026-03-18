@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     Plus, FileText, X, ArrowUpRight, AtSign,
     MoreHorizontal, Edit3, MousePointerClick, CalendarDays,
-    ChevronLeft, ChevronRight, BarChart3,
+    ChevronLeft, ChevronRight,
     ListOrdered, Sigma
 } from 'lucide-react';
 import { Note } from '../types';
@@ -375,9 +375,17 @@ export const CalendarBlock = ({ content, onChange, readOnly }: { content: string
     );
 };
 
-export const ChartBlock = ({ type, content, onChange, readOnly }: { type: 'chart_bar_v' | 'chart_bar_h' | 'chart_line' | 'chart_donut', content: string, onChange: (val: string) => void, readOnly?: boolean }) => {
+export const ChartBlock = ({ type, content, onChange, readOnly }: {
+    type: 'chart_bar_v' | 'chart_bar_h' | 'chart_line' | 'chart_donut',
+    content: string,
+    onChange: (val: string) => void,
+    readOnly?: boolean
+}) => {
     const [isEditing, setIsEditing] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; value: number; color: string } | null>(null);
+    const hoveredIndexRef = useRef<number>(-1);
 
     const parseData = (str: string) => str.split('\n').map(line => {
         const [label, val] = line.split(',');
@@ -389,13 +397,13 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: { type: 'chart
 
     const COLORS = ['#20B8CD', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#F97316', '#14B8A6'];
 
-    useEffect(() => {
+    // Funcția principală de desenare — acceptă hoveredIndex pentru highlight
+    const draw = (hoveredIndex: number) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // Citește culorile din CSS variables ale sistemului — se adaptează automat la dark/light mode
         const style = getComputedStyle(document.documentElement);
         const textColor = style.getPropertyValue('--text-primary').trim() || '#2D2B26';
         const mutedColor = style.getPropertyValue('--text-muted').trim() || '#6E6D6A';
@@ -404,6 +412,7 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: { type: 'chart
         const dpr = window.devicePixelRatio || 1;
         const W = canvas.offsetWidth;
         const H = canvas.offsetHeight;
+        if (W === 0 || H === 0) return;
         canvas.width = W * dpr;
         canvas.height = H * dpr;
         ctx.scale(dpr, dpr);
@@ -418,47 +427,54 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: { type: 'chart
             const barW = Math.min((chartW / data.length) * 0.6, 60);
             const gap = chartW / data.length;
 
-            // Grid lines
-            const steps = 4;
+            // Grid
             ctx.strokeStyle = borderColor;
             ctx.lineWidth = 0.5;
             ctx.setLineDash([3, 3]);
-            for (let i = 0; i <= steps; i++) {
-                const y = padT + (chartH / steps) * i;
+            for (let i = 0; i <= 4; i++) {
+                const y = padT + (chartH / 4) * i;
                 ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + chartW, y); ctx.stroke();
                 ctx.fillStyle = mutedColor;
                 ctx.font = '10px Inter, system-ui, sans-serif';
                 ctx.textAlign = 'right';
-                ctx.fillText(String(Math.round(maxVal - (maxVal / steps) * i)), padL - 6, y + 3);
+                ctx.fillText(String(Math.round(maxVal - (maxVal / 4) * i)), padL - 6, y + 3);
             }
             ctx.setLineDash([]);
 
-            // Bars
             data.forEach((d, i) => {
                 const x = padL + gap * i + gap / 2 - barW / 2;
-                const barH = (d.value / maxVal) * chartH;
-                const y = padT + chartH - barH;
+                const bH = (d.value / maxVal) * chartH;
+                const y = padT + chartH - bH;
                 const color = COLORS[i % COLORS.length];
                 const radius = Math.min(4, barW / 4);
+                const isHovered = hoveredIndex === i;
 
+                // Highlight: luminozitate crescută + shadow
+                if (isHovered) {
+                    ctx.save();
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = 12;
+                }
+                ctx.globalAlpha = hoveredIndex === -1 ? 1 : (isHovered ? 1 : 0.45);
                 ctx.fillStyle = color;
                 ctx.beginPath();
                 ctx.moveTo(x + radius, y);
                 ctx.lineTo(x + barW - radius, y);
                 ctx.quadraticCurveTo(x + barW, y, x + barW, y + radius);
-                ctx.lineTo(x + barW, y + barH);
-                ctx.lineTo(x, y + barH);
+                ctx.lineTo(x + barW, y + bH);
+                ctx.lineTo(x, y + bH);
                 ctx.lineTo(x, y + radius);
                 ctx.quadraticCurveTo(x, y, x + radius, y);
                 ctx.closePath();
                 ctx.fill();
+                if (isHovered) ctx.restore();
+                ctx.globalAlpha = 1;
 
-                // Label
-                ctx.fillStyle = mutedColor;
-                ctx.font = '10px Inter, system-ui, sans-serif';
+                ctx.fillStyle = hoveredIndex === -1 ? mutedColor : (isHovered ? textColor : mutedColor);
+                ctx.font = isHovered ? 'bold 10px Inter, system-ui, sans-serif' : '10px Inter, system-ui, sans-serif';
                 ctx.textAlign = 'center';
-                const label = d.label.length > 8 ? d.label.slice(0, 7) + '…' : d.label;
-                ctx.fillText(label, x + barW / 2, padT + chartH + 16);
+                const lbl = d.label.length > 8 ? d.label.slice(0, 7) + '…' : d.label;
+                ctx.fillText(lbl, x + barW / 2, padT + chartH + 16);
             });
 
         } else if (type === 'chart_bar_h') {
@@ -470,35 +486,42 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: { type: 'chart
 
             data.forEach((d, i) => {
                 const y = padT + gap * i + gap / 2 - barH / 2;
-                const barW = (d.value / maxVal) * chartW;
+                const bW = (d.value / maxVal) * chartW;
                 const color = COLORS[i % COLORS.length];
                 const radius = Math.min(4, barH / 4);
+                const isHovered = hoveredIndex === i;
 
-                // Label stânga
-                ctx.fillStyle = mutedColor;
-                ctx.font = '10px Inter, system-ui, sans-serif';
+                ctx.fillStyle = hoveredIndex === -1 ? mutedColor : (isHovered ? textColor : mutedColor);
+                ctx.font = isHovered ? 'bold 10px Inter, system-ui, sans-serif' : '10px Inter, system-ui, sans-serif';
                 ctx.textAlign = 'right';
-                const label = d.label.length > 10 ? d.label.slice(0, 9) + '…' : d.label;
-                ctx.fillText(label, padL - 8, y + barH / 2 + 3);
+                const lbl = d.label.length > 10 ? d.label.slice(0, 9) + '…' : d.label;
+                ctx.fillText(lbl, padL - 8, y + barH / 2 + 3);
 
-                // Bar
+                if (isHovered) {
+                    ctx.save();
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = 12;
+                }
+                ctx.globalAlpha = hoveredIndex === -1 ? 1 : (isHovered ? 1 : 0.45);
                 ctx.fillStyle = color;
                 ctx.beginPath();
                 ctx.moveTo(padL, y + radius);
                 ctx.quadraticCurveTo(padL, y, padL + radius, y);
-                ctx.lineTo(padL + barW - radius, y);
-                ctx.quadraticCurveTo(padL + barW, y, padL + barW, y + radius);
-                ctx.lineTo(padL + barW, y + barH - radius);
-                ctx.quadraticCurveTo(padL + barW, y + barH, padL + barW - radius, y + barH);
+                ctx.lineTo(padL + bW - radius, y);
+                ctx.quadraticCurveTo(padL + bW, y, padL + bW, y + radius);
+                ctx.lineTo(padL + bW, y + barH - radius);
+                ctx.quadraticCurveTo(padL + bW, y + barH, padL + bW - radius, y + barH);
                 ctx.lineTo(padL + radius, y + barH);
                 ctx.quadraticCurveTo(padL, y + barH, padL, y + barH - radius);
                 ctx.closePath();
                 ctx.fill();
+                if (isHovered) ctx.restore();
+                ctx.globalAlpha = 1;
 
-                // Valoare dreapta
-                ctx.fillStyle = mutedColor;
+                ctx.fillStyle = hoveredIndex === -1 ? mutedColor : (isHovered ? textColor : mutedColor);
+                ctx.font = isHovered ? 'bold 10px Inter, system-ui, sans-serif' : '10px Inter, system-ui, sans-serif';
                 ctx.textAlign = 'left';
-                ctx.fillText(String(d.value), padL + barW + 6, y + barH / 2 + 3);
+                ctx.fillText(String(d.value), padL + bW + 6, y + barH / 2 + 3);
             });
 
         } else if (type === 'chart_line') {
@@ -507,18 +530,16 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: { type: 'chart
             const chartH = H - padT - padB;
             const stepX = data.length > 1 ? chartW / (data.length - 1) : chartW;
 
-            // Grid
-            const steps = 4;
             ctx.strokeStyle = borderColor;
             ctx.lineWidth = 0.5;
             ctx.setLineDash([3, 3]);
-            for (let i = 0; i <= steps; i++) {
-                const y = padT + (chartH / steps) * i;
+            for (let i = 0; i <= 4; i++) {
+                const y = padT + (chartH / 4) * i;
                 ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + chartW, y); ctx.stroke();
                 ctx.fillStyle = mutedColor;
                 ctx.font = '10px Inter, system-ui, sans-serif';
                 ctx.textAlign = 'right';
-                ctx.fillText(String(Math.round(maxVal - (maxVal / steps) * i)), padL - 6, y + 3);
+                ctx.fillText(String(Math.round(maxVal - (maxVal / 4) * i)), padL - 6, y + 3);
             }
             ctx.setLineDash([]);
 
@@ -527,9 +548,9 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: { type: 'chart
                 y: padT + chartH - (d.value / maxVal) * chartH
             }));
 
-            // Gradient fill sub linie
+            // Gradient fill
             const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
-            grad.addColorStop(0, 'rgba(32,184,205,0.25)');
+            grad.addColorStop(0, 'rgba(32,184,205,0.20)');
             grad.addColorStop(1, 'rgba(32,184,205,0)');
             ctx.beginPath();
             ctx.moveTo(pts[0].x, padT + chartH);
@@ -547,21 +568,44 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: { type: 'chart
             pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
             ctx.stroke();
 
-            // Puncte + labels
+            // Puncte
             pts.forEach((p, i) => {
+                const isHovered = hoveredIndex === i;
+                const r = isHovered ? 6 : 3.5;
+
+                if (isHovered) {
+                    ctx.save();
+                    ctx.shadowColor = '#20B8CD';
+                    ctx.shadowBlur = 14;
+                }
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+                ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
                 ctx.fillStyle = '#20B8CD';
                 ctx.fill();
-                ctx.strokeStyle = 'rgba(32,184,205,0.3)';
-                ctx.lineWidth = 2;
-                ctx.stroke();
+                if (isHovered) {
+                    ctx.restore();
+                    // Inel exterior
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, r + 3, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(32,184,205,0.35)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    // Linie verticală de referință
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(32,184,205,0.25)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([3, 3]);
+                    ctx.moveTo(p.x, p.y + r + 4);
+                    ctx.lineTo(p.x, padT + chartH);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
 
-                ctx.fillStyle = mutedColor;
-                ctx.font = '10px Inter, system-ui, sans-serif';
+                ctx.fillStyle = isHovered ? textColor : mutedColor;
+                ctx.font = isHovered ? 'bold 10px Inter, system-ui, sans-serif' : '10px Inter, system-ui, sans-serif';
                 ctx.textAlign = 'center';
-                const label = data[i].label.length > 8 ? data[i].label.slice(0, 7) + '…' : data[i].label;
-                ctx.fillText(label, p.x, padT + chartH + 16);
+                const lbl = data[i].label.length > 8 ? data[i].label.slice(0, 7) + '…' : data[i].label;
+                ctx.fillText(lbl, p.x, padT + chartH + 16);
             });
 
         } else if (type === 'chart_donut') {
@@ -573,52 +617,194 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: { type: 'chart
             let startAngle = -Math.PI / 2;
             data.forEach((d, i) => {
                 const slice = (d.value / total) * Math.PI * 2;
-                ctx.beginPath();
-                ctx.moveTo(cx, cy);
-                ctx.arc(cx, cy, outerR, startAngle, startAngle + slice);
-                ctx.closePath();
+                const isHovered = hoveredIndex === i;
+                const offset = isHovered ? 8 : 0;
+                const midAngle = startAngle + slice / 2;
+
+                if (isHovered) {
+                    ctx.save();
+                    ctx.shadowColor = COLORS[i % COLORS.length];
+                    ctx.shadowBlur = 16;
+                }
+                ctx.globalAlpha = hoveredIndex === -1 ? 1 : (isHovered ? 1 : 0.5);
                 ctx.fillStyle = COLORS[i % COLORS.length];
+                ctx.beginPath();
+                ctx.moveTo(cx + Math.cos(midAngle) * offset, cy + Math.sin(midAngle) * offset);
+                ctx.arc(
+                    cx + Math.cos(midAngle) * offset,
+                    cy + Math.sin(midAngle) * offset,
+                    outerR, startAngle, startAngle + slice
+                );
+                ctx.closePath();
                 ctx.fill();
+                if (isHovered) ctx.restore();
+                ctx.globalAlpha = 1;
+
                 startAngle += slice;
             });
 
-            // Gaura din mijloc (donut)
+            // Gaura donut
+            const bgColor = style.getPropertyValue('--bg-primary').trim() || 'transparent';
             ctx.beginPath();
             ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
-            ctx.fillStyle = style.getPropertyValue('--bg-primary').trim() || 'transparent';
+            ctx.fillStyle = bgColor === 'transparent' ? (document.documentElement.classList.contains('dark') ? '#191919' : '#ffffff') : bgColor;
             ctx.fill();
 
-            // Total în centru
-            ctx.fillStyle = textColor;
-            ctx.font = `bold 16px Inter, system-ui, sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.fillText(String(total), cx, cy + 3);
-            ctx.fillStyle = mutedColor;
-            ctx.font = '10px Inter, system-ui, sans-serif';
-            ctx.fillText('total', cx, cy + 16);
+            // Text centru
+            if (hoveredIndex >= 0) {
+                ctx.fillStyle = textColor;
+                ctx.font = 'bold 15px Inter, system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(String(data[hoveredIndex].value), cx, cy + 3);
+                ctx.fillStyle = mutedColor;
+                ctx.font = '10px Inter, system-ui, sans-serif';
+                const pct = Math.round((data[hoveredIndex].value / total) * 100);
+                ctx.fillText(`${pct}%`, cx, cy + 16);
+            } else {
+                ctx.fillStyle = textColor;
+                ctx.font = 'bold 16px Inter, system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(String(total), cx, cy + 3);
+                ctx.fillStyle = mutedColor;
+                ctx.font = '10px Inter, system-ui, sans-serif';
+                ctx.fillText('total', cx, cy + 16);
+            }
 
-            // Legendă dreapta
+            // Legendă
             const legendX = W * 0.72;
             const legendStartY = cy - (data.length * 20) / 2;
             data.forEach((d, i) => {
                 const y = legendStartY + i * 22;
+                const isHovered = hoveredIndex === i;
+                ctx.globalAlpha = hoveredIndex === -1 ? 1 : (isHovered ? 1 : 0.45);
                 ctx.fillStyle = COLORS[i % COLORS.length];
                 ctx.beginPath();
                 ctx.roundRect(legendX, y, 10, 10, 3);
                 ctx.fill();
-
-                ctx.fillStyle = mutedColor;
-                ctx.font = '11px Inter, system-ui, sans-serif';
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = isHovered ? textColor : mutedColor;
+                ctx.font = isHovered ? 'bold 11px Inter, system-ui, sans-serif' : '11px Inter, system-ui, sans-serif';
                 ctx.textAlign = 'left';
-                const label = d.label.length > 12 ? d.label.slice(0, 11) + '…' : d.label;
-                ctx.fillText(`${label}  ${d.value}`, legendX + 16, y + 9);
+                const lbl = d.label.length > 12 ? d.label.slice(0, 11) + '…' : d.label;
+                ctx.fillText(`${lbl}  ${d.value}`, legendX + 16, y + 9);
             });
         }
+    };
 
+    // Desenare inițială și la schimbarea datelor
+    useEffect(() => {
+        hoveredIndexRef.current = -1;
+        setTooltip(null);
+        draw(-1);
     }, [type, content, isEditing]);
 
+    // Handler mousemove — detectează elementul hover și redesenează
+    const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        const canvas = canvasRef.current;
+        const container = containerRef.current;
+        if (!canvas || !container) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const W = rect.width;
+        const H = rect.height;
+        const maxVal = Math.max(...data.map(d => d.value)) * 1.15 || 100;
+
+        let newIndex = -1;
+
+        if (type === 'chart_bar_v') {
+            const padL = 40, padR = 16, padT = 16, padB = 40;
+            const chartW = W - padL - padR;
+            const chartH = H - padT - padB;
+            const barW = Math.min((chartW / data.length) * 0.6, 60);
+            const gap = chartW / data.length;
+            data.forEach((d, i) => {
+                const x = padL + gap * i + gap / 2 - barW / 2;
+                const bH = (d.value / maxVal) * chartH;
+                const y = padT + chartH - bH;
+                if (mx >= x && mx <= x + barW && my >= y && my <= padT + chartH) newIndex = i;
+            });
+
+        } else if (type === 'chart_bar_h') {
+            const padL = 80, padR = 40, padT = 12, padB = 12;
+            const chartH = H - padT - padB;
+            const barH = Math.min((chartH / data.length) * 0.6, 28);
+            const gap = chartH / data.length;
+            const chartW = W - padL - padR;
+            data.forEach((d, i) => {
+                const y = padT + gap * i + gap / 2 - barH / 2;
+                const bW = (d.value / maxVal) * chartW;
+                if (mx >= padL && mx <= padL + bW && my >= y && my <= y + barH) newIndex = i;
+            });
+
+        } else if (type === 'chart_line') {
+            const padL = 44, padR = 16, padT = 16, padB = 40;
+            const chartW = W - padL - padR;
+            const chartH = H - padT - padB;
+            const stepX = data.length > 1 ? chartW / (data.length - 1) : chartW;
+            let minDist = 30;
+            data.forEach((d, i) => {
+                const px = padL + i * stepX;
+                const py = padT + chartH - (d.value / maxVal) * chartH;
+                const dist = Math.sqrt((mx - px) ** 2 + (my - py) ** 2);
+                if (dist < minDist) { minDist = dist; newIndex = i; }
+            });
+
+        } else if (type === 'chart_donut') {
+            const cx = W * 0.38, cy = H / 2;
+            const outerR = Math.min(cx, cy) * 0.82;
+            const innerR = outerR * 0.55;
+            const dist = Math.sqrt((mx - cx) ** 2 + (my - cy) ** 2);
+            if (dist >= innerR && dist <= outerR) {
+                const total = data.reduce((s, d) => s + d.value, 0) || 1;
+                let angle = Math.atan2(my - cy, mx - cx);
+                if (angle < -Math.PI / 2) angle += Math.PI * 2;
+                angle += Math.PI / 2;
+                let cumAngle = 0;
+                data.forEach((d, i) => {
+                    const slice = (d.value / total) * Math.PI * 2;
+                    if (angle >= cumAngle && angle < cumAngle + slice) newIndex = i;
+                    cumAngle += slice;
+                });
+            }
+        }
+
+        if (newIndex !== hoveredIndexRef.current) {
+            hoveredIndexRef.current = newIndex;
+            draw(newIndex);
+
+            if (newIndex >= 0) {
+                const containerRect = container.getBoundingClientRect();
+                setTooltip({
+                    x: e.clientX - containerRect.left,
+                    y: e.clientY - containerRect.top,
+                    label: data[newIndex].label,
+                    value: data[newIndex].value,
+                    color: COLORS[newIndex % COLORS.length]
+                });
+                canvas.style.cursor = 'pointer';
+            } else {
+                setTooltip(null);
+                canvas.style.cursor = 'default';
+            }
+        } else if (newIndex >= 0 && tooltip) {
+            // Actualizează poziția tooltip-ului fără redraw
+            const containerRect = container.getBoundingClientRect();
+            setTooltip(prev => prev ? { ...prev, x: e.clientX - containerRect.left, y: e.clientY - containerRect.top } : null);
+        }
+    };
+
+    const handleMouseLeave = () => {
+        if (hoveredIndexRef.current !== -1) {
+            hoveredIndexRef.current = -1;
+            draw(-1);
+        }
+        setTooltip(null);
+    };
+
     return (
-        <div className="my-6 bg-transparent group/chart relative">
+        <div className="my-6 bg-transparent group/chart relative" ref={containerRef}>
             {!readOnly && (
                 <div className="absolute top-3 right-3 z-20 opacity-0 group-hover/chart:opacity-100 transition-opacity">
                     <button onClick={() => setIsEditing(!isEditing)} className="p-1.5 bg-pplx-secondary/80 backdrop-blur hover:bg-pplx-hover rounded-lg border border-pplx-border text-xs flex items-center gap-1.5 font-medium shadow-sm">
@@ -634,8 +820,27 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: { type: 'chart
             ) : (
                 <canvas
                     ref={canvasRef}
+                    onMouseMove={handleMouseMove}
+                    onMouseLeave={handleMouseLeave}
                     style={{ width: '100%', height: type === 'chart_donut' ? '200px' : '240px', display: 'block' }}
                 />
+            )}
+            {tooltip && (
+                <div
+                    className="pointer-events-none absolute z-30 px-2.5 py-1.5 rounded-lg text-xs font-medium shadow-lg border border-pplx-border backdrop-blur-sm"
+                    style={{
+                        left: tooltip.x + 14,
+                        top: tooltip.y - 36,
+                        background: document.documentElement.classList.contains('dark') ? 'rgba(30,30,30,0.92)' : 'rgba(255,255,255,0.95)',
+                        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#2D2B26',
+                        borderLeft: `3px solid ${tooltip.color}`,
+                        transform: 'translateY(-50%)',
+                        whiteSpace: 'nowrap'
+                    }}
+                >
+                    <span style={{ color: tooltip.color }} className="font-semibold">{tooltip.label}</span>
+                    <span className="ml-2 opacity-80">{tooltip.value}</span>
+                </div>
             )}
         </div>
     );
