@@ -598,6 +598,10 @@ svg line[stroke="black"], svg line[stroke="#000"], svg line[stroke="#333"] { str
 svg polyline[stroke="black"], svg polyline[stroke="#000"] { stroke: var(--text-primary); }
 svg polygon[fill="black"], svg polygon[fill="#000"] { fill: var(--text-primary); }
 svg tspan[fill="black"], svg tspan[fill="#000"], svg tspan[fill="#333"] { fill: var(--text-primary); }
+${!dark ? `
+/* Force dark text in light mode for charts */
+svg text, svg tspan { fill: var(--text-primary) !important; }
+` : ''}
 </style>
 </head>
 <body>
