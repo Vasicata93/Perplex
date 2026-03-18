@@ -1505,7 +1505,7 @@ export class LLMService {
                         // EMIT THINKING EVENT: START
                         if (onThinkingEvent) {
                             onThinkingEvent({
-                                stepId: `tool_start_${fc.name}_${Date.now()}`,
+                                stepId: Date.now() + Math.random(),
                                 label: `Using tool: ${fc.name}...`,
                                 status: 'active'
                             });
@@ -1768,7 +1768,7 @@ Error Type: ${execResult.error_type || 'None'}`;
                         // EMIT THINKING EVENT: DONE
                         if (onThinkingEvent) {
                             onThinkingEvent({
-                                stepId: `tool_end_${fc.name}_${Date.now()}`,
+                                stepId: Date.now() + Math.random(),
                                 label: `Finished ${fc.name}`,
                                 status: 'done'
                             });
@@ -2091,7 +2091,7 @@ Error Type: ${execResult.error_type || 'None'}`;
                     // EMIT THINKING EVENT: START
                     if (onThinkingEvent) {
                         onThinkingEvent({
-                            stepId: `tool_start_${toolCall.function.name}_${Date.now()}`,
+                            stepId: Date.now() + Math.random(),
                             label: `Using tool: ${toolCall.function.name}...`,
                             status: 'active'
                         });
@@ -2356,7 +2356,7 @@ Error Type: ${execResult.error_type || 'None'}`;
                     // EMIT THINKING EVENT: DONE
                     if (onThinkingEvent) {
                         onThinkingEvent({
-                            stepId: `tool_end_${toolCall.function.name}_${Date.now()}`,
+                            stepId: Date.now() + Math.random(),
                             label: `Finished ${toolCall.function.name}`,
                             status: 'done'
                         });
