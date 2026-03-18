@@ -582,11 +582,62 @@ button{font-family:inherit;cursor:pointer;border:0.5px solid var(--border-color)
     border-radius:8px;background:transparent;color:var(--text-primary);
     padding:6px 14px;font-size:13px;transition:background 0.15s}
 button:hover{background:var(--bg-hover)}
+/* Global SVG fixes for black/dark elements in dark mode */
+svg text:not([fill]):not([class]) { fill: var(--text-primary); }
+svg text[fill="black"], svg text[fill="#000"], svg text[fill="#000000"],
+svg text[fill="#333"], svg text[fill="#333333"],
+svg text[fill="#1a1a1a"], svg text[fill="#222"], svg text[fill="#111"] { fill: var(--text-primary); }
+svg path[stroke="black"], svg path[stroke="#000"], svg path[stroke="#000000"],
+svg path[stroke="#333"], svg path[stroke="#1a1a1a"] { stroke: var(--text-primary); }
+svg path[fill="black"], svg path[fill="#000"], svg path[fill="#000000"],
+svg path[fill="#333"], svg path[fill="#1a1a1a"] { fill: var(--text-primary); }
+svg circle[stroke="black"], svg circle[stroke="#000"] { stroke: var(--text-primary); }
+svg circle[fill="black"], svg circle[fill="#000"], svg circle[fill="#333"] { fill: var(--text-primary); }
+svg rect[fill="black"], svg rect[fill="#000"], svg rect[fill="#333"] { fill: var(--text-primary); }
+svg line[stroke="black"], svg line[stroke="#000"], svg line[stroke="#333"] { stroke: var(--text-primary); }
+svg polyline[stroke="black"], svg polyline[stroke="#000"] { stroke: var(--text-primary); }
+svg polygon[fill="black"], svg polygon[fill="#000"] { fill: var(--text-primary); }
+svg tspan[fill="black"], svg tspan[fill="#000"], svg tspan[fill="#333"] { fill: var(--text-primary); }
 </style>
 </head>
 <body>
 ${code}
 <script>
+const DARK = ${dark ? 'true' : 'false'};
+const textColor   = DARK ? '#e8e6e0' : '#2D2B26';
+const mutedColor  = DARK ? '#8a8880' : '#6E6D6A';
+const gridColor   = DARK ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+const borderColor = DARK ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+
+const setupCharts = () => {
+    if (!window.Chart) return;
+    Chart.defaults.color = textColor;
+    Chart.defaults.borderColor = borderColor;
+    Chart.defaults.font = { family: 'Inter, system-ui, sans-serif', size: 12 };
+    Chart.defaults.plugins.legend.labels.color = textColor;
+    Chart.defaults.plugins.legend.labels.boxWidth = 10;
+    if (Chart.defaults.plugins.tooltip) {
+        Chart.defaults.plugins.tooltip.backgroundColor = DARK ? '#2a2a2a' : '#ffffff';
+        Chart.defaults.plugins.tooltip.titleColor = textColor;
+        Chart.defaults.plugins.tooltip.bodyColor = mutedColor;
+        Chart.defaults.plugins.tooltip.borderColor = borderColor;
+        Chart.defaults.plugins.tooltip.borderWidth = 1;
+    }
+    const scaleDefaults = {
+        grid: { color: gridColor },
+        ticks: { color: mutedColor },
+        title: { color: textColor }
+    };
+    Chart.defaults.scales = Chart.defaults.scales || {};
+    ['linear','logarithmic','category','time','radialLinear'].forEach(t => {
+        Chart.defaults.scales[t] = Chart.defaults.scales[t] || {};
+        Object.assign(Chart.defaults.scales[t], scaleDefaults);
+    });
+};
+setupCharts();
+window.addEventListener('load', setupCharts);
+setInterval(setupCharts, 800);
+
 function sendPrompt(text){window.parent.postMessage({type:'PERPLEX_SEND_PROMPT',text},'*')}
 function reportHeight(){
     var h = document.documentElement.scrollHeight || document.body.scrollHeight;
