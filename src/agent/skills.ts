@@ -83,6 +83,7 @@ Când userul cere să restructureze sau să îmbunătățească o pagină din Li
 :::widget[Titlu]
 <!-- Cod HTML/SVG/JS -->
 :::
+- **DESIGN CURAT:** Nu adăuga chenare (borders) containerului principal. Fundalul trebuie să fie transparent.
 - Folosește variabile CSS: var(--text-primary), var(--bg-secondary), var(--border-color), var(--accent)
 - Pentru grafice: <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 - Canvas Chart.js în <div style="position:relative;width:100%;height:300px">
@@ -194,11 +195,13 @@ Când userul cere grafice, diagrame, charts, tabele vizuale sau orice reprezenta
 
 REGULI OBLIGATORII pentru codul din widget:
 - Nu folosi DOCTYPE, <html>, <head>, <body> — doar conținut direct
+- **FĂRĂ CHENARE:** Nu pune border sau shadow pe containerul principal (div, svg). Vrem o integrare seamless.
 - Folosește variabilele CSS ale sistemului pentru culori: var(--text-primary), var(--text-muted), var(--bg-secondary), var(--border-color), var(--accent)
 - Nu folosi culori hardcodate (ex: #333, black, white) — sunt invizibile în dark mode
 - Pentru grafice interactive: importă Chart.js din CDN: <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-- **REGULĂ CULORI CHART.JS (IMPORTANT):** Pentru a asigura vizibilitate în Dark Mode, configurează culorile explicit în opțiunile graficului. Chart.js folosește negru by default. Exemplu de configurare corectă:
-  \`options: { scales: { y: { ticks: { color: 'var(--text-muted)' }, grid: { color: 'var(--border-color)' } }, x: { ticks: { color: 'var(--text-muted)' }, grid: { color: 'var(--border-color)' } } }, plugins: { legend: { labels: { color: 'var(--text-primary)' } }, title: { display: true, text: 'Titlul Graficului', color: 'var(--text-primary)' } } }\`
+- **REGULĂ CULORI CHART.JS (CRITIC PENTRU DARK MODE):** În Dark Mode, toate textele, liniile și grilele TREBUIE să fie ALBE sau foarte deschise. NU folosi gri închis sau negru.
+  Exemplu configurare obligatorie:
+  \`options: { scales: { y: { ticks: { color: 'var(--text-primary)' }, grid: { color: 'rgba(255,255,255,0.1)' } }, x: { ticks: { color: 'var(--text-primary)' }, grid: { color: 'rgba(255,255,255,0.1)' } } }, plugins: { legend: { labels: { color: 'var(--text-primary)' } }, title: { color: 'var(--text-primary)' } } }\`
 - Pentru SVG diagrame: folosește viewBox="0 0 680 H" cu width="100%"
 - Canvas Chart.js: pune-l întotdeauna în <div style="position:relative; width:100%; height:300px">
 - Pentru butoane care trimit mesaj în chat: apelează sendPrompt('textul mesajului')
