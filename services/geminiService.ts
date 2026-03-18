@@ -1541,7 +1541,7 @@ export class LLMService {
                                 type: 'block_operation',
                                 data: {
                                     operation: fc.name,
-                                    args: fc.args
+                                    args: fc.name === 'update_table_cell' ? { ...fc.args, rowIndex: Number(fc.args.rowIndex), colIndex: Number(fc.args.colIndex) } : fc.args
                                 },
                                 originalToolCallId: "gemini-fc"
                             };
@@ -2155,7 +2155,7 @@ Error Type: ${execResult.error_type || 'None'}`;
                                 type: 'block_operation',
                                 data: {
                                     operation: toolCall.function.name,
-                                    args: args
+                                    args: toolCall.function.name === 'update_table_cell' ? { ...args, rowIndex: Number(args.rowIndex), colIndex: Number(args.colIndex) } : args
                                 },
                                 originalToolCallId: toolCall.id
                             };
