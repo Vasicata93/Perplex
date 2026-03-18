@@ -219,7 +219,7 @@ const BarChart: React.FC<{ data: ChartData }> = ({ data }) => {
                             {val} {data.unit}
                         </div>
                         <div 
-                            className="w-full bg-pplx-accent opacity-80 hover:opacity-100 rounded-t-sm transition-all relative"
+                            className="w-full bg-pplx-accent opacity-90 hover:opacity-100 rounded-t-sm transition-all relative"
                             style={{ height: `${(val / max) * 100}%` }}
                         />
                     </div>
@@ -349,7 +349,7 @@ const ImageGallery: React.FC<{ images: Attachment[] }> = ({ images }) => (
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {images.map((img, idx) => (
-                <div key={idx} className="group relative aspect-video rounded-lg overflow-hidden border border-pplx-border bg-white">
+                <div key={idx} className="group relative aspect-video rounded-lg overflow-hidden border border-pplx-border bg-pplx-card">
                     <img 
                         src={img.content} 
                         alt={img.name} 
