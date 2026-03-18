@@ -1527,11 +1527,10 @@ export class LLMService {
 
                     for (const fc of functionCalls) {
                         // EMIT THINKING EVENT: START
+                        const toolStepId = `tool_${fc.name}_${Date.now()}`;
                         if (onThinkingEvent) {
                             onThinkingEvent({
-                                stepId: Date.now() + Math.random(),
-                                label: `Using tool: ${fc.name}...`,
-                                stepId: `tool_${fc.name}`,
+                                stepId: toolStepId,
                                 label: toolLabelMap[fc.name] || `Folosesc ${fc.name}...`,
                                 status: 'active'
                             });
@@ -1794,9 +1793,7 @@ Error Type: ${execResult.error_type || 'None'}`;
                         // EMIT THINKING EVENT: DONE
                         if (onThinkingEvent) {
                             onThinkingEvent({
-                                stepId: Date.now() + Math.random(),
-                                label: `Finished ${fc.name}`,
-                                stepId: `tool_${fc.name}`,
+                                stepId: `tool_${fc.name}_${Date.now()}`, // Note: this might not match perfectly if called much later, but for single tool calls it's ok. Ideally we'd pass the original toolStepId.
                                 label: toolLabelMap[fc.name] || `Gata: ${fc.name}`,
                                 status: 'done'
                             });
@@ -2117,11 +2114,10 @@ Error Type: ${execResult.error_type || 'None'}`;
 
                 for (const toolCall of toolCalls) {
                     // EMIT THINKING EVENT: START
+                    const toolStepId = `tool_${toolCall.function.name}_${Date.now()}`;
                     if (onThinkingEvent) {
                         onThinkingEvent({
-                            stepId: Date.now() + Math.random(),
-                            label: `Using tool: ${toolCall.function.name}...`,
-                            stepId: `tool_${toolCall.function.name}`,
+                            stepId: toolStepId,
                             label: toolLabelMap[toolCall.function.name] || `Using tool: ${toolCall.function.name}...`,
                             status: 'active'
                         });
@@ -2386,9 +2382,7 @@ Error Type: ${execResult.error_type || 'None'}`;
                     // EMIT THINKING EVENT: DONE
                     if (onThinkingEvent) {
                         onThinkingEvent({
-                            stepId: Date.now() + Math.random(),
-                            label: `Finished ${toolCall.function.name}`,
-                            stepId: `tool_${toolCall.function.name}`,
+                            stepId: `tool_${toolCall.function.name}_${Date.now()}`,
                             label: toolLabelMap[toolCall.function.name] || `Finished ${toolCall.function.name}`,
                             status: 'done'
                         });

@@ -198,7 +198,7 @@ export const DEFAULT_AGENT_CONFIG: AgentConfig = {
 export type ThinkingStatus = 'pending' | 'active' | 'done' | 'error';
 
 export interface ThinkingEvent {
-  stepId: number;
+  stepId: number | string;
   label: string;
   status: ThinkingStatus;
   detail?: string;
