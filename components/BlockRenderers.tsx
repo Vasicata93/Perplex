@@ -7,7 +7,7 @@ import {
     ListOrdered, Sigma
 } from 'lucide-react';
 import { Note } from '../types';
-import { generateWidgetHtml } from '../widgetGenerator';
+import { buildWidgetHtml } from '../services/widgetHtmlBuilder';
 
 // --- Types needed for blocks ---
 export type BlockType =
@@ -521,7 +521,7 @@ export const WidgetBlock: React.FC<{
     }, []);
 
     const blobUrl = React.useMemo(() => {
-        const html = generateWidgetHtml(content, isDark);
+        const html = buildWidgetHtml(content, isDark);
         const blob = new Blob([html], { type: 'text/html' });
         return URL.createObjectURL(blob);
     }, [content, isDark]);
