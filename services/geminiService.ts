@@ -761,6 +761,8 @@ export class LLMService {
         openRouterModel: string,
         openAiKey: string,
         openAiModel: string,
+        ollamaUrl: string,
+        ollamaModel: string,
         activeLocalModel: LocalModelConfig | undefined,
         useSearch: boolean,
         proMode: ProMode,
@@ -798,7 +800,7 @@ export class LLMService {
                 onThinkingEvent({ stepId: 'chat_start', label: 'Generez răspunsul...', status: 'active' });
             }
             // In simple chat mode, force ProMode.STANDARD to ensure a fast, direct response without reasoning.
-            const result = await this.runCoreGeneration(shortTermHistory, prompt, attachments, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel, useSearch, ProMode.STANDARD, enableMemory, userProfile, aiProfile, spaceSystemInstruction, tavilyApiKey, geminiApiKey, searchProvider, braveApiKey, customOnChunk, undefined, threadId, onThinkingEvent);
+            const result = await this.runCoreGeneration(shortTermHistory, prompt, attachments, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, ollamaUrl, ollamaModel, activeLocalModel, useSearch, ProMode.STANDARD, enableMemory, userProfile, aiProfile, spaceSystemInstruction, tavilyApiKey, geminiApiKey, searchProvider, braveApiKey, customOnChunk, undefined, threadId, onThinkingEvent);
             this.triggerMemoryConsolidation(prompt, result.text, enableMemory, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
             result.reasoning = accumulatedReasoning + (result.reasoning || "");
             if (onThinkingEvent) {
@@ -848,6 +850,8 @@ export class LLMService {
             openRouterModel,
             openAiKey,
             openAiModel,
+            ollamaUrl,
+            ollamaModel,
             activeLocalModel,
             true, // useSearch
             proMode,
@@ -883,6 +887,8 @@ export class LLMService {
         openRouterModel: string,
         openAiKey: string,
         openAiModel: string,
+        ollamaUrl: string,
+        ollamaModel: string,
         activeLocalModel: LocalModelConfig | undefined,
         useSearch: boolean,
         proMode: ProMode,
@@ -1071,6 +1077,10 @@ export class LLMService {
                 endpoint = "https://openrouter.ai/api/v1/chat/completions";
                 apiKey = openRouterKey;
                 modelName = openRouterModel || "openai/gpt-4o";
+            } else if (provider === ModelProvider.OLLAMA) {
+                endpoint = `${ollamaUrl || 'http://localhost:11434'}/v1/chat/completions`;
+                apiKey = "not-needed";
+                modelName = ollamaModel || "llama3.2";
             }
 
             // Determine correct search key

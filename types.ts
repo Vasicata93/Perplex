@@ -115,7 +115,8 @@ export enum ModelProvider {
   LOCAL = 'local', // Renamed from OLLAMA/LMSTUDIO to generic LOCAL
   OPENROUTER = 'openrouter', // Cloud generic
   OPENAI = 'openai', // Cloud
-  LANGFLOW = 'langflow'
+  LANGFLOW = 'langflow',
+  OLLAMA = 'ollama'
 }
 
 export enum FocusMode {
@@ -142,7 +143,7 @@ export interface LocalModelConfig {
   description: string;
   isDownloaded: boolean;
   downloadProgress?: number; // 0-100
-  family: 'llama' | 'gemma' | 'mistral' | 'phi' | 'qwen';
+  family: 'llama' | 'gemma' | 'mistral' | 'phi' | 'qwen' | 'lfm';
 }
 
 export interface UserProfile {
@@ -165,6 +166,11 @@ export interface AppSettings {
   openRouterModelId: string; // Specific model for OpenRouter
   openAiApiKey: string; // Specific key for OpenAI
   openAiModelId: string; // Specific model for OpenAI
+
+  // Ollama Configuration
+  ollamaUrl: string;
+  ollamaModel: string;
+  ollamaAvailable: boolean;
 
   // Search Configuration
   searchProvider: 'tavily' | 'brave'; // Selector
@@ -208,6 +214,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   openRouterModelId: 'openai/gpt-4o',
   openAiApiKey: '',
   openAiModelId: 'gpt-4o',
+
+  ollamaUrl: 'http://localhost:11434',
+  ollamaModel: 'llama3.2',
+  ollamaAvailable: false,
 
   searchProvider: 'tavily',
   tavilyApiKey: '',

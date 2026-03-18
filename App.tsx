@@ -698,7 +698,7 @@ function App() {
         if (!text) return "";
         const prompt = `You are an AI editor. Task: ${instruction}\nOriginal Text: "${text}"\nReturn ONLY the modified text. Do not add quotes, explanations, or markdown fences unless requested.`;
         try {
-            const response = await llmService.generateResponse([], prompt, [], settings.modelProvider, settings.openRouterApiKey, settings.openRouterModelId, settings.openAiApiKey, settings.openAiModelId, settings.localModels.find(m => m.id === settings.activeLocalModelId), false, ProMode.STANDARD, false, settings.userProfile, settings.aiProfile, undefined, settings.tavilyApiKey, settings.geminiApiKey, settings.searchProvider, settings.braveApiKey, undefined, false, undefined);
+            const response = await llmService.generateResponse([], prompt, [], settings.modelProvider, settings.openRouterApiKey, settings.openRouterModelId, settings.openAiApiKey, settings.openAiModelId, settings.ollamaUrl, settings.ollamaModel, settings.localModels.find(m => m.id === settings.activeLocalModelId), false, ProMode.STANDARD, false, settings.userProfile, settings.aiProfile, undefined, settings.tavilyApiKey, settings.geminiApiKey, settings.searchProvider, settings.braveApiKey, undefined, false, undefined);
             return response.text.trim();
         } catch (e) { console.error("AI Edit Failed", e); return text; }
     };
@@ -1204,7 +1204,7 @@ function App() {
             const response = await llmService.generateResponse(
                 history, modifiedPrompt, combinedAttachments, provider,
                 settings.openRouterApiKey, settings.openRouterModelId,
-                settings.openAiApiKey, settings.openAiModelId,
+                settings.openAiApiKey, settings.openAiModelId, settings.ollamaUrl, settings.ollamaModel,
                 activeLocalModel, effectiveUseSearch, ProMode.STANDARD,
                 settings.enableMemory, settings.userProfile,
                 settings.aiProfile, customSystemInstructions,
@@ -1439,8 +1439,7 @@ function App() {
             const response = await llmService.generateResponse(
                 history.slice(0, -1), // History excluding current user message (handled by params)
                 modifiedPrompt, combinedAttachments, provider,
-                settings.openRouterApiKey, settings.openRouterModelId,
-                settings.openAiApiKey, settings.openAiModelId,
+                settings.openRouterApiKey, settings.openRouterModelId, settings.openAiApiKey, settings.openAiModelId, settings.ollamaUrl, settings.ollamaModel,
                 activeLocalModel, effectiveUseSearch, proMode,
                 settings.enableMemory, settings.userProfile,
                 settings.aiProfile, customSystemInstructions,

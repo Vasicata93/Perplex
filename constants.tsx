@@ -35,6 +35,15 @@ export const EMOJI_LIST = [
 
 export const AVAILABLE_OFFLINE_MODELS: LocalModelConfig[] = [
   {
+    id: 'lfm2-1b',
+    name: 'LFM2 1B',
+    modelId: 'LFM2-1B-MLC',
+    fileSize: '~850 MB',
+    description: 'Liquid AI — arhitectură LFM2. Rapid, eficient, optimizat pentru browser.',
+    isDownloaded: false,
+    family: 'lfm'
+  },
+  {
     id: 'llama-3.2-1b',
     name: 'Llama 3.2 1B',
     modelId: 'Llama-3.2-1B-Instruct-q4f16_1-MLC',

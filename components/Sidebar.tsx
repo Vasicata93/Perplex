@@ -133,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         const handleMouseMove = (e: MouseEvent) => {
             if (!isResizing) return;
             let newWidth = e.clientX;
-            if (newWidth < 120) newWidth = 64; // Snap to collapsed
+            if (newWidth < 120) newWidth = 54; // Snap to collapsed (15% smaller than 64px)
             else if (newWidth < 200) newWidth = 200; // Min expanded width
             else if (newWidth > 600) newWidth = 600; // Max width
             setSidebarWidth(newWidth);
@@ -264,9 +264,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                 <div className="w-full h-full flex flex-col overflow-hidden">
                     {/* Header - Fixed layout: Logo Left, Close Button Right */}
-                    <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} p-4 mb-2 pt-safe`}>
+                    <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} ${isCollapsed ? 'p-3' : 'p-4'} mb-2 pt-safe`}>
                         <div className="flex items-center cursor-pointer opacity-90 hover:opacity-100 transition-opacity" onClick={() => handleNavClick(() => { onChangeView('chat'); onNewThread(); })}>
-                            <PerplexityLogo className="w-9 h-9 text-pplx-text shrink-0" />
+                            <PerplexityLogo className="w-8 h-8 text-pplx-text shrink-0" />
                             {!isCollapsed && <span className="ml-2.5 text-xl font-medium tracking-tight text-pplx-text font-serif">perplex</span>}
                         </div>
 
@@ -290,7 +290,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                         {/* Home */}
                         <NavItem
-                            icon={<Search size={22} />}
+                            icon={<Search size={18} />}
                             label={t.home}
                             active={activeView === 'chat' && !activeThreadId && !activeSpaceId}
                             onClick={() => handleNavClick(() => { onChangeView('chat'); onSelectSpace(null); })}
@@ -300,7 +300,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         {/* Chat (History) */}
                         <div className="flex flex-col">
                             <NavItem
-                                icon={<MessageSquareText size={22} />}
+                                icon={<MessageSquareText size={18} />}
                                 label={t.chat}
                                 onClick={() => {
                                     if (isCollapsed) { setSidebarWidth(280); toggleSection('chat'); onChangeView('chat'); }
@@ -348,7 +348,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         {/* Spaces Accordion (Moved above Library) */}
                         <div className="flex flex-col">
                             <NavItem
-                                icon={<LayoutGrid size={22} />}
+                                icon={<LayoutGrid size={18} />}
                                 label={t.spaces}
                                 onClick={() => {
                                     if (isCollapsed) { setSidebarWidth(280); toggleSection('spaces'); }
@@ -390,7 +390,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <div className="flex flex-col">
                             <div className="flex items-center w-full group relative">
                                 <NavItem
-                                    icon={<Library size={22} />}
+                                    icon={<Library size={18} />}
                                     label={t.library}
                                     onClick={() => {
                                         if (window.innerWidth < 768) {
@@ -479,7 +479,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     {/* Calendar Button - Positioned above user */}
                     <div className="px-3 pb-1">
                         <NavItem
-                            icon={<CalendarDays size={22} />}
+                            icon={<CalendarDays size={18} />}
                             label="Calendar"
                             active={activeView === 'calendar'}
                             onClick={() => { onChangeView('calendar'); if (window.innerWidth < 768) toggleSidebar(); }}
@@ -495,7 +495,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             title={isCollapsed ? t.settings : undefined}
                         >
                             <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-3'}`}>
-                                <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white text-sm font-bold border border-white/10 overflow-hidden shrink-0">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white text-sm font-bold border border-white/10 overflow-hidden shrink-0">
                                     {userProfile.avatar ? (
                                         <img src={userProfile.avatar} alt="Avatar" className="w-full h-full object-cover" />
                                     ) : (
@@ -511,7 +511,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 )}
                             </div>
                             {!isCollapsed && (
-                                <Settings size={22} className="text-pplx-muted hover:text-pplx-text transition-colors shrink-0" />
+                                <Settings size={18} className="text-pplx-muted hover:text-pplx-text transition-colors shrink-0" />
                             )}
                         </div>
                     </div>
