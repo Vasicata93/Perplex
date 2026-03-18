@@ -640,6 +640,24 @@ const getCurrentTimeToolGemini: FunctionDeclaration = {
     }
 };
 
+const toolLabelMap: Record<string, string> = {
+    perform_search: 'Caut pe web...',
+    search_memory: 'Accesez memoria...',
+    save_to_library: 'Salvez în bibliotecă...',
+    get_current_time: 'Verific ora...',
+    list_calendar_events: 'Citesc calendarul...',
+    add_calendar_event: 'Adaug eveniment...',
+    update_calendar_event: 'Actualizez eveniment...',
+    delete_calendar_event: 'Șterg eveniment...',
+    execute_code: 'Execut cod...',
+    insert_block: 'Inserez bloc...',
+    replace_block: 'Modific bloc...',
+    delete_block: 'Șterg bloc...',
+    get_page_structure: 'Citesc structura paginii...',
+    read_workspace_files: 'Citesc fișiere...',
+    search_workspace_files: 'Caut în fișiere...',
+};
+
 import { BlockService } from "./blockService";
 
 export class LLMService {
@@ -776,10 +794,16 @@ export class LLMService {
         // If Agentic Research is disabled, bypass the planner and execute directly
         if (!useAgenticResearch) {
             if (onChunk) customOnChunk("", "⚡ Mod Chat Simplu (Fără etape)...\n");
+            if (onThinkingEvent) {
+                onThinkingEvent({ stepId: 'chat_start', label: 'Generez răspunsul...', status: 'active' });
+            }
             // In simple chat mode, force ProMode.STANDARD to ensure a fast, direct response without reasoning.
             const result = await this.runCoreGeneration(shortTermHistory, prompt, attachments, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, activeLocalModel, useSearch, ProMode.STANDARD, enableMemory, userProfile, aiProfile, spaceSystemInstruction, tavilyApiKey, geminiApiKey, searchProvider, braveApiKey, customOnChunk, undefined, threadId, onThinkingEvent);
             this.triggerMemoryConsolidation(prompt, result.text, enableMemory, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
             result.reasoning = accumulatedReasoning + (result.reasoning || "");
+            if (onThinkingEvent) {
+                onThinkingEvent({ stepId: 'chat_start', label: 'Răspuns generat', status: 'done' });
+            }
             return result;
         }
 
@@ -1507,6 +1531,8 @@ export class LLMService {
                             onThinkingEvent({
                                 stepId: Date.now() + Math.random(),
                                 label: `Using tool: ${fc.name}...`,
+                                stepId: `tool_${fc.name}`,
+                                label: toolLabelMap[fc.name] || `Folosesc ${fc.name}...`,
                                 status: 'active'
                             });
                         }
@@ -1770,6 +1796,8 @@ Error Type: ${execResult.error_type || 'None'}`;
                             onThinkingEvent({
                                 stepId: Date.now() + Math.random(),
                                 label: `Finished ${fc.name}`,
+                                stepId: `tool_${fc.name}`,
+                                label: toolLabelMap[fc.name] || `Gata: ${fc.name}`,
                                 status: 'done'
                             });
                         }
@@ -2093,6 +2121,8 @@ Error Type: ${execResult.error_type || 'None'}`;
                         onThinkingEvent({
                             stepId: Date.now() + Math.random(),
                             label: `Using tool: ${toolCall.function.name}...`,
+                            stepId: `tool_${toolCall.function.name}`,
+                            label: toolLabelMap[toolCall.function.name] || `Using tool: ${toolCall.function.name}...`,
                             status: 'active'
                         });
                     }
@@ -2358,6 +2388,8 @@ Error Type: ${execResult.error_type || 'None'}`;
                         onThinkingEvent({
                             stepId: Date.now() + Math.random(),
                             label: `Finished ${toolCall.function.name}`,
+                            stepId: `tool_${toolCall.function.name}`,
+                            label: toolLabelMap[toolCall.function.name] || `Finished ${toolCall.function.name}`,
                             status: 'done'
                         });
                     }
