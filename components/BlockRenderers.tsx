@@ -377,20 +377,248 @@ export const CalendarBlock = ({ content, onChange, readOnly }: { content: string
 
 export const ChartBlock = ({ type, content, onChange, readOnly }: { type: 'chart_bar_v' | 'chart_bar_h' | 'chart_line' | 'chart_donut', content: string, onChange: (val: string) => void, readOnly?: boolean }) => {
     const [isEditing, setIsEditing] = useState(false);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
 
     const parseData = (str: string) => str.split('\n').map(line => {
         const [label, val] = line.split(',');
-        return { label: label || 'Item', value: parseFloat(val) || 0 };
+        return { label: (label || 'Item').trim(), value: parseFloat(val) || 0 };
     }).filter(d => d.label);
 
     let data = parseData(content);
-    if (data.length === 0) data = [{ label: 'Jan', value: 10 }, { label: 'Feb', value: 25 }];
+    if (data.length === 0) data = [{ label: 'Jan', value: 10 }, { label: 'Feb', value: 25 }, { label: 'Mar', value: 18 }];
 
-    const maxVal = Math.max(...data.map(d => d.value)) * 1.1 || 100;
-    const colors = ['#20B8CD', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6'];
+    const COLORS = ['#20B8CD', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#F97316', '#14B8A6'];
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Citește culorile din CSS variables ale sistemului — se adaptează automat la dark/light mode
+        const style = getComputedStyle(document.documentElement);
+        const textColor = style.getPropertyValue('--text-primary').trim() || '#2D2B26';
+        const mutedColor = style.getPropertyValue('--text-muted').trim() || '#6E6D6A';
+        const borderColor = style.getPropertyValue('--border-color').trim() || '#D6D6D4';
+
+        const dpr = window.devicePixelRatio || 1;
+        const W = canvas.offsetWidth;
+        const H = canvas.offsetHeight;
+        canvas.width = W * dpr;
+        canvas.height = H * dpr;
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, W, H);
+
+        const maxVal = Math.max(...data.map(d => d.value)) * 1.15 || 100;
+
+        if (type === 'chart_bar_v') {
+            const padL = 40, padR = 16, padT = 16, padB = 40;
+            const chartW = W - padL - padR;
+            const chartH = H - padT - padB;
+            const barW = Math.min((chartW / data.length) * 0.6, 60);
+            const gap = chartW / data.length;
+
+            // Grid lines
+            const steps = 4;
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = 0.5;
+            ctx.setLineDash([3, 3]);
+            for (let i = 0; i <= steps; i++) {
+                const y = padT + (chartH / steps) * i;
+                ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + chartW, y); ctx.stroke();
+                ctx.fillStyle = mutedColor;
+                ctx.font = '10px Inter, system-ui, sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(String(Math.round(maxVal - (maxVal / steps) * i)), padL - 6, y + 3);
+            }
+            ctx.setLineDash([]);
+
+            // Bars
+            data.forEach((d, i) => {
+                const x = padL + gap * i + gap / 2 - barW / 2;
+                const barH = (d.value / maxVal) * chartH;
+                const y = padT + chartH - barH;
+                const color = COLORS[i % COLORS.length];
+                const radius = Math.min(4, barW / 4);
+
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + barW - radius, y);
+                ctx.quadraticCurveTo(x + barW, y, x + barW, y + radius);
+                ctx.lineTo(x + barW, y + barH);
+                ctx.lineTo(x, y + barH);
+                ctx.lineTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.closePath();
+                ctx.fill();
+
+                // Label
+                ctx.fillStyle = mutedColor;
+                ctx.font = '10px Inter, system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                const label = d.label.length > 8 ? d.label.slice(0, 7) + '…' : d.label;
+                ctx.fillText(label, x + barW / 2, padT + chartH + 16);
+            });
+
+        } else if (type === 'chart_bar_h') {
+            const padL = 80, padR = 40, padT = 12, padB = 12;
+            const chartW = W - padL - padR;
+            const chartH = H - padT - padB;
+            const barH = Math.min((chartH / data.length) * 0.6, 28);
+            const gap = chartH / data.length;
+
+            data.forEach((d, i) => {
+                const y = padT + gap * i + gap / 2 - barH / 2;
+                const barW = (d.value / maxVal) * chartW;
+                const color = COLORS[i % COLORS.length];
+                const radius = Math.min(4, barH / 4);
+
+                // Label stânga
+                ctx.fillStyle = mutedColor;
+                ctx.font = '10px Inter, system-ui, sans-serif';
+                ctx.textAlign = 'right';
+                const label = d.label.length > 10 ? d.label.slice(0, 9) + '…' : d.label;
+                ctx.fillText(label, padL - 8, y + barH / 2 + 3);
+
+                // Bar
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.moveTo(padL, y + radius);
+                ctx.quadraticCurveTo(padL, y, padL + radius, y);
+                ctx.lineTo(padL + barW - radius, y);
+                ctx.quadraticCurveTo(padL + barW, y, padL + barW, y + radius);
+                ctx.lineTo(padL + barW, y + barH - radius);
+                ctx.quadraticCurveTo(padL + barW, y + barH, padL + barW - radius, y + barH);
+                ctx.lineTo(padL + radius, y + barH);
+                ctx.quadraticCurveTo(padL, y + barH, padL, y + barH - radius);
+                ctx.closePath();
+                ctx.fill();
+
+                // Valoare dreapta
+                ctx.fillStyle = mutedColor;
+                ctx.textAlign = 'left';
+                ctx.fillText(String(d.value), padL + barW + 6, y + barH / 2 + 3);
+            });
+
+        } else if (type === 'chart_line') {
+            const padL = 44, padR = 16, padT = 16, padB = 40;
+            const chartW = W - padL - padR;
+            const chartH = H - padT - padB;
+            const stepX = data.length > 1 ? chartW / (data.length - 1) : chartW;
+
+            // Grid
+            const steps = 4;
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = 0.5;
+            ctx.setLineDash([3, 3]);
+            for (let i = 0; i <= steps; i++) {
+                const y = padT + (chartH / steps) * i;
+                ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + chartW, y); ctx.stroke();
+                ctx.fillStyle = mutedColor;
+                ctx.font = '10px Inter, system-ui, sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(String(Math.round(maxVal - (maxVal / steps) * i)), padL - 6, y + 3);
+            }
+            ctx.setLineDash([]);
+
+            const pts = data.map((d, i) => ({
+                x: padL + i * stepX,
+                y: padT + chartH - (d.value / maxVal) * chartH
+            }));
+
+            // Gradient fill sub linie
+            const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
+            grad.addColorStop(0, 'rgba(32,184,205,0.25)');
+            grad.addColorStop(1, 'rgba(32,184,205,0)');
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x, padT + chartH);
+            pts.forEach(p => ctx.lineTo(p.x, p.y));
+            ctx.lineTo(pts[pts.length - 1].x, padT + chartH);
+            ctx.closePath();
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            // Linie
+            ctx.beginPath();
+            ctx.strokeStyle = '#20B8CD';
+            ctx.lineWidth = 2;
+            ctx.lineJoin = 'round';
+            pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+            ctx.stroke();
+
+            // Puncte + labels
+            pts.forEach((p, i) => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+                ctx.fillStyle = '#20B8CD';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(32,184,205,0.3)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = mutedColor;
+                ctx.font = '10px Inter, system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                const label = data[i].label.length > 8 ? data[i].label.slice(0, 7) + '…' : data[i].label;
+                ctx.fillText(label, p.x, padT + chartH + 16);
+            });
+
+        } else if (type === 'chart_donut') {
+            const cx = W * 0.38, cy = H / 2;
+            const outerR = Math.min(cx, cy) * 0.82;
+            const innerR = outerR * 0.55;
+            const total = data.reduce((s, d) => s + d.value, 0) || 1;
+
+            let startAngle = -Math.PI / 2;
+            data.forEach((d, i) => {
+                const slice = (d.value / total) * Math.PI * 2;
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.arc(cx, cy, outerR, startAngle, startAngle + slice);
+                ctx.closePath();
+                ctx.fillStyle = COLORS[i % COLORS.length];
+                ctx.fill();
+                startAngle += slice;
+            });
+
+            // Gaura din mijloc (donut)
+            ctx.beginPath();
+            ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+            ctx.fillStyle = style.getPropertyValue('--bg-primary').trim() || 'transparent';
+            ctx.fill();
+
+            // Total în centru
+            ctx.fillStyle = textColor;
+            ctx.font = `bold 16px Inter, system-ui, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText(String(total), cx, cy + 3);
+            ctx.fillStyle = mutedColor;
+            ctx.font = '10px Inter, system-ui, sans-serif';
+            ctx.fillText('total', cx, cy + 16);
+
+            // Legendă dreapta
+            const legendX = W * 0.72;
+            const legendStartY = cy - (data.length * 20) / 2;
+            data.forEach((d, i) => {
+                const y = legendStartY + i * 22;
+                ctx.fillStyle = COLORS[i % COLORS.length];
+                ctx.beginPath();
+                ctx.roundRect(legendX, y, 10, 10, 3);
+                ctx.fill();
+
+                ctx.fillStyle = mutedColor;
+                ctx.font = '11px Inter, system-ui, sans-serif';
+                ctx.textAlign = 'left';
+                const label = d.label.length > 12 ? d.label.slice(0, 11) + '…' : d.label;
+                ctx.fillText(`${label}  ${d.value}`, legendX + 16, y + 9);
+            });
+        }
+
+    }, [type, content, isEditing]);
 
     return (
-        <div className="my-6 p-4 bg-transparent group/chart relative overflow-hidden">
+        <div className="my-6 bg-transparent group/chart relative">
             {!readOnly && (
                 <div className="absolute top-3 right-3 z-20 opacity-0 group-hover/chart:opacity-100 transition-opacity">
                     <button onClick={() => setIsEditing(!isEditing)} className="p-1.5 bg-pplx-secondary/80 backdrop-blur hover:bg-pplx-hover rounded-lg border border-pplx-border text-xs flex items-center gap-1.5 font-medium shadow-sm">
@@ -404,25 +632,10 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: { type: 'chart
                     <textarea className="w-full h-32 bg-pplx-input border border-pplx-border rounded-lg p-3 text-sm font-mono outline-none resize-none" value={content} onChange={(e) => onChange(e.target.value)} />
                 </div>
             ) : (
-                <div className="h-64 w-full flex items-center justify-center relative">
-                    {/* Visualizations simplified for brevity but functional */}
-                    {type === 'chart_bar_v' && (
-                        <div className="flex items-end gap-3 h-full w-full pl-8 pb-6 pr-2 pt-4 relative z-10">
-                            {data.map((d, i) => (
-                                <div key={i} className="flex-1 flex flex-col justify-end items-center h-full group/bar relative">
-                                    <div className="w-full rounded-t-lg transition-all min-w-[12px] hover:brightness-110 shadow-sm" style={{ height: `${(d.value / maxVal) * 100}%`, backgroundColor: colors[i % colors.length] }} />
-                                    <span className="text-[10px] font-medium text-pplx-muted mt-3 truncate w-full text-center absolute -bottom-6">{d.label}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                    {(type === 'chart_bar_h' || type === 'chart_line' || type === 'chart_donut') && (
-                        <div className="flex flex-col items-center justify-center text-pplx-muted">
-                            <BarChart3 size={32} />
-                            <span className="text-xs mt-2">Visualization enabled</span>
-                        </div>
-                    )}
-                </div>
+                <canvas
+                    ref={canvasRef}
+                    style={{ width: '100%', height: type === 'chart_donut' ? '200px' : '240px', display: 'block' }}
+                />
             )}
         </div>
     );

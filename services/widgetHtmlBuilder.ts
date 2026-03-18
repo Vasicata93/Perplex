@@ -193,7 +193,31 @@ const applyChartDefaults = () => {
   });
 };
 applyChartDefaults();
+document.addEventListener('DOMContentLoaded', applyChartDefaults);
 window.addEventListener('load', applyChartDefaults);
+
+const patchExistingCharts = () => {
+  if (!window.Chart) return;
+  Object.values(Chart.instances || {}).forEach(chart => {
+    try {
+      const opts = chart.options;
+      if (opts.scales) {
+        Object.values(opts.scales).forEach(scale => {
+          if (scale.ticks) scale.ticks.color = mutedColor;
+          if (scale.grid) scale.grid.color = gridColor;
+          if (scale.title) scale.title.color = textColor;
+        });
+      }
+      if (opts.plugins?.legend?.labels) opts.plugins.legend.labels.color = textColor;
+      if (opts.plugins?.title) opts.plugins.title.color = textColor;
+      chart.update('none');
+    } catch(e) {}
+  });
+};
+window.addEventListener('load', patchExistingCharts);
+setTimeout(patchExistingCharts, 100);
+setTimeout(patchExistingCharts, 600);
+
 setInterval(applyChartDefaults, 800);
 
 function sendPrompt(text) { window.parent.postMessage({ type: 'PERPLEX_SEND_PROMPT', text }, '*'); }
@@ -201,7 +225,9 @@ function reportHeight() {
   const h = document.documentElement.scrollHeight || document.body.scrollHeight;
   window.parent.postMessage({ type: 'PERPLEX_WIDGET_HEIGHT', height: h }, '*');
 }
-new ResizeObserver(reportHeight).observe(document.body);
+const initResize = () => new ResizeObserver(reportHeight).observe(document.body);
+if (document.body) initResize();
+else document.addEventListener('DOMContentLoaded', initResize);
 window.addEventListener('load', () => { reportHeight(); setTimeout(reportHeight, 500); });
 `;
 
@@ -211,10 +237,10 @@ window.addEventListener('load', () => { reportHeight(); setTimeout(reportHeight,
  * @param dark     Whether dark mode is active
  */
 export function buildWidgetHtml(content: string, dark: boolean): string {
-    const themeVars = dark ? DARK_VARS : LIGHT_VARS;
-    const darkOverrides = dark ? DARK_OVERRIDES : '';
+  const themeVars = dark ? DARK_VARS : LIGHT_VARS;
+  const darkOverrides = dark ? DARK_OVERRIDES : '';
 
-    return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html class="${dark ? 'dark' : ''}">
 <head>
 <meta charset="UTF-8">
@@ -226,10 +252,10 @@ ${SVG_RAMPS_LIGHT}
 ${SVG_RAMPS_DARK}
 ${darkOverrides}
 </style>
+<script>${IFRAME_SCRIPT(dark)}</script>
 </head>
 <body>
 ${content}
-<script>${IFRAME_SCRIPT(dark)}</script>
 </body>
 </html>`;
 }
