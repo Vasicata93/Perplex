@@ -582,37 +582,11 @@ button{font-family:inherit;cursor:pointer;border:0.5px solid var(--border-color)
     border-radius:8px;background:transparent;color:var(--text-primary);
     padding:6px 14px;font-size:13px;transition:background 0.15s}
 button:hover{background:var(--bg-hover)}
-/* Global SVG fixes for black elements */
-svg text { fill: var(--text-primary); }
-svg path[stroke="black"], svg path[stroke="#000"], svg path[stroke="#000000"] { stroke: var(--text-primary); }
-svg path[fill="black"], svg path[fill="#000"], svg path[fill="#000000"] { fill: var(--text-primary); }
-svg circle[fill="black"], svg circle[fill="#000"] { fill: var(--text-primary); }
-svg rect[fill="black"], svg rect[fill="#000"] { fill: var(--text-primary); }
 </style>
 </head>
 <body>
 ${code}
 <script>
-// Global Chart.js defaults
-const setupCharts = () => {
-    if (window.Chart) {
-        Chart.defaults.color = '${dark ? '#e8e6e0' : '#2D2B26'}';
-        Chart.defaults.borderColor = '${dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}';
-        Chart.defaults.plugins.legend.labels.color = '${dark ? '#e8e6e0' : '#2D2B26'}';
-        if (Chart.defaults.scales?.y) {
-            Chart.defaults.scales.y.grid.color = '${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}';
-            Chart.defaults.scales.y.ticks.color = '${dark ? '#8a8880' : '#6E6D6A'}';
-        }
-        if (Chart.defaults.scales?.x) {
-            Chart.defaults.scales.x.grid.color = '${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}';
-            Chart.defaults.scales.x.ticks.color = '${dark ? '#8a8880' : '#6E6D6A'}';
-        }
-    }
-};
-window.addEventListener('load', setupCharts);
-// Re-check periodically since Chart might be loaded dynamically
-setInterval(setupCharts, 1000);
-
 function sendPrompt(text){window.parent.postMessage({type:'PERPLEX_SEND_PROMPT',text},'*')}
 function reportHeight(){
     var h = document.documentElement.scrollHeight || document.body.scrollHeight;
