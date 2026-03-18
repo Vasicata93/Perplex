@@ -958,7 +958,7 @@ function App() {
                     } else if (operation === 'delete_block') {
                         pageStructure = BlockService.deleteBlock(pageStructure, args.blockId);
                     } else if (operation === 'update_table_cell') {
-                        pageStructure = BlockService.updateTableCell(pageStructure, args.tableBlockId, args.rowIndex, args.colIndex, args.newValue);
+                        pageStructure = BlockService.updateTableCell(pageStructure, args.tableBlockId, Number(args.rowIndex), Number(args.colIndex), args.newValue);
                     }
 
                     // Convert back to Markdown

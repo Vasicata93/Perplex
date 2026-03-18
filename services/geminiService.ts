@@ -1613,7 +1613,7 @@ export class LLMService {
                             };
                             toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Calendar action pending user confirmation." } } });
                         } else if (fc.name === 'get_calendar_holidays') {
-                            const year = fc.args.year as number || new Date().getFullYear();
+                            const year = Number(fc.args.year) || new Date().getFullYear();
                             const holidays = getHolidays(year);
                             let responseContent = `HOLIDAYS FOR ${year} (RO & DE):\n`;
                             holidays.forEach(h => {
@@ -1742,7 +1742,7 @@ export class LLMService {
                                 const execResult = await E2BService.executeCode({
                                     code: code as string,
                                     language: language as 'python' | 'typescript',
-                                    timeout: (timeout as number) || 30,
+                                    timeout: Number(timeout) || 30,
                                     packages: (packages as string[]) || [],
                                     session_id: threadId
                                 });
@@ -2327,7 +2327,7 @@ Error Type: ${execResult.error_type || 'None'}`;
                                 const execResult = await E2BService.executeCode({
                                     code: code,
                                     language: language,
-                                    timeout: timeout || 30,
+                                    timeout: Number(timeout) || 30,
                                     packages: packages || [],
                                     session_id: threadId
                                 });
