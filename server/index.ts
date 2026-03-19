@@ -28,6 +28,35 @@ async function startServer() {
             appType: 'spa',
         });
         app.use(vite.middlewares);
+        
+        // Fallback to index.html for SPA routing in development
+        app.use('*', async (_req, res) => {
+            try {
+                const url = _req.originalUrl || '/';
+                const template = await vite.transformIndexHtml(url, `<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Perplex Clone</title>
+    <meta name="theme-color" content="#191A1A" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" href="/logo.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/logo.svg">
+    <meta name="description" content="A high-fidelity clone of Perplex AI.">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"><\/script>
+  </body>
+</html>`);
+                res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+            } catch (e: any) {
+                console.error('Error transforming index.html:', e.message);
+                res.status(500).end('Internal Server Error');
+            }
+        });
     } else {
         const distPath = path.join(process.cwd(), 'dist');
         app.use(express.static(distPath));
