@@ -3,7 +3,7 @@ import { Message, Role, Attachment, Note, FocusMode } from '../types';
 import { InputArea } from './InputArea';
 import { MessageRenderer } from './MessageRenderer';
 import { PerplexityLogo } from '../constants';
-import { User, BookOpen, Globe, Copy, Check, RefreshCw, Share2, Volume2, FileText, Pencil, ChevronDown, ChevronUp, Loader2, BrainCircuit } from 'lucide-react';
+import { User, BookOpen, Globe, Copy, Check, RefreshCw, Share2, Volume2, FileText, Pencil, ChevronDown, Loader2, BrainCircuit } from 'lucide-react';
 import { ThinkingEvent } from '../src/agent/types';
 
 interface ChatInterfaceProps {
