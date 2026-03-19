@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { handleExecute } from './routes/execute';
 import { handleLangflow } from './routes/langflow';
@@ -17,7 +18,7 @@ async function startServer() {
     app.post('/api/langflow', handleLangflow);
 
     // Basic health check
-    app.get('/api/health', (_req, res) => {
+    app.get('/api/health', (req, res) => {
         res.json({ status: 'ok' });
     });
 
@@ -30,37 +31,22 @@ async function startServer() {
         app.use(vite.middlewares);
         
         // Fallback to index.html for SPA routing in development
-        app.use('*', async (_req, res) => {
+        app.use('*', async (req, res) => {
             try {
-                const url = _req.originalUrl || '/';
-                const template = await vite.transformIndexHtml(url, `<!DOCTYPE html>
-<html lang="en" class="dark">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>Perplex Clone</title>
-    <meta name="theme-color" content="#191A1A" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <link rel="icon" href="/logo.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/logo.svg">
-    <meta name="description" content="A high-fidelity clone of Perplex AI.">
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"><\/script>
-  </body>
-</html>`);
+                const url = req.originalUrl || '/';
+                const indexPath = path.resolve(__dirname, '../index.html');
+                let template = fs.readFileSync(indexPath, 'utf-8');
+                template = await vite.transformIndexHtml(url, template);
                 res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
             } catch (e: any) {
-                console.error('Error transforming index.html:', e.message);
+                console.error('Error serving index.html:', e.message);
                 res.status(500).end('Internal Server Error');
             }
         });
     } else {
         const distPath = path.join(process.cwd(), 'dist');
         app.use(express.static(distPath));
-        app.get('*', (_req, res) => {
+        app.get('*', (req, res) => {
             res.sendFile(path.join(distPath, 'index.html'));
         });
     }
