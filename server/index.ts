@@ -34,7 +34,7 @@ async function startServer() {
         app.use('*', async (req, res) => {
             try {
                 const url = req.originalUrl || '/';
-                const indexPath = path.resolve(__dirname, '../index.html');
+                const indexPath = path.resolve(process.cwd(), 'index.html');
                 let template = fs.readFileSync(indexPath, 'utf-8');
                 template = await vite.transformIndexHtml(url, template);
                 res.status(200).set({ 'Content-Type': 'text/html' }).end(template);

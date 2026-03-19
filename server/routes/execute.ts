@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 
 // Ruta /api/execute nu mai este necesară — execuția se face local în browser.
 // Păstrăm endpoint-ul activ dar îl facem no-op pentru compatibilitate.
-export const handleExecute = async (_req: Request, res: Response) => {
+export const handleExecute = async (req: Request, res: Response) => {
     res.status(200).json({
         success: false,
         stdout: '',
