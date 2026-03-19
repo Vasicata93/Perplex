@@ -1162,19 +1162,36 @@ export class LLMService {
 
     // --- Helper: Extract Related Questions ---
     private extractRelatedQuestions(text: string): { cleanText: string, questions: string[] } {
-        const jsonBlockRegex = /```json\s*(\[\s*".*?"\s*(?:,\s*".*?"\s*)*\])\s*```$/s;
-        const match = text.match(jsonBlockRegex);
         let questions: string[] = [];
         let cleanText = text;
 
-        if (match) {
-            try {
-                questions = JSON.parse(match[1]);
-                cleanText = text.replace(match[0], '').trim();
-            } catch (e) {
-                // Failed to parse
+        // Strategy 1: Markdown separator format (preferred)
+        // Matches a trailing section starting with --- followed by - bullet items
+        const markdownRegex = /\n---\s*\n((?:\s*-\s*.+\n?)+)\s*$/;
+        const mdMatch = text.match(markdownRegex);
+        if (mdMatch) {
+            const lines = mdMatch[1].trim().split('\n');
+            questions = lines
+                .map(line => line.replace(/^\s*-\s*/, '').trim())
+                .filter(q => q.length > 0);
+            if (questions.length > 0) {
+                cleanText = text.replace(mdMatch[0], '').trim();
+                return { cleanText, questions };
             }
         }
+
+        // Strategy 2: Legacy JSON fallback (backward compatibility)
+        const jsonBlockRegex = /```json\s*(\[\s*".*?"\s*(?:,\s*".*?"\s*)*\])\s*```$/s;
+        const jsonMatch = text.match(jsonBlockRegex);
+        if (jsonMatch) {
+            try {
+                questions = JSON.parse(jsonMatch[1]);
+                cleanText = text.replace(jsonMatch[0], '').trim();
+            } catch (e) {
+                // Failed to parse — ignore
+            }
+        }
+
         return { cleanText, questions };
     }
 
@@ -2561,9 +2578,8 @@ Error Type: ${execResult.error_type || 'None'}`;
             parts.push("You are a helpful AI assistant. Answer concisely and accurately. Use Markdown formatting.");
         }
 
-        if (aiProfile.language && aiProfile.language !== 'English') {
-            parts.push(`\nPlease respond in ${aiProfile.language}.`);
-        }
+        // Language: Auto-detect from user message, fallback to setting
+        parts.push(`\n**LANGUAGE RULE (HIGHEST PRIORITY):** Detect the language of the user's message and ALWAYS respond in that same language. If the message is too short or ambiguous to determine the language (e.g., a single word, emoji, or code snippet), use ${aiProfile.language || 'English'} as the default.`);
 
         if (modeInstruction) {
             parts.push("\nMODE INSTRUCTION: " + modeInstruction);
@@ -2613,29 +2629,17 @@ Error Type: ${execResult.error_type || 'None'}`;
         }
 
         // [7-8] Global Tools / Skills / Protocols
-        parts.push(`\n**REAL-TIME INFORMATION PROTOCOL:**
-1. If the user asks about "today", "recent", "news", "crypto", "stocks", or "current events", you **MUST** use the available search tool (e.g., \`perform_search\` or built-in Google Search).
-2. Your internal knowledge is frozen in time. For any dynamic topic, the web is your source of truth.`);
+        parts.push(`\n**REAL-TIME SEARCH:** Use the search tool when the user asks about recent events, news, or any information that may have changed since your training cutoff. Your internal knowledge is frozen — the web is your source of truth for dynamic topics.`);
 
-        // Simplificăm protocolul pentru Simple Chat
+        // Calendar Protocol
         if (!isSimpleChat) {
-            parts.push(`3. When searching for "today's news", explicitly include the current date (${timeStr}) in your search queries to get the most relevant results.
-4. If you are in a research loop, focus on gathering facts from the search results rather than your internal memory.`);
-
-            parts.push(`\n**CALENDAR PROTOCOL (CRITICAL):**
-1. **SOURCE OF TRUTH:** The user's calendar is the ONLY source of truth for events.
-2. **ALWAYS VERIFY:** Before answering ANY question about the calendar you **MUST** first call \`list_calendar_events\`.
-3. **MOVING EVENTS:** Call \`list_calendar_events\`, verify date, call \`update_calendar_event\`. Do NOT ask for confirmation if verified.`);
+            parts.push(`\n**CALENDAR:** You have full access to the user's calendar. ALWAYS call \`list_calendar_events\` before answering any schedule-related question. For add/update/delete operations, confirm the details with the user before executing.`);
         } else {
-            // Versiune light pentru Chat Mode
-            parts.push(`\n**CALENDAR:** You have access to the user's calendar. Use \`list_calendar_events\` ONLY if the user explicitly asks about their schedule.`);
+            parts.push(`\n**CALENDAR:** You have access to the user's calendar. Use \`list_calendar_events\` when the user asks about their schedule or events. For add/update/delete operations, confirm with the user before executing.`);
         }
 
         if (!isSimpleChat) {
-            parts.push(`\n**LIBRARY/SOURCE PROTOCOL (CRITICAL):**
-1. **PRIORITY:** If the user has attached a file, page, or source (e.g., from the Library), this attachment is your **PRIMARY SOURCE OF TRUTH**.
-2. **VERIFY FIRST:** Do NOT answer from your internal memory or assumptions about what the file *might* contain. You MUST read and analyze the actual content of the attachment provided in the context.
-3. **NO HALLUCINATIONS:** If the attached file does not contain the answer, state that clearly.`);
+            parts.push(`\n**LIBRARY/SOURCE PROTOCOL:**\nIf the user has attached a file, page, or source, treat it as your PRIMARY SOURCE OF TRUTH. Read and analyze the actual content — do NOT guess or hallucinate. If the answer is not in the attachment, say so clearly.`);
         } else {
             parts.push(`\n**CONTEXT:** Use attached files as your primary source of truth.`);
         }
@@ -2647,34 +2651,14 @@ Error Type: ${execResult.error_type || 'None'}`;
 
         // Explicit Tool Usage Instruction (Crucial for generic OpenRouter/OpenAI models)
         if (forceExplicitToolUse) {
-            parts.push(`\n**CRITICAL INSTRUCTION: REAL-TIME SEARCH & KNOWLEDGE BASE**
-1. **Real-Time Search:** You have access to \`perform_search\`. If the user asks about current events, news, weather, or ANY information that might have changed since your training cutoff, you **MUST** use it.
-2. **Workspace Knowledge Base:** You have access to workspace files. If the user asks for specific data (ID numbers, tax codes like 'Steuer number', IBAN, names, dates) that might be in these files, you **MUST** find it.
-3. **Semantic Mapping:** Use \`get_workspace_map\` first if you are unsure which file contains the information. This gives you a high-level overview of the topics and context of each file.
-4. **Semantic Search:** Use \`semantic_search_workspace\` for complex questions where keywords might fail (e.g., "What are my obligations?" instead of "Tax"). This finds information based on meaning.
-5. **Query Expansion (Synonyms):** When using \`search_workspace_files\`, always include multiple synonyms and related terms in the \`queries\` array to ensure semantic coverage. For example, if searching for a tax ID, use \`["Steuer", "Tax ID", "Fiscal Code", "Steuernummer"]\`.
-6. **Contextual Understanding:** Don't just look for exact matches. Analyze the snippets returned by search to understand the context. If a snippet mentions "the number assigned by the finance office", it might be the tax ID even if the word "tax" isn't there.
-7. **Accuracy:** Never hallucinate or guess personal data. If you cannot find it after searching/reading, state that clearly.
-8. **Form Filling:** If asked to fill a form or provide a list of personal details, use the tools to gather every single piece of information requested.
-9. **Calendar Management:** You have full access to the user's calendar. You can list, add, update, and delete events. ALWAYS check the current time using \`get_current_time\` before making any date-relative assumptions (like "tomorrow" or "next week"). Check for conflicts using \`list_calendar_events\` before adding new events.`);
-        } else {
-            // For Gemini models, we still want to mention the calendar capability
-            parts.push(`\n**CALENDAR CAPABILITY:** You have full access to the user's calendar. You can list, add, update, and delete events. ALWAYS check the current time using \`get_current_time\` before making any date-relative assumptions. Check for conflicts before adding events.`);
+            parts.push(`\n**TOOL USAGE:**
+1. **Real-Time Search:** Use \`perform_search\` for current events, news, weather, or any post-training-cutoff information.
+2. **Workspace Knowledge Base:** Use \`get_workspace_map\`, \`search_workspace_files\` (with synonyms), or \`semantic_search_workspace\` to find specific data in uploaded files.
+3. **Accuracy:** Never hallucinate or guess personal data. If you cannot find it, say so clearly.
+4. **Save to Library:** ONLY use \`save_to_library\` when the user explicitly asks to save, create a page, or remember something. NEVER call it automatically.`);
         }
 
-        if (!isSimpleChat) {
-            // GLOBAL PROCESS INSTRUCTION (Enforces the Plan -> Execute -> Analyze -> Answer loop) - ONLY FOR AGENT/COMPLEX MODES
-            parts.push(`\n**OPERATIONAL PROTOCOL:**
-1. **PLAN:** Understand the user's goal. If information is missing (from web or workspace), use tools (Search/Read) to find it.
-2. **EXECUTE:** Call necessary tools.
-3. **ANALYZE:** Critically evaluate the tool results. Are they relevant? Are they sufficient? If not, search again with a better query.
-4. **SYNTHESIZE:** Formulate a clear, comprehensive answer based *only* on the verified information.
-5. **CITE:** Support your claims with [1], [2] citations from the search results.`);
-        } else {
-            parts.push(`\n**RESPONSE GUIDELINES:** Answer directly, concisely, and naturally. Do not simulate a thought process. Use tools only if absolutely necessary for the specific request. Focus on speed and directness.`);
-        }
-
-        // WIDGET INSTRUCTIONS - ALWAYS AVAILABLE
+        // WIDGET INSTRUCTIONS - ALWAYS AVAILABLE (placed before chat mode instructions so models don't deprioritize them)
         parts.push(`\n**INTERACTIVE WIDGET FORMAT (MANDATORY FOR ALL VISUALIZATIONS):**
 Când userul cere un grafic, diagramă, chart, vizualizare sau orice reprezentare vizuală a datelor — indiferent de modul de operare (Chat sau Agent) — TREBUIE să generezi un bloc widget interactiv folosind EXACT această sintaxă:
 
@@ -2708,14 +2692,23 @@ CÂND să NU generezi widget:
 Când generezi conținut pentru Library (save_to_library sau restructurare pagini), aplică aceleași reguli widget de mai sus.
 `);
 
+        if (!isSimpleChat) {
+            // GLOBAL PROCESS INSTRUCTION (Enforces the Plan -> Execute -> Analyze -> Answer loop) - ONLY FOR AGENT/COMPLEX MODES
+            parts.push(`\n**OPERATIONAL PROTOCOL:**
+1. **PLAN:** Understand the user's goal. If information is missing (from web or workspace), use tools (Search/Read) to find it.
+2. **EXECUTE:** Call necessary tools.
+3. **ANALYZE:** Critically evaluate the tool results. Are they relevant? Are they sufficient? If not, search again with a better query.
+4. **SYNTHESIZE:** Formulate a clear, comprehensive answer based *only* on the verified information.
+5. **CITE:** Support your claims with [1], [2] citations from the search results.`);
+        } else {
+            parts.push(`\n**RESPONSE GUIDELINES:** Answer directly, concisely, and naturally. Do not simulate a thought process. Use tools only if absolutely necessary for the specific request. Focus on speed and directness.`);
+        }
+
         // Explicit Citation Instruction for Generic Models
         parts.push("\nCITATION RULES: If you use the 'perform_search' tool, you must cite the results in your final answer. Use the format [1], [2], etc., corresponding to the order of the sources provided by the tool. Do NOT invent sources.");
 
-        // Add capabilities instruction for Saving
-        parts.push("\n\nCAPABILITIES: You can save information to the user's library. CRITICAL RULE: ONLY use `save_to_library` if the user EXPLICITLY and DIRECTLY commands you to 'save this', 'create a page', or 'remember this'. DO NOT call this tool automatically at the end of a research task or conversation. If the user just asks a question or asks for research, DO NOT save it.");
-
         // Instruction to generate related questions
-        parts.push("\n\nIMPORTANT: After your main response (and after </thinking> if applicable), generate 3 relevant follow-up questions. Return them as a JSON array in a markdown code block at the very end, e.g., ```json\n[\"Q1?\", \"Q2?\"]\n```.");
+        parts.push(`\n\nIMPORTANT: After your main response, suggest 3 relevant follow-up questions. Place them at the very end, separated by a horizontal rule, as a simple bullet list:\n---\n- First follow-up question?\n- Second follow-up question?\n- Third follow-up question?`);
 
         return parts.join("\n");
     }
