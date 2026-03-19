@@ -385,6 +385,7 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; value: number; color: string } | null>(null);
+    const themeColors = useRef<{ textColor: string; mutedColor: string; borderColor: string; bgColor: string } | null>(null);
     const hoveredIndexRef = useRef<number>(-1);
 
     const parseData = (str: string) => str.split('\n').map(line => {
@@ -397,17 +398,22 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: {
 
     const COLORS = ['#20B8CD', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#F97316', '#14B8A6'];
 
-    // Funcția principală de desenare — acceptă hoveredIndex pentru highlight
     const draw = (hoveredIndex: number) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        const style = getComputedStyle(document.documentElement);
-        const textColor = style.getPropertyValue('--text-primary').trim() || '#2D2B26';
-        const mutedColor = style.getPropertyValue('--text-muted').trim() || '#6E6D6A';
-        const borderColor = style.getPropertyValue('--border-color').trim() || '#D6D6D4';
+        if (!themeColors.current) {
+            const style = getComputedStyle(document.documentElement);
+            themeColors.current = {
+                textColor: style.getPropertyValue('--text-primary').trim() || '#2D2B26',
+                mutedColor: style.getPropertyValue('--text-muted').trim() || '#6E6D6A',
+                borderColor: style.getPropertyValue('--border-color').trim() || '#D6D6D4',
+                bgColor: style.getPropertyValue('--bg-primary').trim() || '#ffffff',
+            };
+        }
+        const { textColor, mutedColor, borderColor, bgColor } = themeColors.current;
 
         const dpr = window.devicePixelRatio || 1;
         const W = canvas.offsetWidth;
@@ -644,10 +650,9 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: {
             });
 
             // Gaura donut
-            const bgColor = style.getPropertyValue('--bg-primary').trim() || 'transparent';
             ctx.beginPath();
             ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
-            ctx.fillStyle = bgColor === 'transparent' ? (document.documentElement.classList.contains('dark') ? '#191919' : '#ffffff') : bgColor;
+            ctx.fillStyle = bgColor === 'transparent' ? (document.documentElement.classList.contains('dark') ? '#191919' : '#ffffff') : bgColor; // Fallback for transparency
             ctx.fill();
 
             // Text centru
@@ -691,22 +696,21 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: {
         }
     };
 
-    // Desenare inițială și la schimbarea datelor
     useEffect(() => {
         hoveredIndexRef.current = -1;
         setTooltip(null);
+        themeColors.current = null; // Invalidate color cache
         draw(-1);
-    }, [type, content, isEditing]);
+    }, [type, content, isEditing, readOnly]);
 
-    // Handler mousemove — detectează elementul hover și redesenează
-    const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const updateInteraction = (clientX: number, clientY: number) => {
         const canvas = canvasRef.current;
         const container = containerRef.current;
         if (!canvas || !container) return;
 
         const rect = canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
+        const mx = clientX - rect.left;
+        const my = clientY - rect.top;
         const W = rect.width;
         const H = rect.height;
         const maxVal = Math.max(...data.map(d => d.value)) * 1.15 || 100;
@@ -777,8 +781,8 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: {
             if (newIndex >= 0) {
                 const containerRect = container.getBoundingClientRect();
                 setTooltip({
-                    x: e.clientX - containerRect.left,
-                    y: e.clientY - containerRect.top,
+                    x: clientX - containerRect.left,
+                    y: clientY - containerRect.top,
                     label: data[newIndex].label,
                     value: data[newIndex].value,
                     color: COLORS[newIndex % COLORS.length]
@@ -791,8 +795,22 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: {
         } else if (newIndex >= 0 && tooltip) {
             // Actualizează poziția tooltip-ului fără redraw
             const containerRect = container.getBoundingClientRect();
-            setTooltip(prev => prev ? { ...prev, x: e.clientX - containerRect.left, y: e.clientY - containerRect.top } : null);
+            setTooltip(prev => prev ? { ...prev, x: clientX - containerRect.left, y: clientY - containerRect.top } : null);
         }
+    };
+
+    // Theme change detector
+    useEffect(() => {
+        const observer = new MutationObserver(() => {
+            themeColors.current = null; // Invalidate cache
+            draw(hoveredIndexRef.current); // Redraw
+        });
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        return () => observer.disconnect();
+    }, []);
+
+    const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        updateInteraction(e.clientX, e.clientY);
     };
 
     const handleMouseLeave = () => {
@@ -801,6 +819,16 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: {
             draw(-1);
         }
         setTooltip(null);
+        if (canvasRef.current) canvasRef.current.style.cursor = 'default';
+    };
+
+    const handleTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
+        // Prevent page scroll while interacting with the chart
+        e.preventDefault();
+        const touch = e.touches[0];
+        if (touch) {
+            updateInteraction(touch.clientX, touch.clientY);
+        }
     };
 
     return (
@@ -822,6 +850,9 @@ export const ChartBlock = ({ type, content, onChange, readOnly }: {
                     ref={canvasRef}
                     onMouseMove={handleMouseMove}
                     onMouseLeave={handleMouseLeave}
+                    onTouchStart={handleTouch}
+                    onTouchMove={handleTouch}
+                    onTouchEnd={handleMouseLeave}
                     style={{ width: '100%', height: type === 'chart_donut' ? '200px' : '240px', display: 'block' }}
                 />
             )}
