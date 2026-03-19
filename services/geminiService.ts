@@ -27,6 +27,53 @@ function sanitizeContentForAgent(content: string): string {
     );
 }
 
+const toolLabelMap: Record<string, string> = {
+    perform_search: 'Caut pe web...',
+    search_memory: 'Accesez memoria...',
+    save_to_library: 'Salvez în bibliotecă...',
+    get_current_time: 'Verific ora...',
+    list_calendar_events: 'Citesc calendarul...',
+    add_calendar_event: 'Adaug eveniment...',
+    update_calendar_event: 'Actualizez eveniment...',
+    delete_calendar_event: 'Șterg eveniment...',
+    execute_code: 'Execut cod...',
+    insert_block: 'Inserez bloc...',
+    replace_block: 'Modific bloc...',
+    delete_block: 'Șterg bloc...',
+    get_page_structure: 'Citesc structura paginii...',
+    read_workspace_files: 'Citesc fișiere...',
+    search_workspace_files: 'Caut în fișiere...',
+};
+
+// Helper to generate dynamic tool labels
+function getDetailedToolLabel(name: string, args: any): string {
+    switch (name) {
+        case 'perform_search':
+            return `Caut pe internet: "${args.query}"...`;
+        case 'search_memory':
+            return `Verific memoria: "${args.query}"...`;
+        case 'list_calendar_events':
+            return `Verific calendarul (${args.startDate || 'azi'})...`;
+        case 'add_calendar_event':
+            return `Adaug în calendar: "${args.title}"...`;
+        case 'read_workspace_files':
+            const files = Array.isArray(args.filenames) ? args.filenames.join(', ') : 'fișiere';
+            return `Citesc fișierele: ${files}...`;
+        case 'search_workspace_files':
+            const queries = Array.isArray(args.queries) ? args.queries.join(', ') : 'termeni';
+            return `Caut în documente: ${queries}...`;
+        case 'execute_code':
+            return `Execut cod ${args.language || 'script'}...`;
+        case 'save_to_library':
+            return `Salvez pagina: "${args.title}"...`;
+        case 'insert_block':
+        case 'replace_block':
+            return `Modific pagina: "${args.pageTitle}"...`;
+        default:
+            return toolLabelMap[name] || `Folosesc unealta ${name}...`;
+    }
+}
+
 // --- Tool Definitions ---
 
 const searchToolGeneric = {
@@ -638,24 +685,6 @@ const getCurrentTimeToolGemini: FunctionDeclaration = {
         properties: {},
         required: []
     }
-};
-
-const toolLabelMap: Record<string, string> = {
-    perform_search: 'Caut pe web...',
-    search_memory: 'Accesez memoria...',
-    save_to_library: 'Salvez în bibliotecă...',
-    get_current_time: 'Verific ora...',
-    list_calendar_events: 'Citesc calendarul...',
-    add_calendar_event: 'Adaug eveniment...',
-    update_calendar_event: 'Actualizez eveniment...',
-    delete_calendar_event: 'Șterg eveniment...',
-    execute_code: 'Execut cod...',
-    insert_block: 'Inserez bloc...',
-    replace_block: 'Modific bloc...',
-    delete_block: 'Șterg bloc...',
-    get_page_structure: 'Citesc structura paginii...',
-    read_workspace_files: 'Citesc fișiere...',
-    search_workspace_files: 'Caut în fișiere...',
 };
 
 import { BlockService } from "./blockService";
@@ -1536,12 +1565,14 @@ export class LLMService {
                     const toolResponses: any[] = [];
 
                     for (const fc of functionCalls) {
+                        // Pre-calculate label to show what is happening
+                        const toolLabel = getDetailedToolLabel(fc.name, fc.args);
                         // EMIT THINKING EVENT: START
                         const toolStepId = `tool_${fc.name}_${Date.now()}`;
                         if (onThinkingEvent) {
                             onThinkingEvent({
                                 stepId: toolStepId,
-                                label: toolLabelMap[fc.name] || `Folosesc ${fc.name}...`,
+                                label: toolLabel,
                                 status: 'active'
                             });
                         }
@@ -1804,7 +1835,7 @@ Error Type: ${execResult.error_type || 'None'}`;
                         if (onThinkingEvent) {
                             onThinkingEvent({
                                 stepId: `tool_${fc.name}_${Date.now()}`, // Note: this might not match perfectly if called much later, but for single tool calls it's ok. Ideally we'd pass the original toolStepId.
-                                label: toolLabelMap[fc.name] || `Gata: ${fc.name}`,
+                                label: `Finalizat: ${fc.name}`,
                                 status: 'done'
                             });
                         }
@@ -2125,10 +2156,19 @@ Error Type: ${execResult.error_type || 'None'}`;
                 for (const toolCall of toolCalls) {
                     // EMIT THINKING EVENT: START
                     const toolStepId = `tool_${toolCall.function.name}_${Date.now()}`;
+                    let toolLabel = toolLabelMap[toolCall.function.name] || `Using tool: ${toolCall.function.name}...`;
+
+                    // We try to parse args early just for the label if possible, but args might be partial in some streams. 
+                    // In this generic handler we assume args are complete strings in the object.
+                    try {
+                        const argsPeek = JSON.parse(toolCall.function.arguments);
+                        toolLabel = getDetailedToolLabel(toolCall.function.name, argsPeek);
+                    } catch (e) { }
+
                     if (onThinkingEvent) {
                         onThinkingEvent({
                             stepId: toolStepId,
-                            label: toolLabelMap[toolCall.function.name] || `Using tool: ${toolCall.function.name}...`,
+                            label: toolLabel,
                             status: 'active'
                         });
                     }
@@ -2393,7 +2433,7 @@ Error Type: ${execResult.error_type || 'None'}`;
                     if (onThinkingEvent) {
                         onThinkingEvent({
                             stepId: `tool_${toolCall.function.name}_${Date.now()}`,
-                            label: toolLabelMap[toolCall.function.name] || `Finished ${toolCall.function.name}`,
+                            label: `Finalizat: ${toolCall.function.name}`,
                             status: 'done'
                         });
                     }
