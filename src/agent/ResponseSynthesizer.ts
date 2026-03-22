@@ -284,7 +284,7 @@ function detectPendingAction(
 function assessConfidence(
   text: string,
   executionLog: ExecutionLog | null,
-  routing: RoutingDecision
+  _routing: RoutingDecision
 ): ConfidenceLevel {
   const lowerText = text.toLowerCase();
 

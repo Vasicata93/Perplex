@@ -12,7 +12,6 @@ import {
   ToolState,
   PriorityLevel,
   SituationalSkill,
-  SkillDefinition,
   DEFAULT_COST_GUARD,
 } from './types';
 
@@ -131,9 +130,6 @@ export const WRITE_TOOLS = new Set([
  * Tools sunt mereu DEFINITE (Layer 1). Această funcție decide care sunt ACTIVE.
  */
 function determineToolState(input: RoutingInput): ToolState {
-  // Dacă există deja o PendingAction în așteptare → confirming
-  if (input.activeToolState === 'confirming') return 'confirming';
-
   // Dacă suntem la limita de iterații → error (Cost Guard)
   if (input.iterationCount >= DEFAULT_COST_GUARD.maxIterationsAgentMode) return 'error';
 
@@ -141,6 +137,9 @@ function determineToolState(input: RoutingInput): ToolState {
   const isConfirmation = /^(da|yes|ok|okay|confirm|confirmă|confirma|proceed|continuă|continua)\b/i
     .test(input.currentMessage.trim());
   if (isConfirmation && input.activeToolState === 'confirming') return 'idle';
+
+  // Dacă există deja o PendingAction în așteptare → confirming
+  if (input.activeToolState === 'confirming') return 'confirming';
 
   // Stare normală → idle (toate tools disponibile)
   return 'idle';
@@ -220,7 +219,14 @@ function assessPriority(input: RoutingInput, complexity: ComplexityLevel): Prior
 // CORE skills sunt în Layer 1 (cached). Acestea sunt SITUATIONAL.
 // ─────────────────────────────────────────────────────────────
 
-export const SKILL_DEFINITIONS: SkillDefinition[] = [
+interface RouteSkillDefinition {
+  id: string;
+  triggerKeywords: string[];
+  triggerPatterns: RegExp[];
+  instructions: string;
+}
+
+export const SKILL_DEFINITIONS: RouteSkillDefinition[] = [
   {
     id: 'coding_skill',
     triggerKeywords: ['cod', 'code', 'script', 'function', 'funcție', 'clasă', 'class', 'bug', 'error', 'python', 'javascript', 'typescript', 'react', 'api', 'debug', 'test', 'refactor'],
@@ -337,7 +343,7 @@ export function buildSkillInjectionContext(skills: SituationalSkill[]): string {
 
   const skillTexts = skills.map(skillId => {
     const def = SKILL_DEFINITIONS.find(s => s.id === skillId);
-    return def ? (def as any).instructions : '';
+    return def ? def.instructions : '';
   }).filter(Boolean);
 
   if (skillTexts.length === 0) return '';
