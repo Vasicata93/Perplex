@@ -230,7 +230,7 @@ export const SKILL_DEFINITIONS: SkillDefinition[] = [
       /implement.*(feature|functionality)/i,
       /```[\s\S]/,
     ],
-    contextAddition: `### Active Skill: Software Development
+    instructions: `### Active Skill: Software Development
 - Prefer working, complete code over partial snippets
 - Always include error handling in production code
 - Add brief inline comments for non-obvious logic
@@ -248,7 +248,7 @@ export const SKILL_DEFINITIONS: SkillDefinition[] = [
       /analizează.+din.+perspective/i,
       /ce spun.+despre/i,
     ],
-    contextAddition: `### Active Skill: Research and Analysis
+    instructions: `### Active Skill: Research and Analysis
 - Minimum 3 independent sources for factual claims
 - Clearly distinguish between: confirmed fact / expert opinion / speculation
 - When sources contradict: present both positions with their evidence
@@ -265,7 +265,7 @@ export const SKILL_DEFINITIONS: SkillDefinition[] = [
       /profit.+și.+pierdere/i,
       /analiză.+financiară/i,
     ],
-    contextAddition: `### Active Skill: Financial Analysis
+    instructions: `### Active Skill: Financial Analysis
 - Always clarify currency and time period when presenting numbers
 - Distinguish between gross and net values explicitly
 - For projections: state assumptions clearly, mark as estimates
@@ -282,7 +282,7 @@ export const SKILL_DEFINITIONS: SkillDefinition[] = [
       /ton.+(formal|informal|profesional)/i,
       /în stilul/i,
     ],
-    contextAddition: `### Active Skill: Writing and Communication
+    instructions: `### Active Skill: Writing and Communication
 - Match tone to context: formal for business, conversational for personal
 - Structure: clear opening → core message → clear call to action
 - Avoid filler phrases and corporate speak
@@ -299,7 +299,7 @@ export const SKILL_DEFINITIONS: SkillDefinition[] = [
       /tabel.+cu/i,
       /calculează.+(media|suma|totalul)/i,
     ],
-    contextAddition: `### Active Skill: Data Analysis
+    instructions: `### Active Skill: Data Analysis
 - For numerical data: always use execute_code (Python) to calculate, never mental math
 - Present results as interactive widget (chart/table) when data has 3+ data points
 - State clearly: sample size, time period, data source
@@ -318,10 +318,10 @@ function detectSkills(input: RoutingInput): SituationalSkill[] {
     const hasKeyword = skill.triggerKeywords.some(kw => msg.includes(kw.toLowerCase()));
 
     // Check patterns
-    const hasPattern = skill.triggerPatterns.some(pattern => pattern.test(input.currentMessage));
+    const hasPattern = skill.triggerPatterns.some((pattern: RegExp) => pattern.test(input.currentMessage));
 
     if (hasKeyword || hasPattern) {
-      activeSkills.push(skill.id);
+      activeSkills.push(skill.id as SituationalSkill);
     }
   }
 
@@ -337,7 +337,7 @@ export function buildSkillInjectionContext(skills: SituationalSkill[]): string {
 
   const skillTexts = skills.map(skillId => {
     const def = SKILL_DEFINITIONS.find(s => s.id === skillId);
-    return def ? def.contextAddition : '';
+    return def ? (def as any).instructions : '';
   }).filter(Boolean);
 
   if (skillTexts.length === 0) return '';
@@ -388,7 +388,6 @@ export function route(input: RoutingInput): RoutingDecision {
     toolState,
     priority,
     injectedSkills,
-    needsClarification,
     estimatedToolCalls,
   });
 

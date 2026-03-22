@@ -12,11 +12,9 @@ import {
   ThinkingEngineOutput,
   ThinkingFrame,
   ThinkingStep,
-  ThinkingStepStatus,
   ReasoningMode,
   RoutingDecision,
   ThinkingEvent,
-  ComplexityLevel,
   SituationalSkill,
 } from './types';
 import type { ThinkingStatus } from './types';
@@ -89,7 +87,7 @@ export function buildThinkingEngine(input: ThinkingEngineInput): ThinkingEngineO
 // ─────────────────────────────────────────────────────────────
 function selectReasoningMode(
   routing: RoutingDecision,
-  hasNativeThinking: boolean,
+  _hasNativeThinking: boolean,
   iterationCount: number
 ): ReasoningMode {
 
@@ -132,7 +130,7 @@ function selectReasoningMode(
 // 5.2 — PLANIFICARE PAȘI
 // ─────────────────────────────────────────────────────────────
 function planThinkingSteps(
-  message: string,
+  _message: string,
   routing: RoutingDecision,
   mode: ReasoningMode
 ): ThinkingStep[] {
@@ -264,7 +262,7 @@ function buildDecompositionSteps(routing: RoutingDecision): ThinkingStep[] {
   return steps;
 }
 
-function buildVerificationSteps(routing: RoutingDecision): ThinkingStep[] {
+function buildVerificationSteps(_routing: RoutingDecision): ThinkingStep[] {
   return [
     {
       id: 'verify_search',
@@ -376,7 +374,7 @@ ${stepList}
  * Detectează dacă modelul curent are gândire nativă (thinking tokens).
  * Actualizează lista când adaugi modele noi în aplicație.
  */
-export function detectNativeThinking(provider: string, model: string): boolean {
+export function detectNativeThinking(_provider: string, model: string): boolean {
   const modelLower = (model || '').toLowerCase();
 
   const nativeThinkingModels = [
