@@ -11,7 +11,6 @@ import {
   ExternalizedObservation,
   RagEngineInput,
   RagEngineOutput,
-  DEFAULT_COST_GUARD,
 } from './types';
 
 // ─────────────────────────────────────────────────────────────
@@ -289,7 +288,6 @@ export function formatRagResults(
 
   const parts: string[] = [];
   let tokenCount = 0;
-  const charBudget = maxTokenBudget * 4;
 
   for (const result of output.results) {
     const entry =

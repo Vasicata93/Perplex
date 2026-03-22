@@ -323,7 +323,7 @@ function assessUrgency(message: string, events: DetectedEvent[]): UrgencyLevel {
 
 function detectEmotionalTone(
   message: string,
-  history: PerceptionContextInput['messageHistory']
+  _history: PerceptionContextInput['messageHistory']
 ): EmotionalTone {
   const lowerMsg = message.toLowerCase();
 
@@ -350,7 +350,7 @@ function assessComplexityAndMode(
   intent: ParsedIntent,
   isAgentMode?: boolean,
   proMode?: string,
-  events?: DetectedEvent[]
+  _events?: DetectedEvent[]
 ): { complexity: ComplexityLevel; mode: OperationMode } {
 
   // Agent Mode explicit activat de user

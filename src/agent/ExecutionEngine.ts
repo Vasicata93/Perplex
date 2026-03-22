@@ -6,13 +6,10 @@
 
 import {
   ExecutionEngineInput,
-  ExecutionEngineOutput,
   ExecutionLog,
   ExecutionLogEntry,
   ToolCallRecord,
-  ExecutionStatus,
   FallbackRule,
-  ThinkingStep,
   ThinkingEvent,
   DEFAULT_COST_GUARD,
 } from './types';

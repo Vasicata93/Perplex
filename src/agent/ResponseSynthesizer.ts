@@ -14,7 +14,6 @@ import {
   ConfidenceLevel,
   ExecutionLog,
   RoutingDecision,
-  ThinkingFrame,
 } from './types';
 
 // ─────────────────────────────────────────────────────────────
@@ -190,7 +189,7 @@ function normalizeCitations(text: string, citations: Citation[]): string {
 // ─────────────────────────────────────────────────────────────
 function extractOrGenerateRelatedQuestions(
   text: string,
-  currentMessage: string,
+  _currentMessage: string,
   format: ResponseFormat
 ): RelatedQuestion[] {
 

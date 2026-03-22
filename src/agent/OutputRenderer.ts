@@ -9,9 +9,7 @@ import {
   RendererInput,
   RendererOutput,
   RenderBlock,
-  RenderBlockType,
   StreamingState,
-  SynthesisOutput,
   Citation,
   ResponseFormat,
 } from './types';

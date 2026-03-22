@@ -78,7 +78,7 @@ export async function loadMemoryContext(
 // Relevant summaries of past conversations
 // ─────────────────────────────────────────────────────────────
 async function retrieveEpisodicMemory(
-  prompt: string,
+  _prompt: string,
   memoryManager: any
 ): Promise<MemoryEntry[]> {
   try {
