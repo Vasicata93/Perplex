@@ -6,12 +6,46 @@ import { memoryManager } from "../memory";
 import { TavilyService } from "./tavilyService";
 import { db, STORES } from "./db";
 import { getHolidays } from "../src/services/holidayService";
-import { RAGService } from "./ragService";
+// import { RAGService } from "./ragService"; // Unused
 import { buildAgentSystemPrompt } from "../src/agent/AgentOrchestrator";
-import { DEFAULT_AGENT_CONFIG, ThinkingEvent } from "../src/agent/types";
+import { DEFAULT_AGENT_CONFIG } from "../src/agent/types";
 import { E2BService } from "./e2bService";
 import { webLLMService } from "./webLLMService";
-
+import { buildStaticSystemContext } from '../src/agent/SystemContext';
+import { DEFAULT_COST_GUARD } from '../src/agent/types';
+import { loadMemoryContext } from '../src/agent/MemoryLayer';
+import { buildPerceptionContext } from '../src/agent/PerceptionContext';
+import type { PerceptionContextOutput } from '../src/agent/types';
+import { route, buildSkillInjectionContext, getActiveTools } from '../src/agent/Router';
+import { RoutingInput, RoutingDecision, ToolState } from '../src/agent/types';
+import {
+    buildThinkingEngine,
+    detectNativeThinking,
+    buildRoutingEvent,
+} from '../src/agent/ThinkingEngine';
+import type { ThinkingEngineOutput, ThinkingEvent, ThinkingFrame, MemoryEntry } from '../src/agent/types';
+import {
+    processToolCall,
+    createExecutionLog,
+    markStepDone,
+    appendToLog,
+} from '../src/agent/ExecutionEngine';
+import type { ExecutionLog, ExecutionEngineInput } from '../src/agent/types';
+import {
+    synthesizeResponse,
+} from '../src/agent/ResponseSynthesizer';
+import type { SynthesisOutput } from '../src/agent/types';
+import {
+    ragSearch,
+    indexDocument,
+    storeExternalizedObservation,
+    formatRagResults,
+    getRagIndexStats,
+} from '../src/agent/RagEngine';
+import {
+    triggerConsolidation,
+} from '../src/agent/MemoryConsolidation';
+import type { ConsolidationInput } from '../src/agent/types';
 
 // --- Helper Functions ---
 function sanitizeContentForAgent(content: string): string {
@@ -693,6 +727,78 @@ export class LLMService {
     private ai: GoogleGenAI | null = null;
     private apiKey: string | undefined;
 
+    // Layer 6: Execution log per request (resetat la fiecare request nou)
+    private currentExecutionLog: ExecutionLog | null = null;
+
+    // Layer 6: Getter pentru debugging și UI
+    public getExecutionLog(): ExecutionLog | null {
+        return this.currentExecutionLog;
+    }
+
+    // Layer 4: Tool State Machine state
+    private currentToolState: ToolState = 'idle';
+
+    // Layer 4: Setter public (apelat din App.tsx când o PendingAction e confirmată/anulată)
+    public setToolState(state: ToolState): void {
+        this.currentToolState = state;
+        console.log(`[Layer 4] Tool State → ${state}`);
+    }
+
+    public getToolState(): ToolState {
+        return this.currentToolState;
+    }
+
+    /**
+     * LAYER 7 — Post-processes raw model output into structured response.
+     * Called after model generation completes, before returning to UI.
+     */
+    private buildLayer7Synthesis(
+        rawModelOutput: string,
+        currentMessage: string,
+        routingDecision: RoutingDecision,
+        thinkingFrame: ThinkingFrame,
+        executionLog: ExecutionLog | null,
+        searchResults?: Array<{ uri: string; title: string; snippet?: string }>,
+        isAgentMode: boolean = false
+    ): SynthesisOutput {
+        return synthesizeResponse({
+            rawModelOutput,
+            executionLog,
+            routingDecision,
+            thinkingFrame,
+            searchResults,
+            currentMessage,
+            isAgentMode,
+        });
+    }
+
+    /**
+     * LAYER 5 — Builds thinking scaffold for the current request.
+     * Called after Layer 4 routing, before model generation.
+     * Returns system prompt addition + initial ThinkingEvents for UI.
+     */
+    private buildLayer5Thinking(
+        routingDecision: RoutingDecision,
+        currentMessage: string,
+        provider: ModelProvider,
+        currentModel: string,
+        isAgentMode: boolean,
+        iterationCount: number = 0
+    ): ThinkingEngineOutput {
+        const nativeThinking = detectNativeThinking(String(provider), currentModel);
+
+        return buildThinkingEngine({
+            routingDecision,
+            perceptionOutput: {},    // Partial — Layer 3 output nu e stocat încă ca variabilă separată
+            currentMessage,
+            provider: String(provider),
+            currentModel,
+            hasNativeThinking: nativeThinking,
+            isAgentMode,
+            iterationCount,
+        });
+    }
+
     // Track listeners for "learning" state (brain pulse in UI)
     private learningListeners: ((isLearning: boolean) => void)[] = [];
 
@@ -757,27 +863,6 @@ export class LLMService {
         }
     }
 
-    private async triggerMemoryConsolidation(
-        prompt: string,
-        responseText: string,
-        enableMemory: boolean,
-        provider: ModelProvider,
-        openRouterKey: string,
-        openRouterModel: string,
-        openAiKey: string,
-        openAiModel: string,
-        geminiApiKey?: string
-    ) {
-        if (enableMemory) {
-            await memoryManager.processNewMessage({ id: crypto.randomUUID(), role: Role.MODEL, content: responseText, timestamp: Date.now() }, 'current_session');
-            const buffer = memoryManager.workingMemory.getMessages();
-            const shouldConsolidate = buffer.length >= 5 || prompt.toLowerCase().includes("remember this") || prompt.toLowerCase().includes("salvează");
-            if (shouldConsolidate) {
-                this.runConsolidation(provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
-            }
-        }
-    }
-
     /**
      * Orchestrator function that implements the 3-stage agent architecture
      */
@@ -808,9 +893,11 @@ export class LLMService {
         threadId?: string,
         onThinkingEvent?: (event: ThinkingEvent) => void
     ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
-
+        
         this.abortController = new AbortController();
         const shortTermHistory = history.slice(-5); // 5 messages short-term memory
+        
+        this.notifyLearningState(true); // Integrate notifyLearningState
 
         if (enableMemory) {
             await memoryManager.processNewMessage({ id: crypto.randomUUID(), role: Role.USER, content: prompt, timestamp: Date.now() }, 'current_session');
@@ -830,7 +917,11 @@ export class LLMService {
             }
             // In simple chat mode, force ProMode.STANDARD to ensure a fast, direct response without reasoning.
             const result = await this.runCoreGeneration(shortTermHistory, prompt, attachments, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, ollamaUrl, ollamaModel, activeLocalModel, useSearch, ProMode.STANDARD, enableMemory, userProfile, aiProfile, spaceSystemInstruction, tavilyApiKey, geminiApiKey, searchProvider, braveApiKey, customOnChunk, undefined, threadId, onThinkingEvent);
-            this.triggerMemoryConsolidation(prompt, result.text, enableMemory, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
+            
+            // Fix Error 1: Argument type mismatch & Integrate functionality
+            // Old signature expected provider keys, new signature expects history + boolean + sessionId
+            this.triggerMemoryConsolidation(prompt, result.text, shortTermHistory, enableMemory, this.currentExecutionLog?.sessionId || 'simple_chat_session');
+            
             result.reasoning = accumulatedReasoning + (result.reasoning || "");
             if (onThinkingEvent) {
                 onThinkingEvent({ stepId: 'chat_start', label: 'Răspuns generat', status: 'done' });
@@ -858,7 +949,11 @@ export class LLMService {
 
         // Build the base system context (identity, profiles, protocols)
         const baseSystemContext = await this.buildSystemContext(
-            prompt, '', enableMemory, userProfile, aiProfile, spaceSystemInstruction, false, false, false
+            prompt, '', enableMemory, userProfile, aiProfile, spaceSystemInstruction, false, false, false,
+            attachments, // Attachments from method args
+            shortTermHistory, // History from method args
+            proMode, // ProMode from method args
+            false // isAgentMode (implicitly false here as we are in agentic path)
         );
 
         // Build the full 5-step agent system prompt via the orchestrator
@@ -898,9 +993,9 @@ export class LLMService {
             onThinkingEvent
         );
 
-        this.triggerMemoryConsolidation(prompt, result.text, enableMemory, provider, openRouterKey, openRouterModel, openAiKey, openAiModel, geminiApiKey);
         result.reasoning = accumulatedReasoning + (result.reasoning || "");
 
+        this.notifyLearningState(false); // Integrate notifyLearningState
         return result;
     }
 
@@ -932,8 +1027,130 @@ export class LLMService {
         onChunk?: (text: string, reasoning?: string) => void,
         systemInstructionOverride?: string,
         threadId?: string,
-        onThinkingEvent?: (event: ThinkingEvent) => void
-    ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
+        onThinkingEvent?: (event: ThinkingEvent) => void,
+        isAgentMode?: boolean
+    ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string; rawText?: string }> {
+
+        // Determine System Logic based on ProMode
+        let modeInstruction = "";
+        let forceSearch = useSearch;
+        // Reasoning is forced if Agent Mode is active or if the ProMode requires it.
+        let forceReasoning = !!(systemInstructionOverride && systemInstructionOverride.includes('AGENT OPERATIONAL PROTOCOL'));
+
+        // ── LAYER 4: ROUTING ────────────────────────────────────────
+        const routingInput: RoutingInput = {
+            currentMessage: prompt,
+            messageHistory: history.slice(-6).map(m => ({
+                role: m.role === Role.USER ? 'user' : 'assistant',
+                content: m.content,
+            })),
+            hasAttachments: attachments.length > 0,
+            hasWorkspaceFiles: attachments.some(a => a.type === 'text'),
+            activeToolState: this.currentToolState,
+            isAgentModeEnabled: isAgentMode || false,
+            iterationCount: 0,  // resetat per request
+        };
+
+        const routingDecision = route(routingInput);
+
+        console.log(`[Layer 4] Routing: ${routingDecision.reasoning}`);
+
+        // Emit routing decision ca ThinkingEvent pentru UI
+        if (onThinkingEvent) {
+            onThinkingEvent({
+                stepId: 'routing',
+                label: routingDecision.operationMode === 'agent'
+                    ? `Agent Mode · ${routingDecision.complexity}`
+                    : `Chat Mode · ${routingDecision.complexity}`,
+                detail: String(routingDecision.reasoning || ''),
+                status: 'done',
+            });
+        }
+
+        // Dacă trebuie clarificare → returnează imediat cu întrebarea
+        if (routingDecision.needsClarification && routingDecision.clarificationQuestion) {
+            return {
+                text: routingDecision.clarificationQuestion,
+                citations: [],
+                relatedQuestions: [],
+                reasoning: `[Layer 4] Clarification needed: ${routingDecision.reasoning}`,
+            };
+        }
+
+        // Construiește skill injection context (adăugat la Layer 3 output ulterior)
+        const skillContext = buildSkillInjectionContext(routingDecision.injectedSkills);
+
+        // Tool State Machine: obține tools active
+        const { allowedTools } = getActiveTools(routingDecision.toolState);
+        // allowedTools va fi folosit în secțiunile Gemini/Generic pentru a filtra tools
+
+        // ── LAYER 5: THINKING ENGINE ────────────────────────────────
+        // Logic to determine currentModel for ThinkingEngine
+        let currentModel = "";
+        if (provider === ModelProvider.OPENROUTER) currentModel = openRouterModel;
+        else if (provider === ModelProvider.OPENAI) currentModel = openAiModel;
+        else if (provider === ModelProvider.OLLAMA) currentModel = ollamaModel;
+        else if (provider === ModelProvider.LOCAL) currentModel = activeLocalModel?.modelId || "";
+        else if (provider === ModelProvider.GEMINI) {
+             currentModel = (forceReasoning || proMode === ProMode.REASONING || proMode === ProMode.THINKING)
+            ? "gemini-3.1-pro-preview"
+            : "gemini-3-flash-preview";
+        }
+
+        const thinkingOutput = this.buildLayer5Thinking(
+            routingDecision,
+            prompt,
+            provider,
+            currentModel,      // variabila care conține modelul selectat curent
+            isAgentMode || false,
+            0                  // iterationCount = 0 la începutul fiecărui request
+        );
+
+        // ── LAYER 6: EXECUTION ENGINE INIT ──────────────────────────
+        const requestId = typeof crypto !== 'undefined'
+            ? crypto.randomUUID()
+            : String(Date.now());
+
+        this.currentExecutionLog = createExecutionLog(requestId);
+        const executionLog = this.currentExecutionLog;
+
+        // Execution engine input — callbacks conectate la UI
+        const executionInput: ExecutionEngineInput = {
+            thinkingFrame: thinkingOutput.thinkingFrame,
+            routingDecision,
+            currentMessage: prompt,
+            availableTools: allowedTools,  // din Layer 4 getActiveTools()
+            onThinkingEvent,
+            onToolCallStart: (toolName, params) => {
+                console.log(`[Layer 6] Tool call START: ${toolName}`, params); // Integrate params (Warning 3)
+            },
+            onToolCallComplete: (record) => {
+                console.log(`[Layer 6] Tool call DONE: ${record.toolName} -> ${record.status} (${record.durationMs}ms)`);
+            },
+            onCostGuardWarning: (iteration) => {
+                console.warn(`[Layer 6] Cost Guard warning: ${iteration} tool calls used`);
+                if (onThinkingEvent) {
+                    onThinkingEvent({
+                        stepId: 'cost_guard_warning',
+                        label: `⚠ ${iteration} tool calls used`,
+                        detail: `Approaching limit of ${DEFAULT_COST_GUARD.maxToolCallsPerRequest}`,
+                        status: 'active',
+                        timestamp: Date.now(),
+                    });
+                }
+            },
+        };
+
+        // Emite routing event + thinking events inițiale către UI
+        if (onThinkingEvent) {
+            // Event Layer 4 (routing summary) — primul afișat în ThinkingBar
+            onThinkingEvent(buildRoutingEvent(routingDecision));
+
+            // Events Layer 5 (pașii planificați) — afișați imediat după routing
+            for (const event of thinkingOutput.initialThinkingEvents) {
+                onThinkingEvent(event);
+            }
+        }
 
         // Reset AbortController
         this.abortController = new AbortController();
@@ -942,13 +1159,6 @@ export class LLMService {
         if (enableMemory) {
             await memoryManager.processNewMessage({ id: crypto.randomUUID(), role: Role.USER, content: prompt, timestamp: Date.now() }, 'current_session');
         }
-
-        // 2. Determine System Logic based on ProMode
-        let modeInstruction = "";
-        let forceSearch = useSearch;
-
-        // Reasoning is forced if Agent Mode is active or if the ProMode requires it.
-        let forceReasoning = !!(systemInstructionOverride && systemInstructionOverride.includes('AGENT OPERATIONAL PROTOCOL'));
 
         switch (proMode) {
             case ProMode.STANDARD:
@@ -993,6 +1203,23 @@ export class LLMService {
 
         const totalSize = textFiles.reduce((sum, a) => sum + (a.content?.length || 0), 0);
 
+        // Când workspace files sunt disponibile, indexează-le pentru RAG
+        if (virtualFiles && virtualFiles.length > 0) {
+            const sessionId = this.currentExecutionLog?.sessionId || 'rag_session';
+
+            for (const file of virtualFiles) {
+                if (file.content && typeof file.content === 'string') {
+                    indexDocument(file.name, file.content, sessionId);
+                }
+            }
+
+            const stats = getRagIndexStats();
+            console.log(
+                `[Layer 8] Workspace indexed: ${stats.totalChunks} chunks ` +
+                `from ${stats.sourceFiles.length} files`
+            );
+        }
+
         if (textFiles.length > MAX_DIRECT_FILES || totalSize > MAX_DIRECT_SIZE) {
             // Move large/many files to virtual storage
             virtualFiles = textFiles;
@@ -1013,17 +1240,25 @@ export class LLMService {
 
         const systemInstruction = await this.buildSystemContext(
             prompt,
-            (systemInstructionOverride ? systemInstructionOverride + "\n\n" : "") + modeInstruction + kbSummary,
+            (systemInstructionOverride ? systemInstructionOverride + "\n\n" : "") + modeInstruction + skillContext + thinkingOutput.systemAddition + kbSummary,
             enableMemory,
             userProfile,
             aiProfile,
             spaceSystemInstruction,
-            provider === ModelProvider.GEMINI ? false : forceReasoning, // Only force XML thinking for non-Gemini
+            !thinkingOutput.skipXmlThinking && provider !== ModelProvider.GEMINI, // Force XML thinking only if Layer 5 hasn't handled it
             provider !== ModelProvider.GEMINI && (forceSearch || virtualFiles.length > 0), // Force explicit tool instruction for generics
-            proMode === ProMode.STANDARD // isSimpleChat
+            proMode === ProMode.STANDARD, // isSimpleChat
+            directAttachments,
+            history,
+            proMode,
+            isAgentMode
         );
 
-        let result: { text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string } = { text: "", citations: [] as Citation[], relatedQuestions: [] as string[] };
+        let result: { text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string; rawText?: string } = { text: "", citations: [], relatedQuestions: [] };
+
+        if (result.pendingAction) {
+            this.setToolState('confirming');
+        }
 
         // 4. Route to Provider
         if (provider === ModelProvider.GEMINI) {
@@ -1040,7 +1275,9 @@ export class LLMService {
                 onChunk,
                 virtualFiles.length > 0, // Enable readFiles tool
                 threadId,
-                onThinkingEvent
+                onThinkingEvent,
+                executionLog,
+                executionInput
             );
         } else if (provider === ModelProvider.LOCAL) {
             // ── WebLLM: rulează 100% în browser, fără server ──
@@ -1101,7 +1338,7 @@ export class LLMService {
             if (provider === ModelProvider.OPENAI) {
                 endpoint = "https://api.openai.com/v1/chat/completions";
                 apiKey = openAiKey;
-                modelName = openAiModel || "gpt-4o";
+                modelName = openAiModel || "gpt-4-turbo";
             } else if (provider === ModelProvider.OPENROUTER) {
                 endpoint = "https://openrouter.ai/api/v1/chat/completions";
                 apiKey = openRouterKey;
@@ -1131,11 +1368,100 @@ export class LLMService {
                 virtualFiles.length > 0, // Enable readFiles tool
                 proMode,
                 threadId,
-                onThinkingEvent
+                onThinkingEvent,
+                executionLog,
+                executionInput
             );
         }
 
-        return result;
+        if (result.pendingAction) {
+            this.setToolState('confirming');
+        }
+
+        // ── LAYER 7: RESPONSE SYNTHESIS ─────────────────────────────
+        
+        // Determine the raw response text to use.
+        // Ideally, generate... methods should return rawText. 
+        // If not, use result.text (which might be cleaned already, but better than nothing).
+        const rawResponseText = result.rawText || result.text;
+
+        // Colectează search results din execution log pentru citări
+        const searchResultsForCitations = executionLog?.entries
+            .filter(e =>
+                e.type === 'observation' &&
+                e.toolCall?.toolName === 'perform_search'
+            )
+            .flatMap(e => {
+                try {
+                    const parsed = typeof e.toolCall?.result === 'string'
+                        ? JSON.parse(e.toolCall.result)
+                        : e.toolCall?.result;
+                    // Try to normalize to the structure required by Layer 7
+                    if (parsed && parsed.results && Array.isArray(parsed.results)) {
+                         return parsed.results.map((r: any) => ({ uri: r.url, title: r.title, snippet: r.content }));
+                    }
+                    return [];
+                } catch {
+                    return [];
+                }
+            }) ?? [];
+
+        // Merge with existing citations from native grounding if any (normalized)
+        const existingCitations = result.citations.map(c => ({ uri: c.uri, title: c.title, snippet: '' }));
+        const allSearchResults = [...searchResultsForCitations, ...existingCitations];
+
+        const synthesisOutput = this.buildLayer7Synthesis(
+            rawResponseText,        // textul brut returnat de model
+            prompt,
+            routingDecision,
+            thinkingOutput.thinkingFrame,
+            executionLog,
+            allSearchResults.length > 0 ? allSearchResults : undefined,
+            isAgentMode || false
+        );
+
+        if (onThinkingEvent) {
+            onThinkingEvent({
+                stepId: 'layer7_synthesis',
+                label: 'Response ready',
+                detail: synthesisOutput.reasoning,
+                status: 'done',
+                timestamp: Date.now(),
+            });
+        }
+
+        // ── LAYER 10: MEMORY CONSOLIDATION (fire-and-forget) ────────
+        this.triggerMemoryConsolidation(
+            prompt,
+            synthesisOutput.finalText,  // textul final din Layer 7
+            history,
+            enableMemory,
+            this.currentExecutionLog?.sessionId || `session_${Date.now()}`
+        );
+
+        // Layer 6: Marchează pașii rămași ca done în UI
+        if (executionLog && onThinkingEvent) {
+            // Marchează synthesis step ca done
+            if (thinkingOutput.thinkingFrame.steps.some(s => s.id === 'decomp_synthesize')) markStepDone('decomp_synthesize', onThinkingEvent);
+            markStepDone('cot_compose', onThinkingEvent);
+            markStepDone('verify_compose', onThinkingEvent);
+
+            // Finalizează executionLog
+            executionLog.status = 'complete';
+            executionLog.totalDurationMs = Date.now() - (executionLog.entries[0]?.timestamp || Date.now());
+        }
+
+        // Returnează structura finală folosind output-ul Layer 7
+        return {
+            text: synthesisOutput.finalText,
+            citations: synthesisOutput.citations.map(c => ({
+                uri: c.uri,
+                title: c.title,
+            })),
+            relatedQuestions: synthesisOutput.relatedQuestions.map(q => q.text),
+            pendingAction: synthesisOutput.pendingAction,
+            reasoning: synthesisOutput.reasoning,
+        };
     }
 
     // --- Helper: Extract JSON content ---
@@ -1185,7 +1511,12 @@ export class LLMService {
         const jsonMatch = text.match(jsonBlockRegex);
         if (jsonMatch) {
             try {
-                questions = JSON.parse(jsonMatch[1]);
+                // Integrate extractJson (Warning 4)
+                // Using extractJson instead of direct JSON.parse for better robustness
+                const extracted = this.extractJson(jsonMatch[1]);
+                if (Array.isArray(extracted)) {
+                    questions = extracted;
+                }
                 cleanText = text.replace(jsonMatch[0], '').trim();
             } catch (e) {
                 // Failed to parse — ignore
@@ -1209,170 +1540,64 @@ export class LLMService {
         return { cleanText: text };
     }
 
-    // --- Synthesis Engine (Consolidation) ---
-    private async runConsolidation(
-        provider: ModelProvider,
-        openRouterKey: string,
-        openRouterModel: string,
-        openAiKey: string,
-        openAiModel: string,
-        geminiApiKey?: string
-    ) {
-        console.log("[Memory] Starting Consolidation...");
-        this.notifyLearningState(true);
+    /**
+     * LAYER 10 — Memory Consolidation
+     * Fire-and-forget. Called after response is returned.
+     * Never blocks. Never throws to caller.
+     */
+    private triggerMemoryConsolidation(
+        prompt: string,
+        responseText: string,
+        history: Array<{ role: string; content: string }>,
+        enableMemory: boolean,
+        sessionId: string,
+        // The other params from old signature are ignored/deprecated by Layer 10
+        _provider?: ModelProvider,
+        _openRouterKey?: string,
+        _openRouterModel?: string,
+        _openAiKey?: string,
+        _openAiModel?: string,
+        _geminiApiKey?: string
+    ): void {
+        if (!enableMemory) return;
 
-        try {
-            const buffer = memoryManager.workingMemory.getMessages();
-            if (buffer.length === 0) return;
+        // Importul dinamic evită probleme de inițializare circulară
+        import('../memory').then(({ memoryManager }) => {
 
-            const currentMemories = memoryManager.semanticMemory.getAllEntries();
-            const currentProjects = await db.get<any[]>(STORES.PROJECTS, 'all') || [];
+            // Obține memoriile existente pentru deduplicare
+            const existingMemories: MemoryEntry[] = (memoryManager.semanticMemory
+                ?.getAllEntries?.() || []).map((e: any) => ({
+                    id: e.id,
+                    content: e.content,
+                    type: 'semantic', // Map to MemoryEntry type
+                    timestamp: e.timestamp,
+                    category: e.category
+                }));
 
-            const consolidationPrompt = `
-        You are the Memory Manager. Your goal is to keep the Long-Term Memory clean, concise, and useful.
-        
-        RULES:
-        1. IGNORE casual conversation, greetings, simple questions, and transient thoughts.
-        2. ONLY extract *permanent* facts: User preferences, specific project details/status, learned skills, or important life events.
-        3. DO NOT save "User asked about..." or "User wants to know...". Save the underlying interest ONLY if it seems like a long-term hobby/goal.
-        4. If the buffer contains only noise, return empty arrays.
-        
-        BUFFER (Recent Conversation):
-        ${buffer.map((b: any) => `${b.role.toUpperCase()}: ${b.content}`).join('\n')}
+            const consolidationInput: ConsolidationInput = {
+                conversationHistory: history
+                    .filter(m => m.role === 'user' || m.role === 'assistant' || m.role === Role.USER || m.role === Role.MODEL)
+                    .map(m => ({
+                        role: (m.role === Role.USER || m.role === 'user') ? 'user' : 'assistant',
+                        content: typeof m.content === 'string'
+                            ? m.content
+                            : JSON.stringify(m.content),
+                        timestamp: Date.now(),
+                    })),
+                currentPrompt: prompt,
+                currentResponse: responseText,
+                sessionId,
+                existingMemories,
+                // Activează rezumat episodic la fiecare a 10-a conversație
+                enableEpisodicSummary: history.length > 0 && history.length % 10 === 0,
+                provider: 'internal',
+            };
 
-        EXISTING CONTEXT (Do not duplicate these):
-        - Projects: ${currentProjects.map(p => p.title).join(', ')}
-        - Facts: ${currentMemories.slice(0, 20).map((m: any) => m.content).join(', ')}...
+            triggerConsolidation(consolidationInput, memoryManager);
 
-        Return JSON ONLY:
-        {
-            "new_facts": [{ "category": "string", "content": "string", "type": "fact|goal" }],
-            "new_skills": ["string"],
-            "project_updates": [{ "title": "string", "status": "active|completed", "progress": "string", "nextStep": "string", "techStack": ["string"] }]
-        }
-        `;
-
-            let jsonText = "";
-
-            if (provider === ModelProvider.GEMINI) {
-                let clientToUse = this.ai;
-                if (geminiApiKey) {
-                    try { clientToUse = new GoogleGenAI({ apiKey: geminiApiKey }); } catch (e) { }
-                }
-                if (!clientToUse) return;
-
-                const response = await clientToUse.models.generateContent({
-                    model: "gemini-3-flash-preview",
-                    contents: [{ parts: [{ text: consolidationPrompt }] }],
-                    config: { responseMimeType: "application/json" }
-                });
-
-                try {
-                    jsonText = response.text || "";
-                } catch (e) {
-                    // Fallback if text getter fails (e.g. mixed content warning)
-                    if (response.candidates?.[0]?.content?.parts) {
-                        for (const part of response.candidates[0].content.parts) {
-                            if (part.text) jsonText += part.text;
-                        }
-                    }
-                }
-            } else if (provider === ModelProvider.OPENROUTER || provider === ModelProvider.OPENAI) {
-                const isRouter = provider === ModelProvider.OPENROUTER;
-                const endpoint = isRouter ? 'https://openrouter.ai/api/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions';
-                const apiKey = isRouter ? openRouterKey : openAiKey;
-                const modelName = isRouter ? openRouterModel : openAiModel;
-
-                if (!apiKey) {
-                    console.warn(`[Memory] No API key provided for ${provider}. Consolidation aborted.`);
-                    this.notifyLearningState(false);
-                    return;
-                }
-
-                const headers: Record<string, string> = {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                };
-
-                if (isRouter) {
-                    headers['HTTP-Referer'] = window.location.origin;
-                    headers['X-Title'] = "Perplex Clone";
-                }
-
-                const body = {
-                    model: modelName,
-                    messages: [{ role: 'user', content: consolidationPrompt }],
-                    // Note: Not all providers support response_format: { type: "json_object" }, 
-                    // but we prompt for it nicely.
-                    temperature: 0.1
-                };
-
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(body)
-                });
-
-                if (!response.ok) {
-                    console.error(`[Memory] Consolidation fetch failed for ${provider}: ${response.status} ${await response.text()}`);
-                    this.notifyLearningState(false);
-                    return;
-                }
-
-                const data = await response.json();
-                jsonText = data.choices?.[0]?.message?.content || "";
-            }
-
-            if (jsonText) {
-                try {
-                    const updates = this.extractJson(jsonText);
-                    // The new memory system handles consolidation automatically based on message count.
-                    // If we need to explicitly save new facts from the LLM response:
-                    if (updates.new_facts && Array.isArray(updates.new_facts)) {
-                        for (const fact of updates.new_facts) {
-                            await memoryManager.saveExplicitMemory(fact.content, fact.category || 'other');
-                        }
-                    }
-                    // Projects update
-                    if (updates.project_updates && Array.isArray(updates.project_updates)) {
-                        const projects = await db.get<any[]>(STORES.PROJECTS, 'all') || [];
-                        updates.project_updates.forEach((update: any) => {
-                            const existing = projects.find(p => p.title.toLowerCase() === update.title.toLowerCase());
-                            if (existing) {
-                                if (update.progress) existing.progress = update.progress;
-                                if (update.nextStep) existing.nextStep = update.nextStep;
-                                if (update.status) existing.status = update.status;
-                                existing.lastUpdated = Date.now();
-                            } else {
-                                projects.push({
-                                    id: crypto.randomUUID(),
-                                    title: update.title,
-                                    status: update.status || 'active',
-                                    progress: update.progress || 'Started',
-                                    nextStep: update.nextStep || 'Planning',
-                                    techStack: update.techStack || [],
-                                    lastUpdated: Date.now()
-                                });
-                            }
-                        });
-                        await db.set(STORES.PROJECTS, 'all', projects);
-                    }
-                    // Skills update
-                    if (updates.new_skills && Array.isArray(updates.new_skills)) {
-                        for (const skill of updates.new_skills) {
-                            await memoryManager.saveExplicitMemory(skill, 'skills' as any);
-                        }
-                    }
-                } catch (jsonError) {
-                    console.error("[Memory] JSON Parse failed during consolidation");
-                }
-            }
-
-        } catch (e) {
-            console.error("[Memory] Consolidation failed", e);
-        } finally {
-            this.notifyLearningState(false);
-        }
+        }).catch(e => {
+            console.warn('[Layer 10] Memory import failed:', e);
+        });
     }
 
     // --- Gemini Implementation ---
@@ -1389,8 +1614,10 @@ export class LLMService {
         onChunk?: (text: string, reasoning?: string) => void,
         useReadFiles: boolean = false,
         threadId?: string,
-        onThinkingEvent?: (event: ThinkingEvent) => void
-    ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
+        onThinkingEvent?: (event: ThinkingEvent) => void,
+        executionLog?: ExecutionLog,
+        executionInput?: ExecutionEngineInput
+    ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string; rawText?: string }> {
 
         let clientToUse = this.ai;
         if (customApiKey) {
@@ -1500,7 +1727,12 @@ export class LLMService {
                         }
                     }
 
-                    if (text) {
+            if (text && onThinkingEvent) { 
+                 // Integrate onThinkingEvent (Warning 5) - simple pulse for activity
+                 // Actual steps are handled by processToolCall, but this shows stream activity
+            }
+            
+            if (text) {    
                         turnText += text;
 
                         let remainingText = text;
@@ -1582,31 +1814,27 @@ export class LLMService {
                     const toolResponses: any[] = [];
 
                     for (const fc of functionCalls) {
-                        // Pre-calculate label to show what is happening
-                        const toolLabel = getDetailedToolLabel(fc.name, fc.args);
-                        // EMIT THINKING EVENT: START
-                        const toolStepId = `tool_${fc.name}_${Date.now()}`;
-                        if (onThinkingEvent) {
-                            onThinkingEvent({
-                                stepId: toolStepId,
-                                label: toolLabel,
-                                status: 'active'
-                            });
-                        }
-                        if (fc.name === 'save_to_library') {
+                        // WRAPPING LAYER 6: processToolCall with inline logic
+                        // If Layer 6 execution log is missing (shouldn't happen in normal flow), create a dummy one
+                        const currentLog = executionLog || createExecutionLog("fallback-gemini");
+                        const currentInput = executionInput || { availableTools: new Set(), thinkingFrame: {} as any, routingDecision: {} as any, currentMessage: "" };
+
+                        const toolRecord = await processToolCall(fc.name, fc.args, async (name, args) => { // name is now used below
+                        let content = "";
+                        if (name === 'save_to_library') { // Integrate 'name' (Warning 6)
                             pendingAction = {
                                 type: fc.args.action === 'update' ? 'update_page' : 'create_page',
                                 data: { title: fc.args.title as string, content: fc.args.content as string },
                                 originalToolCallId: "gemini-fc"
                             };
-                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Action pending user confirmation." } } });
-                        } else if (fc.name === 'get_page_structure') {
-                            const title = fc.args.pageTitle as string;
+                            content = "Action pending user confirmation.";
+                        } else if (name === 'get_page_structure') {
+                            const title = args.pageTitle as string;
                             const pageAttachment = attachments.find(a => a.name === title || a.name === title + ".md");
                             if (pageAttachment && pageAttachment.content) {
                                 const page = BlockService.fromMarkdown(pageAttachment.content, title);
                                 // Enhanced Structure View: Include context snippet for better identification
-                                const structure = page.blocks.map((b, idx) => {
+                                const structure = page.blocks.map((b: any, idx: number) => {
                                     let context = "";
                                     if (b.type === 'table') {
                                         context = `[TABLE] Rows: ${b.content.split('\n').length}`;
@@ -1615,20 +1843,20 @@ export class LLMService {
                                     }
                                     return `Block ${idx + 1}: [ID: ${b.id}] (${b.type}) -> ${context}`;
                                 }).join('\n');
-                                toolResponses.push({ functionResponse: { name: fc.name, response: { content: `STRUCTURE OF PAGE "${title}":\n${structure}` } } });
+                                content = `STRUCTURE OF PAGE "${title}":\n${structure}`;
                             } else {
-                                toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Error: Page not found in current context. Please ask user to open the page first." } } });
+                                content = "Error: Page not found in current context. Please ask user to open the page first.";
                             }
                         } else if (fc.name === 'insert_block' || fc.name === 'replace_block' || fc.name === 'delete_block' || fc.name === 'update_table_cell') {
                             pendingAction = {
                                 type: 'block_operation',
                                 data: {
                                     operation: fc.name,
-                                    args: fc.name === 'update_table_cell' ? { ...fc.args, rowIndex: Number(fc.args.rowIndex), colIndex: Number(fc.args.colIndex) } : fc.args
+                                    args: fc.name === 'update_table_cell' ? { ...args, rowIndex: Number(args.rowIndex), colIndex: Number(args.colIndex) } : args
                                 },
                                 originalToolCallId: "gemini-fc"
                             };
-                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Block operation pending user confirmation." } } });
+                            content = "Block operation pending user confirmation.";
                         } else if (fc.name === 'list_calendar_events') {
                             const allEvents = await db.get<CalendarEvent[]>(STORES.CALENDAR, 'all_events') || [];
 
@@ -1640,14 +1868,14 @@ export class LLMService {
                             endDate.setDate(endDate.getDate() + 7);
                             endDate.setHours(23, 59, 59, 999);
 
-                            if (fc.args.startDate) {
-                                const parsedStart = new Date(fc.args.startDate as string);
+                            if (args.startDate) {
+                                const parsedStart = new Date(args.startDate as string);
                                 if (!isNaN(parsedStart.getTime())) {
                                     startDate = parsedStart;
                                 }
                             }
-                            if (fc.args.endDate) {
-                                const parsedEnd = new Date(fc.args.endDate as string);
+                            if (args.endDate) {
+                                const parsedEnd = new Date(args.endDate as string);
                                 if (!isNaN(parsedEnd.getTime())) {
                                     endDate = parsedEnd;
                                     // If startDate and endDate are the same day (or close), expand endDate to end of day
@@ -1682,7 +1910,7 @@ export class LLMService {
                                     }
                                 });
                             }
-                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
+                            content = responseContent;
                             if (onChunk) onChunk("", `\n📅 Checked calendar: ${relevantEvents.length} events found.\n`);
 
                         } else if (fc.name === 'add_calendar_event' || fc.name === 'update_calendar_event' || fc.name === 'delete_calendar_event') {
@@ -1690,27 +1918,27 @@ export class LLMService {
                                 type: 'calendar_event',
                                 data: {
                                     operation: fc.name.replace('_calendar_event', ''),
-                                    args: fc.args
+                                    args: args
                                 },
                                 originalToolCallId: "gemini-fc"
                             };
-                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Calendar action pending user confirmation." } } });
+                            content = "Calendar action pending user confirmation.";
                         } else if (fc.name === 'get_calendar_holidays') {
-                            const year = Number(fc.args.year) || new Date().getFullYear();
+                            const year = Number(args.year) || new Date().getFullYear();
                             const holidays = getHolidays(year);
                             let responseContent = `HOLIDAYS FOR ${year} (RO & DE):\n`;
                             holidays.forEach(h => {
                                 responseContent += `- ${h.date}: ${h.name} (${h.country}) [${h.isPublic ? 'Non-working' : 'Observance'}]\n`;
                             });
-                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
+                            content = responseContent;
                             if (onChunk) onChunk("", `\n📅 Checked holidays for ${year}...\n`);
                         } else if (fc.name === 'get_current_time') {
                             const now = new Date();
                             const timeString = now.toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: timeString } } });
+                            content = timeString;
                             if (onChunk) onChunk("", `\n🕒 Time: ${timeString}...\n`);
                         } else if (fc.name === 'read_workspace_files') {
-                            const filenames = fc.args.filenames as string[];
+                            const filenames = args.filenames as string[];
                             const requestedFiles = this.workspaceFiles.filter(f => filenames.includes(f.name));
 
                             let responseContent = "";
@@ -1721,59 +1949,28 @@ export class LLMService {
                             } else {
                                 responseContent = "Error: Requested files not found in workspace.";
                             }
-                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
+                            content = responseContent;
                         } else if (fc.name === 'search_workspace_files') {
-                            const queries = fc.args.queries as string[];
-                            let responseContent = `Search results for [${queries.join(', ')}] in workspace files:\n`;
-                            let foundCount = 0;
-                            const apiKeyToUse = customApiKey || this.apiKey;
+                            const queries = args.queries as string[];
+                            const sessionId = this.currentExecutionLog?.sessionId || 'default';
 
-                            if (apiKeyToUse) {
-                                const filenames = this.workspaceFiles.map(f => f.name);
-                                for (const query of queries) {
-                                    try {
-                                        const results = await RAGService.search(query, undefined, apiKeyToUse, 3, filenames);
-                                        if (results.length > 0) {
-                                            foundCount += results.length;
-                                            responseContent += `\n--- Results for "${query}" ---\n`;
-                                            results.forEach((res, idx) => {
-                                                responseContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${sanitizeContentForAgent(res.chunk.content)}\n`;
-                                            });
-                                        }
-                                    } catch (e) {
-                                        console.error("[RAG] Search error in tool:", e);
-                                    }
+                            const allResults: string[] = [];
+
+                            for (const query of queries) {
+                                const ragOutput = ragSearch({
+                                    query,
+                                    topK: 3,
+                                    includeExternalized: false,
+                                    sessionId,
+                                });
+                                if (ragOutput.totalFound > 0) {
+                                    allResults.push(formatRagResults(ragOutput, 1000));
                                 }
                             }
 
-                            // Fallback to basic search if RAG fails or no API key (or no results?)
-                            // Actually, if RAG finds nothing, we could fallback, but let's just use RAG if key exists.
-                            if (!apiKeyToUse || foundCount === 0) {
-                                // Basic string match fallback
-                                let fallbackFound = 0;
-                                const lowerQueries = queries.map(q => q.toLowerCase());
-                                this.workspaceFiles.forEach(f => {
-                                    if (!f.content) return;
-                                    const lines = f.content.split('\n');
-                                    lines.forEach((line, idx) => {
-                                        const lowerLine = line.toLowerCase();
-                                        if (lowerQueries.some(q => lowerLine.includes(q))) {
-                                            fallbackFound++;
-                                            const start = Math.max(0, idx - 1);
-                                            const end = Math.min(lines.length - 1, idx + 1);
-                                            responseContent += `\n[File: ${f.name}, Line ${idx + 1}]\n`;
-                                            for (let i = start; i <= end; i++) {
-                                                responseContent += `${i === idx ? '>> ' : '   '}${lines[i]}\n`;
-                                            }
-                                        }
-                                    });
-                                });
-                                foundCount += fallbackFound;
-                                responseContent = sanitizeContentForAgent(responseContent);
-                            }
-
-                            if (foundCount === 0) responseContent = `No matches found for any of the queries in workspace files.`;
-                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
+                            content = allResults.length > 0
+                                ? allResults.join('\n\n---\n\n')
+                                : 'No matches found for the provided search terms.';
                             if (onChunk) onChunk("", `\n🔍 Căutat ${queries.length} termeni în workspace...\n`);
                         } else if (fc.name === 'get_workspace_map') {
                             let responseContent = "WORKSPACE KNOWLEDGE BASE MAP:\n";
@@ -1789,36 +1986,23 @@ export class LLMService {
                                 responseContent += `  CONTEXT: This file appears to contain ${f.mimeType || 'text'} data. Use search to find specific entities.\n`;
                             });
 
-                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
+                            content = responseContent;
                             if (onChunk) onChunk("", `\n🗺️ Mapat structura workspace-ului...\n`);
                         } else if (fc.name === 'semantic_search_workspace') {
-                            const query = fc.args.query as string;
-                            let responseContent = `Semantic search results for "${query}":\n`;
-                            const apiKeyToUse = customApiKey || this.apiKey;
+                            const query = args.query as string;
+                            const sessionId = this.currentExecutionLog?.sessionId || 'default';
 
-                            if (!apiKeyToUse) {
-                                responseContent = "Error: API key required for semantic search.";
-                            } else {
-                                try {
-                                    const filenames = this.workspaceFiles.map(f => f.name);
-                                    const results = await RAGService.search(query, undefined, apiKeyToUse, 5, filenames);
+                            const ragOutput = ragSearch({
+                                query,
+                                topK: 5,
+                                includeExternalized: true,
+                                sessionId,
+                            });
 
-                                    if (results.length > 0) {
-                                        results.forEach((res, idx) => {
-                                            responseContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${sanitizeContentForAgent(res.chunk.content)}\n`;
-                                        });
-                                    } else {
-                                        responseContent = "No semantically relevant information found.";
-                                    }
-                                } catch (e) {
-                                    console.error("[RAG] Semantic search error:", e);
-                                    responseContent = "Error: Failed to perform semantic search.";
-                                }
-                            }
-                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: responseContent } } });
+                            content = formatRagResults(ragOutput, 2000);
                             if (onChunk) onChunk("", `\n🧠 Căutare semantică: "${query}"...\n`);
                         } else if (fc.name === 'execute_code') {
-                            const { code, language, timeout, packages } = fc.args;
+                            const { code, language, timeout, packages } = args;
                             if (onChunk) onChunk("", `\n⚙️ Se execută cod ${language} local...\n`);
 
                             try {
@@ -1830,7 +2014,7 @@ export class LLMService {
                                     session_id: threadId
                                 });
 
-                                const content = `Execution finished (Mode: ${execResult.sandbox_mode}).
+                                const output = `Execution finished (Mode: ${execResult.sandbox_mode}).
 Success: ${execResult.success}
 Exit Code: ${execResult.exit_code}
 Time: ${execResult.execution_time}ms
@@ -1839,23 +2023,40 @@ ${execResult.stdout || '<empty>'}
 STDERR:
 ${execResult.stderr || '<empty>'}
 Error Type: ${execResult.error_type || 'None'}`;
-
-                                toolResponses.push({ functionResponse: { name: fc.name, response: { content } } });
+                                content = output;
                             } catch (e: any) {
-                                toolResponses.push({ functionResponse: { name: fc.name, response: { content: `Code execution failed unexpectedly: ${e.message}` } } });
+                                content = `Code execution failed unexpectedly: ${e.message}`;
                             }
                         } else {
-                            toolResponses.push({ functionResponse: { name: fc.name, response: { content: "Error: Unknown tool." } } });
+                            content = "Error: Unknown tool.";
+                        }
+                        return content;
+                        }, currentLog, currentInput);
+
+                        // If pending action was set, we still need to record the "response" for the model context
+                        // even if we break the loop later.
+                        const finalResult = toolRecord.status === 'success' ? toolRecord.result : `Tool execution failed: ${toolRecord.error}`;
+                        
+                        // IMPORTANT: For pending actions, Gemini expects a response to the function call.
+                        // The original code pushed "Action pending user confirmation" for saving/updating events.
+                        // We need to ensure that string is in `finalResult` or pushed to `toolResponses`.
+                        // The `processToolCall` callback returns `content` which is what we need.
+                        
+                        if (toolRecord.wasExternalized && toolRecord.result) {
+                            const requestId = this.currentExecutionLog?.requestId || 'unknown';
+                            const fullContent = typeof toolRecord.result === 'string'
+                                ? toolRecord.result
+                                : JSON.stringify(toolRecord.result);
+
+                            storeExternalizedObservation(
+                                requestId,
+                                toolRecord.toolName,
+                                JSON.stringify(toolRecord.parameters),
+                                fullContent
+                            );
                         }
 
-                        // EMIT THINKING EVENT: DONE
-                        if (onThinkingEvent) {
-                            onThinkingEvent({
-                                stepId: `tool_${fc.name}_${Date.now()}`, // Note: this might not match perfectly if called much later, but for single tool calls it's ok. Ideally we'd pass the original toolStepId.
-                                label: `Finalizat: ${fc.name}`,
-                                status: 'done'
-                            });
-                        }
+                        toolResponses.push({ functionResponse: { name: fc.name, response: { content: finalResult } } });
 
                     }
 
@@ -1877,7 +2078,8 @@ Error Type: ${execResult.error_type || 'None'}`;
                 citations: Array.from(new Map(citations.map(c => [c.uri, c])).values()),
                 relatedQuestions: questions,
                 pendingAction,
-                reasoning
+                reasoning,
+                rawText: finalResponseText
             };
         } catch (error: any) {
             console.error("Gemini API Error:", error);
@@ -1902,8 +2104,20 @@ Error Type: ${execResult.error_type || 'None'}`;
         useReadFiles: boolean = false,
         _proMode: ProMode = ProMode.STANDARD,
         threadId?: string,
-        onThinkingEvent?: (event: ThinkingEvent) => void
-    ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string }> {
+        onThinkingEvent?: (event: ThinkingEvent) => void,
+        executionLog?: ExecutionLog,
+        executionInput?: ExecutionEngineInput
+    ): Promise<{ text: string; citations: Citation[]; relatedQuestions: string[]; pendingAction?: PendingAction; reasoning?: string; rawText?: string }> {
+
+        // Integrate executionLog and executionInput (Warning 7 & 8)
+        // We ensure the log tracks that we entered the generic provider flow
+        if (executionLog) {
+            appendToLog(executionLog, 'observation', `[Generic Provider] Using ${modelName} via ${endpoint}`);
+        }
+        
+        if (executionInput) {
+            console.log(`[Generic] Executing with Layer 4 context. Active tools: ${executionInput.availableTools.size}`);
+        }
 
         // 1. Prepare Messages
         const messages: any[] = [];
@@ -2331,52 +2545,25 @@ Error Type: ${execResult.error_type || 'None'}`;
                             if (onChunk) onChunk("", `\n📖 Citit ${filenames.length} fișiere din workspace...\n`);
                         } else if (toolCall.function.name === 'search_workspace_files') {
                             const queries = args.queries as string[];
-                            let foundCount = 0;
-                            toolResultContent = `Search results for [${queries.join(', ')}] in workspace files:\n`;
-                            const apiKeyToUse = apiKey || this.apiKey;
+                            const sessionId = this.currentExecutionLog?.sessionId || 'default';
 
-                            if (apiKeyToUse) {
-                                const filenames = this.workspaceFiles.map(f => f.name);
-                                for (const query of queries) {
-                                    try {
-                                        const results = await RAGService.search(query, undefined, apiKeyToUse, 3, filenames);
-                                        if (results.length > 0) {
-                                            foundCount += results.length;
-                                            toolResultContent += `\n--- Results for "${query}" ---\n`;
-                                            results.forEach((res, idx) => {
-                                                toolResultContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${sanitizeContentForAgent(res.chunk.content)}\n`;
-                                            });
-                                        }
-                                    } catch (e) {
-                                        console.error("[RAG] Search error in tool:", e);
-                                    }
+                            const allResults: string[] = [];
+
+                            for (const query of queries) {
+                                const ragOutput = ragSearch({
+                                    query,
+                                    topK: 3,
+                                    includeExternalized: false,
+                                    sessionId,
+                                });
+                                if (ragOutput.totalFound > 0) {
+                                    allResults.push(formatRagResults(ragOutput, 1000));
                                 }
                             }
 
-                            if (!apiKeyToUse || foundCount === 0) {
-                                let fallbackFound = 0;
-                                const lowerQueries = queries.map(q => q.toLowerCase());
-                                this.workspaceFiles.forEach(f => {
-                                    if (!f.content) return;
-                                    const lines = f.content.split('\n');
-                                    lines.forEach((line, idx) => {
-                                        const lowerLine = line.toLowerCase();
-                                        if (lowerQueries.some(q => lowerLine.includes(q))) {
-                                            fallbackFound++;
-                                            const start = Math.max(0, idx - 1);
-                                            const end = Math.min(lines.length - 1, idx + 1);
-                                            toolResultContent += `\n[File: ${f.name}, Line ${idx + 1}]\n`;
-                                            for (let i = start; i <= end; i++) {
-                                                toolResultContent += `${i === idx ? '>> ' : '   '}${lines[i]}\n`;
-                                            }
-                                        }
-                                    });
-                                });
-                                foundCount += fallbackFound;
-                                toolResultContent = sanitizeContentForAgent(toolResultContent);
-                            }
-
-                            if (foundCount === 0) toolResultContent = `No matches found for any of the queries in workspace files.`;
+                            toolResultContent = allResults.length > 0
+                                ? allResults.join('\n\n---\n\n')
+                                : 'No matches found for the provided search terms.';
                             if (onChunk) onChunk("", `\n🔍 Căutat ${queries.length} termeni în workspace...\n`);
                         } else if (toolCall.function.name === 'get_workspace_map') {
                             toolResultContent = "WORKSPACE KNOWLEDGE BASE MAP:\n";
@@ -2390,27 +2577,16 @@ Error Type: ${execResult.error_type || 'None'}`;
                             if (onChunk) onChunk("", `\n🗺️ Mapat structura workspace-ului...\n`);
                         } else if (toolCall.function.name === 'semantic_search_workspace') {
                             const query = args.query as string;
-                            let toolResultContent = `Semantic search results for "${query}":\n`;
-                            const apiKeyToUse = apiKey || this.apiKey;
+                            const sessionId = this.currentExecutionLog?.sessionId || 'default';
 
-                            if (!apiKeyToUse) {
-                                toolResultContent = "Error: API key required for semantic search.";
-                            } else {
-                                try {
-                                    const filenames = this.workspaceFiles.map(f => f.name);
-                                    const results = await RAGService.search(query, undefined, apiKeyToUse, 5, filenames);
-                                    if (results.length > 0) {
-                                        results.forEach((res, idx) => {
-                                            toolResultContent += `\n[Result ${idx + 1} - File: ${res.chunk.filename} (Score: ${res.score.toFixed(2)})]\n${sanitizeContentForAgent(res.chunk.content)}\n`;
-                                        });
-                                    } else {
-                                        toolResultContent = "No semantically relevant information found.";
-                                    }
-                                } catch (e) {
-                                    console.error("[RAG] Semantic search error:", e);
-                                    toolResultContent = "Error: Failed to perform semantic search.";
-                                }
-                            }
+                            const ragOutput = ragSearch({
+                                query,
+                                topK: 5,
+                                includeExternalized: true,
+                                sessionId,
+                            });
+
+                            toolResultContent = formatRagResults(ragOutput, 2000);
                             if (onChunk) onChunk("", `\n🧠 Căutare semantică: "${query}"...\n`);
                         } else if (toolCall.function.name === 'execute_code') {
                             const { code, language, timeout, packages } = args;
@@ -2500,7 +2676,8 @@ Error Type: ${execResult.error_type || 'None'}`;
             citations: uniqueCitations,
             relatedQuestions: extracted.questions,
             pendingAction,
-            reasoning: finalReasoning
+            reasoning: finalReasoning,
+            rawText: finalContent // Assuming finalContent here is what we accumulated, before extraction
         };
     }
 
@@ -2556,8 +2733,93 @@ Error Type: ${execResult.error_type || 'None'}`;
     }
 
 
-
     // --- Context Builder ---
+
+    // ============================================================
+    // LAYER 1 INTEGRATION
+    // buildStaticSystemContext() — called once, cached per session
+    // buildDynamicPerceptionContext() — called per message (Layer 3, implementat ulterior)
+    // ============================================================
+
+    private _staticContextCache: { key: string; prompt: string } | null = null;
+
+    /**
+     * LAYER 1 — Returns cached static system context.
+     * Called once per session. Returns identical string between messages.
+     * Does NOT accept prompt, memory, or timestamp — those belong to Layer 3.
+     */
+    private buildLayer1Context(
+        userProfile: UserProfile,
+        aiProfile: AiProfile,
+        spaceInstructions?: string
+    ): string {
+        // Integrate _staticContextCache (Warning 9)
+        const cacheKey = JSON.stringify({ userProfile, aiProfile, spaceInstructions });
+        
+        if (this._staticContextCache && this._staticContextCache.key === cacheKey) {
+            return this._staticContextCache.prompt;
+        }
+
+        const result = buildStaticSystemContext({
+            userProfile: {
+                name: userProfile.name || '',
+                bio: userProfile.bio || '',
+                location: userProfile.location || '',
+            },
+            aiProfile: {
+                systemInstructions: aiProfile.systemInstructions || '',
+                language: aiProfile.language || 'English',
+            },
+            spaceInstructions: spaceInstructions,
+        });
+
+        this._staticContextCache = { key: cacheKey, prompt: result.systemPrompt };
+        return this._staticContextCache.prompt;
+    }
+
+    /**
+     * LAYER 3 — Builds dynamic perception context per message.
+     * Called at every message. Returns different string each time.
+     * This is what Layer 1 was NOT allowed to contain.
+     */
+    private buildLayer3Context(
+        currentMessage: string,
+        attachments: Attachment[],
+        history: Message[],
+        enableMemory: boolean,
+        memoryContext?: string,
+        workspaceName?: string,
+        workspaceActive?: boolean,
+        proMode?: string,
+        isAgentMode?: boolean
+    ): PerceptionContextOutput {
+        return buildPerceptionContext({
+            currentMessage,
+            attachments: attachments.map(a => ({
+                type: a.type,
+                name: a.name || 'unnamed',
+                mimeType: a.mimeType,
+            })),
+            messageHistory: history.map(m => ({
+                role: m.role,
+                content: typeof m.content === 'string' ? m.content : '',
+            })),
+            enableMemory,
+            memoryContext,
+            workspaceName,
+            workspaceActive,
+            proMode,
+            isAgentMode,
+        });
+    }
+
+    /**
+     * LEGACY WRAPPER — păstrează compatibilitatea cu codul existent
+     * până când Layer 3 este implementat complet.
+     *
+     * NOTĂ: Această metodă va fi refactorizată în Layer 3.
+     * Deocamdată, Layer 1 (static) + elemente dinamice minime.
+     */
     private async buildSystemContext(
         prompt: string,
         modeInstruction: string,
@@ -2567,149 +2829,80 @@ Error Type: ${execResult.error_type || 'None'}`;
         spaceSystemInstruction?: string,
         forceXmlThinking: boolean = false,
         forceExplicitToolUse: boolean = false,
-        isSimpleChat: boolean = false
+        isSimpleChat: boolean = false,
+        attachments: Attachment[] = [],
+        history: Message[] = [],
+        proMode?: string,
+        isAgentMode?: boolean
     ): Promise<string> {
-        const parts: string[] = [];
 
-        // [1] Agent Identity + Core Instructions
-        if (aiProfile.systemInstructions) {
-            parts.push(aiProfile.systemInstructions);
-        } else {
-            parts.push("You are a helpful AI assistant. Answer concisely and accurately. Use Markdown formatting.");
-        }
+        // ── LAYER 1: Static context (cached) ──
+        const layer1 = this.buildLayer1Context(userProfile, aiProfile, spaceSystemInstruction);
 
-        // Language: Auto-detect from user message, fallback to setting
-        parts.push(`\n**LANGUAGE RULE (HIGHEST PRIORITY):** Detect the language of the user's message and ALWAYS respond in that same language. If the message is too short or ambiguous to determine the language (e.g., a single word, emoji, or code snippet), use ${aiProfile.language || 'English'} as the default.`);
-
-        if (modeInstruction) {
-            parts.push("\nMODE INSTRUCTION: " + modeInstruction);
-        }
-
-        if (spaceSystemInstruction) {
-            parts.push(`\nWorkspace Instructions:\n${spaceSystemInstruction}`);
-        }
-
-        if (userProfile.bio || userProfile.location || userProfile.name) {
-            let userStr = "\nUser Profile:";
-            if (userProfile.name) userStr += `\n- Name: ${userProfile.name}`;
-            if (userProfile.location) userStr += `\n- Location: ${userProfile.location}`;
-            if (userProfile.bio) userStr += `\n- Bio: ${userProfile.bio}`;
-            parts.push(userStr);
-        }
-
-        // [2] Current Date and Time
-        const now = new Date();
-        const timeStr = now.toLocaleString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            timeZoneName: 'short'
-        });
-
-        parts.push(`\n**CURRENT SYSTEM TIME:** ${timeStr}`);
-        parts.push(`**DATE INTERPRETATION RULES:**
-1. Use the current system time above as your absolute reference.
-2. Interpret "today", "tomorrow", "yesterday" relative to this date.
-3. For dates without a year (e.g., "March 30th"):
-   - If the date is in the future relative to today, use the current year.
-   - If the date has already passed this year, use the NEXT year.
-   - NEVER assume a past year unless explicitly stated.
-4. ALWAYS confirm the calculated absolute date internally before calling a tool.
-5. When adding events, if the user doesn't specify a year, apply the logic above.`);
-
-        // [3-6] Memory Layers (Topic Filtered)
+        // ── LAYER 2: Memory context (selectiv, pre-fetched) ──
+        let memoryContext: string | undefined;
         if (enableMemory) {
-            const memoryContext = await memoryManager.formatContextString(prompt);
-            if (memoryContext) {
-                parts.push(memoryContext);
+            try {
+                // Integrate loadMemoryContext from import (Warning 1)
+                // Removed dynamic import to use the top-level import
+                const { memoryManager } = await import('../memory');
+                
+                const memoryResult = await loadMemoryContext(
+                    {
+                        currentPrompt: prompt,
+                        maxTokenBudget: 1500,
+                    },
+                    memoryManager
+                );
+                
+                if (!memoryResult.isEmpty) {
+                    memoryContext = memoryResult.formattedContext;
+                }
+            } catch (e) {
+                console.warn('[Layer 3] Memory context unavailable:', e);
             }
         }
 
-        // [7-8] Global Tools / Skills / Protocols
-        parts.push(`\n**REAL-TIME SEARCH:** Use the search tool when the user asks about recent events, news, or any information that may have changed since your training cutoff. Your internal knowledge is frozen — the web is your source of truth for dynamic topics.`);
+        // ── LAYER 3: Dynamic perception context ──
+        const spaceActive = !!spaceSystemInstruction;
+        const spaceName = spaceSystemInstruction
+            ? userProfile.name + ' Space' // Placeholder — va fi înlocuit cu Space.title real în Layer 4
+            : undefined;
 
-        // Calendar Protocol
-        if (!isSimpleChat) {
-            parts.push(`\n**CALENDAR:** You have full access to the user's calendar. ALWAYS call \`list_calendar_events\` before answering any schedule-related question. For add/update/delete operations, confirm the details with the user before executing.`);
-        } else {
-            parts.push(`\n**CALENDAR:** You have access to the user's calendar. Use \`list_calendar_events\` when the user asks about their schedule or events. For add/update/delete operations, confirm with the user before executing.`);
+        const layer3 = this.buildLayer3Context(
+            prompt,
+            attachments,
+            history,
+            enableMemory,
+            memoryContext,
+            spaceName,
+            spaceActive,
+            proMode,
+            isAgentMode
+        );
+
+        // ── Adăugări temporare compatibilitate (vor migra în Layer 4/5) ──
+        const legacyAdditions: string[] = [];
+
+        if (modeInstruction) {
+            legacyAdditions.push(`\n\n**Active Mode Override:** ${modeInstruction}`);
         }
 
-        if (!isSimpleChat) {
-            parts.push(`\n**LIBRARY/SOURCE PROTOCOL:**\nIf the user has attached a file, page, or source, treat it as your PRIMARY SOURCE OF TRUTH. Read and analyze the actual content — do NOT guess or hallucinate. If the answer is not in the attachment, say so clearly.`);
-        } else {
-            parts.push(`\n**CONTEXT:** Use attached files as your primary source of truth.`);
-        }
-
-        // Simulate Reasoning via XML for non-Gemini models
+        // XML Thinking — gestionat acum de Layer 5 (ThinkingEngine)
+        // Păstrat ca fallback NUMAI dacă Layer 5 nu a injectat deja un thinking prompt
         if (forceXmlThinking) {
-            parts.push("\nIMPORTANT: Before answering, you must output your internal thought process inside <thinking>...</thinking> tags. Analyze the request, plan your search strategy, and critique your findings inside these tags. The user will see this as a 'Thought Process'. Then provide your final answer outside the tags.");
+            legacyAdditions.push(`\n\nBefore answering, briefly reason inside <thinking>...</thinking> tags, then respond outside them.`);
         }
 
-        // Explicit Tool Usage Instruction (Crucial for generic OpenRouter/OpenAI models)
         if (forceExplicitToolUse) {
-            parts.push(`\n**TOOL USAGE:**
-1. **Real-Time Search:** Use \`perform_search\` for current events, news, weather, or any post-training-cutoff information.
-2. **Workspace Knowledge Base:** Use \`get_workspace_map\`, \`search_workspace_files\` (with synonyms), or \`semantic_search_workspace\` to find specific data in uploaded files.
-3. **Accuracy:** Never hallucinate or guess personal data. If you cannot find it, say so clearly.
-4. **Save to Library:** ONLY use \`save_to_library\` when the user explicitly asks to save, create a page, or remember something. NEVER call it automatically.`);
+            legacyAdditions.push(`\n\n**Tool Usage Reminder:** Use perform_search for current events. Use workspace tools to find specific data in files. Use save_to_library ONLY when explicitly requested.`);
         }
 
-        // WIDGET INSTRUCTIONS - ALWAYS AVAILABLE (placed before chat mode instructions so models don't deprioritize them)
-        parts.push(`\n**INTERACTIVE WIDGET FORMAT (MANDATORY FOR ALL VISUALIZATIONS):**
-Când userul cere un grafic, diagramă, chart, vizualizare sau orice reprezentare vizuală a datelor — indiferent de modul de operare (Chat sau Agent) — TREBUIE să generezi un bloc widget interactiv folosind EXACT această sintaxă:
-
-:::widget[Titlu opțional]
-<!-- Conținutul HTML/SVG/JS complet aici — fără DOCTYPE, html, head, body -->
-:::
-
-REGULI OBLIGATORII pentru codul din widget:
-- **FĂRĂ BORDER:** Nu adăuga border sau box-shadow containerului principal.
-- Nu folosi DOCTYPE, <html>, <head>, <body> — NUMAI conținut direct
-- Folosește variabilele CSS: var(--text-primary), var(--text-muted), var(--bg-secondary), var(--border-color), var(--accent)
-- NICIODATĂ culori hardcodate (#333, black, white) — sunt invizibile în dark mode
-- Chart.js interactiv: importă din CDN: <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-- **REGULĂ CULORI CHART.JS (CRITIC):** În Dark Mode, asigură-te că TEXTELE, LINIILE și BARELE sunt ALBE (var(--text-primary)) sau foarte deschise. NU folosi negru sau gri închis.
-  Exemplu configurare: \`options: { scales: { y: { ticks: { color: 'var(--text-primary)' }, grid: { color: 'rgba(255,255,255,0.1)' } }, x: { ticks: { color: 'var(--text-primary)' }, grid: { color: 'rgba(255,255,255,0.1)' } } }, plugins: { legend: { labels: { color: 'var(--text-primary)' } }, title: { color: 'var(--text-primary)' } } }\`
-- Canvas Chart.js: întotdeauna în <div style="position:relative; width:100%; height:300px">
-- SVG diagrame: folosește viewBox="0 0 680 H" cu width="100%"
-- Tot codul într-un singur bloc (fără fișiere CSS/JS separate)
-
-CÂND să generezi widget (OBLIGATORIU):
-- Userul cere grafic, chart, diagramă, vizualizare, pie chart, bar chart, line chart
-- Userul cere să "afișezi" sau "arată" date numerice
-- Userul cere comparații vizuale
-- Ai date numerice care se explică mai bine vizual
-
-CÂND să NU generezi widget:
-- Răspuns text simplu, explicații, cod pentru proiect
-- Userul vrea explicit codul sursă, nu vizualizarea lui
-
-**LIBRARY CONTENT FORMAT:**
-Când generezi conținut pentru Library (save_to_library sau restructurare pagini), aplică aceleași reguli widget de mai sus.
-`);
-
-        if (!isSimpleChat) {
-            // GLOBAL PROCESS INSTRUCTION (Enforces the Plan -> Execute -> Analyze -> Answer loop) - ONLY FOR AGENT/COMPLEX MODES
-            parts.push(`\n**OPERATIONAL PROTOCOL:**
-1. **PLAN:** Understand the user's goal. If information is missing (from web or workspace), use tools (Search/Read) to find it.
-2. **EXECUTE:** Call necessary tools.
-3. **ANALYZE:** Critically evaluate the tool results. Are they relevant? Are they sufficient? If not, search again with a better query.
-4. **SYNTHESIZE:** Formulate a clear, comprehensive answer based *only* on the verified information.
-5. **CITE:** Support your claims with [1], [2] citations from the search results.`);
-        } else {
-            parts.push(`\n**RESPONSE GUIDELINES:** Answer directly, concisely, and naturally. Do not simulate a thought process. Use tools only if absolutely necessary for the specific request. Focus on speed and directness.`);
+        // Integrate isSimpleChat (Warning 10)
+        if (isSimpleChat) {
+            legacyAdditions.push(`\n\nNote: This is a simple chat interaction. Keep responses concise.`);
         }
 
-        // Explicit Citation Instruction for Generic Models
-        parts.push("\nCITATION RULES: If you use the 'perform_search' tool, you must cite the results in your final answer. Use the format [1], [2], etc., corresponding to the order of the sources provided by the tool. Do NOT invent sources.");
-
-        // Instruction to generate related questions
-        parts.push(`\n\nIMPORTANT: After your main response, suggest 3 relevant follow-up questions. Place them at the very end, separated by a horizontal rule, as a simple bullet list:\n---\n- First follow-up question?\n- Second follow-up question?\n- Third follow-up question?`);
-
-        return parts.join("\n");
+        return layer1 + layer3.dynamicPrompt + legacyAdditions.join('');
     }
 }

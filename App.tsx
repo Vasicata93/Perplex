@@ -33,6 +33,7 @@ import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 
 import { SpaceFilesModal } from './components/SpaceFilesModal';
+import { invalidateSystemContextCache } from './src/agent/SystemContext';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -213,6 +214,11 @@ function App() {
         setSettings(newSettings);
         db.set(STORES.SETTINGS, 'app_settings', newSettings);
         setSettingsOpen(false);
+
+        // Layer 1: Invalidează cache-ul System Context când profilul se schimbă
+        invalidateSystemContextCache();
+        console.log('[App] Settings saved. Layer 1 cache invalidated.');
+
         setBackupSettings(null);
     };
 
@@ -910,6 +916,7 @@ function App() {
 
     // --- CONFIRMATION ACTION HANDLERS ---
     const handleConfirmAction = (modifiedData?: any) => {
+        llmService.setToolState('idle');
         if (!pendingAction) return;
 
         const titleToUse = modifiedData?.title || pendingAction.data.title;
@@ -1082,6 +1089,7 @@ function App() {
     };
 
     const handleCancelAction = () => {
+        llmService.setToolState('idle');
         if (activeThreadId && pendingAction) {
             const cancelMsg: Message = {
                 id: generateId(),

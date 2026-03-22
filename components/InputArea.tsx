@@ -443,7 +443,8 @@ export const InputArea: React.FC<InputAreaProps> = ({
 
     // Mobile: Dark circle/pill matching the image (Dark Grey/Black background, Light icon)
     // Desktop: transparent background, muted text, hover to text-primary
-    const mobileButtonFixedBg = "bg-pplx-secondary text-pplx-text border border-pplx-border shadow-lg backdrop-blur-md hover:bg-pplx-hover transition-all sm:bg-transparent dark:sm:bg-transparent sm:text-pplx-muted dark:sm:text-pplx-muted sm:hover:text-pplx-text sm:scale-100 sm:border-none sm:shadow-none sm:hover:bg-transparent";
+    const isSidePanelDesktop = mobileSidePanel && !isMobile;
+    const mobileButtonFixedBg = `bg-pplx-secondary text-pplx-text border border-pplx-border shadow-lg backdrop-blur-md hover:bg-pplx-hover transition-all sm:bg-transparent dark:sm:bg-transparent sm:text-pplx-muted dark:sm:text-pplx-muted sm:hover:text-pplx-text sm:scale-100 sm:border-none sm:shadow-none sm:hover:bg-transparent ${isSidePanelDesktop ? 'md:bg-[#1d1f22] md:text-[#d1d5db] md:border md:border-white/10 md:hover:bg-[#27292d]' : ''}`;
 
     // -- Components --
     const Tooltip = ({ text }: { text: string }) => (
@@ -455,7 +456,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
 
     return (
         <div className={containerClass}>
-            <div className={`${boxClass} ${compact ? 'md:border-none md:shadow-none md:bg-transparent' : ''}`}>
+            <div className={`${boxClass} ${compact ? 'md:border-none md:shadow-none md:bg-transparent' : ''} ${isSidePanelDesktop ? 'md:bg-[#1b1c1e] md:border md:border-white/10 md:shadow-[0_0_0_1px_rgba(255,255,255,0.04)] md:rounded-[20px]' : ''}`}>
 
                 {/* Attachments Preview */}
                 {attachments.length > 0 && (

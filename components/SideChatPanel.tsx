@@ -4,7 +4,7 @@ import React from 'react';
 import { ChatInterface } from './ChatInterface';
 import { Message, FocusMode, Attachment, Note } from '../types';
 import { ThinkingEvent } from '../src/agent/types'; // Import
-import { X, Maximize2, Minimize2, Trash2 } from 'lucide-react';
+import { X, Maximize2, Minimize2, Pencil, ChevronDown } from 'lucide-react';
 
 interface SideChatPanelProps {
   isOpen: boolean;
@@ -50,22 +50,29 @@ export const SideChatPanel: React.FC<SideChatPanelProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className={`fixed z-40 flex flex-col bg-pplx-card border-l border-pplx-border shadow-2xl transition-all duration-300 ${mode === 'sidebar'
+    <div className={`fixed z-40 flex flex-col bg-pplx-card border-l border-pplx-border shadow-2xl transition-all duration-300 md:bg-[#151515] md:border-white/10 ${mode === 'sidebar'
         ? 'top-0 bottom-0 right-0 w-[400px]'
         : 'top-20 right-4 w-[400px] h-[600px] rounded-2xl border border-pplx-border/50'
       }`}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-pplx-border/50 shrink-0">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-sm">Page Chat</span>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-pplx-border/50 shrink-0 md:border-white/10">
+        <div className="flex items-center gap-2 min-w-0">
+          <button onClick={onNewChat} className="flex items-center gap-1.5 text-sm font-medium text-pplx-text/90 hover:text-pplx-text transition-colors">
+            <span>New AI chat</span>
+            <ChevronDown size={14} className="opacity-70" />
+          </button>
           {activeNote && <span className="text-xs text-pplx-muted truncate max-w-[150px]">({activeNote.title})</span>}
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={onNewChat} className="p-1.5 text-pplx-muted hover:text-pplx-text hover:bg-pplx-hover rounded" title="Clear Chat"><Trash2 size={14} /></button>
+          <button onClick={onNewChat} className="p-1.5 text-pplx-muted hover:text-pplx-text hover:bg-pplx-hover rounded" title="New Chat">
+            <Pencil size={14} />
+          </button>
           <button onClick={() => onModeChange(mode === 'sidebar' ? 'floating' : 'sidebar')} className="p-1.5 text-pplx-muted hover:text-pplx-text hover:bg-pplx-hover rounded">
             {mode === 'sidebar' ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
-          <button onClick={onClose} className="p-1.5 text-pplx-muted hover:text-pplx-text hover:bg-pplx-hover rounded"><X size={16} /></button>
+          <button onClick={onClose} className="p-1.5 text-pplx-muted hover:text-pplx-text hover:bg-pplx-hover rounded">
+            <X size={16} />
+          </button>
         </div>
       </div>
 

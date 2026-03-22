@@ -300,7 +300,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       {/* Input Area */}
-      <div className={`p-4 bg-pplx-card sticky bottom-0 z-30 border-t border-pplx-border/10 ${isSidePanel ? 'md:p-4 p-2' : ''}`}>
+      <div className={`p-4 bg-pplx-card sticky bottom-0 z-30 border-t border-pplx-border/10 ${isSidePanel ? 'md:p-4 p-2 md:bg-[#151515] md:border-white/10' : ''}`}>
         {/* Bottom Gradient Fade - Perfectly glued to input box */}
         <div className="absolute bottom-[calc(100%-16px)] left-0 right-0 h-12 bg-gradient-to-t from-pplx-card via-pplx-card/50 to-transparent z-10 pointer-events-none" />
         <InputArea
